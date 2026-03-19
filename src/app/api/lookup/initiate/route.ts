@@ -5,9 +5,22 @@ import { fetchPermits } from "@/lib/accela";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { config } from "@/lib/config";
 import { lookupInitiateSchema } from "@/lib/schemas";
+import { rateLimit } from "@/lib/ratelimit";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 requests per minute per IP
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    const allowed = rateLimit(clientIp, 5, 60_000);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again shortly." },
+        { status: 429 }
+      );
+    }
+
     const raw = await request.json();
     const parsed = lookupInitiateSchema.safeParse(raw);
 
