@@ -1,7 +1,10 @@
 /**
- * Validate required environment variables at startup.
- * Import this in the root layout so the app crashes loudly
- * on missing config rather than failing silently at runtime.
+ * Validate required environment variables at runtime.
+ * Exports a function that should be called from API routes and
+ * server components to ensure all required env vars are present.
+ *
+ * We use a lazy check rather than a top-level throw so the build
+ * succeeds without env vars (they're only needed at runtime).
  */
 
 const required = [
@@ -13,10 +16,18 @@ const required = [
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
 ];
 
-const missing = required.filter((key) => !process.env[key]);
+let validated = false;
 
-if (missing.length > 0) {
-  throw new Error(
-    `Missing required environment variable(s): ${missing.join(", ")}`
-  );
+export function validateEnv(): void {
+  if (validated) return;
+
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variable(s): ${missing.join(", ")}`
+    );
+  }
+
+  validated = true;
 }

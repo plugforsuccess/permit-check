@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
 import { generateReportHtml } from "@/lib/pdf";
-import Stripe from "stripe";
-
-const stripe = new Stripe(config.stripe.secretKey);
+import { getStripe } from "@/lib/stripe";
+import type Stripe from "stripe";
 
 /**
  * POST /api/webhooks/stripe
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       sig,
       config.stripe.webhookSecret
