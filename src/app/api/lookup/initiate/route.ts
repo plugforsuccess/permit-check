@@ -4,14 +4,23 @@ import { createCheckoutSession } from "@/lib/stripe";
 import { fetchPermits } from "@/lib/accela";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { config } from "@/lib/config";
-import type { LookupInitiateRequest } from "@/types";
+import { lookupInitiateSchema } from "@/lib/schemas";
 
 export async function POST(request: NextRequest) {
   try {
-    const body: LookupInitiateRequest = await request.json();
-    const { address, report_type = "standard" } = body;
+    const raw = await request.json();
+    const parsed = lookupInitiateSchema.safeParse(raw);
 
-    // Validate address
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
+
+    const { address, report_type } = parsed.data;
+
+    // Validate address format
     const validation = validateAddress(address);
     if (!validation.valid) {
       return NextResponse.json(

@@ -1,0 +1,24 @@
+import { z } from "zod";
+
+export const addressSchema = z.object({
+  streetNumber: z
+    .string()
+    .min(1)
+    .max(10)
+    .regex(/^\d+[A-Za-z]?$/),
+  streetName: z
+    .string()
+    .min(2)
+    .max(100)
+    .regex(/^[a-zA-Z0-9\s.\-]+$/),
+});
+
+export const lookupInitiateSchema = z.object({
+  address: z.string().min(5).max(150).trim(),
+  report_type: z.enum(["standard", "attorney"]).default("standard"),
+});
+
+export const registerSchema = z.object({
+  email: z.string().email().max(255),
+  password: z.string().min(8).max(128),
+});

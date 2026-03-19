@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
+import { registerSchema } from "@/lib/schemas";
 
 /**
  * POST /api/auth/register
@@ -7,21 +8,17 @@ import { createServerClient } from "@/lib/supabase";
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const raw = await request.json();
+    const parsed = registerSchema.safeParse(raw);
 
-    if (!email || !password) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
 
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 }
-      );
-    }
+    const { email, password } = parsed.data;
 
     const supabase = createServerClient();
 
