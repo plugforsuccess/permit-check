@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
       permit_count: permitResult.total_count,
       payment_url: session.url,
       client_secret: session.id,
+      ...(permitResult.warning ? { warning: permitResult.warning } : {}),
     });
   } catch (error) {
     console.error("Lookup initiation error:", error);
