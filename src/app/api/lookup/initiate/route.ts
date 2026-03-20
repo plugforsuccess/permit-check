@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
         total_count: cachedLookup.permit_count || 0,
         source: "cache",
         cached: true,
+        jurisdiction_id: jurisdictionId,
       });
     }
 
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
       total_count: permits.length,
       source: "accela_scraper",
       cached: false,
+      jurisdiction_id: jurisdictionId,
       ...(warning ? { warning } : {}),
     });
   } catch (error) {
