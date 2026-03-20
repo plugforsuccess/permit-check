@@ -1,8 +1,7 @@
 -- PermitCheck MVP Database Schema
 -- City of Atlanta Permit Verification Platform
 
--- Enable UUID generation
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- gen_random_uuid() is built into Postgres 13+ (no extension needed)
 
 -- Users table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.users (
@@ -16,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 -- Lookups table
 CREATE TABLE IF NOT EXISTS public.lookups (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   address_raw TEXT NOT NULL,
   address_normalized TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -29,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.lookups (
 
 -- Permits table
 CREATE TABLE IF NOT EXISTS public.permits (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lookup_id UUID NOT NULL REFERENCES public.lookups(id) ON DELETE CASCADE,
   record_number TEXT NOT NULL,
   type TEXT NOT NULL,
@@ -43,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.permits (
 
 -- Reports table
 CREATE TABLE IF NOT EXISTS public.reports (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lookup_id UUID NOT NULL REFERENCES public.lookups(id) ON DELETE CASCADE,
   pdf_url TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
