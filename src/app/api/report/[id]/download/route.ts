@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { generateReportHtml } from "@/lib/pdf";
 
+export const maxDuration = 30; // seconds — requires Vercel Pro
+
 /**
  * GET /api/report/:id/download?token=...
  * Returns the generated PDF report as HTML (print-to-PDF).

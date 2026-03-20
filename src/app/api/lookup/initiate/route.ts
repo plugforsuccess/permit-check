@@ -6,6 +6,8 @@ import { normalizeAddress, validateAddress } from "@/lib/address";
 import { lookupInitiateSchema } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
 
+export const maxDuration = 60; // seconds — requires Vercel Pro
+
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(request: NextRequest) {
@@ -33,6 +35,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { address } = parsed.data;
+
+    // Resolve user from auth token (optional — anonymous lookups allowed)
+    let userId: string | null = null;
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const supabaseAuth = createServerClient();
+      const { data: { user } } = await supabaseAuth.auth.getUser(token);
+      if (user) userId = user.id;
+    }
 
     // Validate address format
     const validation = validateAddress(address);
@@ -106,6 +118,7 @@ export async function POST(request: NextRequest) {
         address_normalized: addressNormalized,
         permit_count: permits.length,
         report_type: parsed.data.report_type,
+        user_id: userId,
       })
       .select()
       .single();

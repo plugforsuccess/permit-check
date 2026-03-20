@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AddressSearch from "@/components/AddressSearch";
 import Disclaimer from "@/components/Disclaimer";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
   const router = useRouter();
@@ -14,9 +15,15 @@ export default function HomePage() {
     setError(null);
     setIsLoading(true);
     try {
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
       const response = await fetch("/api/lookup/initiate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ address, report_type: reportType }),
       });
 
@@ -87,6 +94,43 @@ export default function HomePage() {
             For $9.99, you get the full permit history for any Atlanta property
             — searchable in seconds, not days.
           </p>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="py-16">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-10">Pricing</h2>
+          <div className="grid sm:grid-cols-2 gap-6">
+            {/* Standard */}
+            <div className="border-2 border-gray-200 rounded-2xl p-8 text-left">
+              <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
+              <div className="text-sm text-gray-500 mb-6">one-time · instant access</div>
+              <ul className="space-y-3 text-sm text-gray-700">
+                <li>✓ Full permit history for one address</li>
+                <li>✓ All permit types — building, electrical, plumbing, HVAC</li>
+                <li>✓ Filed date, issued date, status, contractor</li>
+                <li>✓ Downloadable PDF report</li>
+                <li>✓ Data sourced directly from City of Atlanta Accela</li>
+              </ul>
+            </div>
+
+            {/* Attorney */}
+            <div className="border-2 border-blue-600 rounded-2xl p-8 text-left relative">
+              <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-full">
+                For legal use
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">$199</div>
+              <div className="text-sm text-gray-500 mb-6">one-time · litigation-grade</div>
+              <ul className="space-y-3 text-sm text-gray-700">
+                <li>✓ Everything in Standard</li>
+                <li>✓ Formal cover page with chain of custody</li>
+                <li>✓ Report ID for evidentiary use</li>
+                <li>✓ Suitable for real estate litigation and due diligence</li>
+                <li>✓ Matter reference field available</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
 

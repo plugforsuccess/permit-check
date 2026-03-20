@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /results/
+Disallow: /api/
+
+Sitemap: https://permitcheck.com/sitemap.xml

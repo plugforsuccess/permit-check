@@ -53,7 +53,9 @@ export async function POST(req: Request) {
       .from("lookups")
       .update({
         payment_status: "paid",
-        payment_id: session.payment_intent as string,
+        payment_id: typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : null,
         paid_at: new Date().toISOString(),
       })
       .eq("id", lookupId);
