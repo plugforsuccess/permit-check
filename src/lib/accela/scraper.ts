@@ -227,28 +227,29 @@ export async function scrapeAccelaPermits(
       );
       allPermits.push(...pagePermits);
 
-      // Find Next link by text content — works for both standard and postback pagination
-      const nextLink = await page.evaluate(() => {
-        const links = Array.from(document.querySelectorAll("a"));
-        const next = links.find(
-          (a) =>
-            a.innerText.trim() === "Next >" ||
-            a.innerText.trim() === "Next" ||
-            a.className.includes("PagerNextStyle")
-        );
-        return next ? true : false;
-      });
+      // Try standard pagination link first, then postback text link
+      let hasNextPage = false;
 
-      if (!nextLink) break;
+      const standardNext = await page.$("a.aca_pagination_PagerNextStyle");
+      if (standardNext) {
+        await standardNext.click();
+        hasNextPage = true;
+      } else {
+        // Try postback-style text link (Gwinnett and others)
+        const textNext = await page.getByText("Next >", { exact: true }).first();
+        const isVisible = await textNext.isVisible().catch(() => false);
+        if (isVisible) {
+          await textNext.click();
+          hasNextPage = true;
+        }
+      }
 
-      // Click by text — Playwright handles the postback correctly
-      await page.getByText("Next >", { exact: true }).first().click();
+      if (!hasNextPage) break;
 
       try {
-        // Wait for the results table to reload after postback
         await page.waitForLoadState("networkidle", { timeout: SELECTOR_TIMEOUT });
         await page.waitForSelector(SELECTORS.resultsTable, { timeout: SELECTOR_TIMEOUT });
-        await page.waitForTimeout(500); // extra buffer for postback DOM update
+        await page.waitForTimeout(500);
       } catch {
         break;
       }
