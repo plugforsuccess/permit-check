@@ -58,7 +58,7 @@ export default function AddressAutocomplete({
           types: ["address"],
           locationBias: {
             center: { lat: 33.749, lng: -84.388 },
-            radius: 80000,
+            radius: 50000,
           },
         });
 
