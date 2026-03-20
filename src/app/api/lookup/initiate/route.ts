@@ -61,11 +61,18 @@ export async function POST(request: NextRequest) {
     // 2. Normalize address
     const addressNormalized = normalizeAddress(address);
 
-    // Split the canonical normalized form for the scraper
-    // normalizeAddress already strips city/state/unit — safe to split directly
-    const parts = addressNormalized.split(/\s+/);
-    const streetNumber = parts[0];
-    const streetName = parts.slice(1).join(" ");
+    // Use structured components from Google Places when available
+    let streetNumber: string;
+    let streetName: string;
+
+    if (parsed.data.address_components) {
+      streetNumber = parsed.data.address_components.streetNumber;
+      streetName = parsed.data.address_components.streetName;
+    } else {
+      const parts = addressNormalized.split(/\s+/);
+      streetNumber = parts[0];
+      streetName = parts.slice(1).join(" ");
+    }
 
     // Detect jurisdiction from the full address (before normalization strips zip)
     const jurisdictionId = detectJurisdiction(address);

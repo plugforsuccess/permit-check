@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AddressSearch from "@/components/AddressSearch";
+import AddressAutocomplete, {
+  type StructuredAddress,
+} from "@/components/AddressAutocomplete";
 import Disclaimer from "@/components/Disclaimer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -11,7 +13,10 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (address: string, reportType: "standard" | "attorney") => {
+  const handleSubmit = async (
+    address: StructuredAddress,
+    reportType: "standard" | "attorney"
+  ) => {
     setError(null);
     setIsLoading(true);
     try {
@@ -24,7 +29,17 @@ export default function HomePage() {
           "Content-Type": "application/json",
           ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
-        body: JSON.stringify({ address, report_type: reportType }),
+        body: JSON.stringify({
+          address: address.raw,
+          report_type: reportType,
+          address_components: {
+            streetNumber: address.streetNumber,
+            streetName: address.streetName,
+            city: address.city,
+            state: address.state,
+            zip: address.zip,
+          },
+        }),
       });
 
       const data = await response.json();
@@ -58,17 +73,13 @@ export default function HomePage() {
             Instantly check the complete permit history for any Atlanta metro property.
           </p>
 
-          <AddressSearch onSearch={handleSubmit} isLoading={isLoading} />
+          <AddressAutocomplete onSelect={handleSubmit} isLoading={isLoading} />
 
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm max-w-2xl mx-auto">
               {error}
             </div>
           )}
-
-          <p className="mt-6 text-sm text-gray-400">
-            Searching official Accela permit databases across the Atlanta metro
-          </p>
         </div>
       </section>
 

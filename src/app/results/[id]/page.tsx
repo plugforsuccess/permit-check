@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
+import PropertyStreetView from "@/components/PropertyStreetView";
 import Disclaimer from "@/components/Disclaimer";
 import type { Permit } from "@/types";
 
@@ -245,6 +246,11 @@ export default function ResultsPage() {
             </p>
           </div>
         )}
+
+        {/* Street View */}
+        <div className="mb-6 street-view-wrapper">
+          <PropertyStreetView address={result.address} />
+        </div>
 
         {/* Address Header */}
         <div className="mb-8">
