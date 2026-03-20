@@ -38,7 +38,7 @@ async function launchBrowser(): Promise<Browser> {
   const browser = await playwrightChromium.launch({
     args: chromium.args,
     executablePath,
-    headless: chromium.headless,
+    headless: true,
   });
   return browser;
 }
