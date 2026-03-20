@@ -62,6 +62,8 @@ export default function AddressAutocomplete({
           },
         });
 
+        console.log("[autocomplete] element created", placeAutocomplete);
+
         // Match the existing input styling
         placeAutocomplete.style.width = "100%";
         placeAutocomplete.setAttribute(
@@ -71,6 +73,22 @@ export default function AddressAutocomplete({
 
         containerRef.current?.appendChild(placeAutocomplete);
         elementRef.current = placeAutocomplete;
+
+        console.log("[autocomplete] element appended, adding listeners...");
+
+        // Try both event names — the API docs have inconsistent naming
+        placeAutocomplete.addEventListener("gmp-placeselect", (event: Event) => {
+          console.log("[autocomplete] gmp-placeselect fired");
+        });
+
+        placeAutocomplete.addEventListener("gmp-select", (event: Event) => {
+          console.log("[autocomplete] gmp-select fired");
+        });
+
+        // Also listen on the container as a fallback
+        containerRef.current?.addEventListener("gmp-placeselect", (event: Event) => {
+          console.log("[autocomplete] container gmp-placeselect fired");
+        });
 
         placeAutocomplete.addEventListener("gmp-placeselect", async (event: Event) => {
           // @ts-expect-error
