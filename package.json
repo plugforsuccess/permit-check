@@ -12,6 +12,8 @@
     "@react-pdf/renderer": "^4.3.2",
     "@sparticuz/chromium": "^131.0.0",
     "@supabase/supabase-js": "^2.99.3",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.37.0",
     "cheerio": "^1.2.0",
     "date-fns": "^4.1.0",
     "lru-cache": "^11.2.7",

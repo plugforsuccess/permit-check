@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getSupabaseClient } from "@/lib/supabase/client";
 import Disclaimer from "@/components/Disclaimer";
 
 interface LookupHistory {
@@ -32,26 +33,24 @@ export default function DashboardPage() {
     setAuthError(null);
 
     try {
-      if (authMode === "register") {
-        const response = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
+      const supabase = getSupabaseClient();
 
-        const data = await response.json();
-        if (!response.ok) {
-          setAuthError(data.error);
+      if (authMode === "register") {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          setAuthError(error.message);
           return;
         }
       }
 
-      // For MVP, store token in sessionStorage
-      // In production, use Supabase Auth session management
-      const token = btoa(`${email}:${password}`);
-      sessionStorage.setItem("auth_token", token);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+
       setIsAuthenticated(true);
-      fetchHistory(token);
+      fetchHistory(data.session.access_token);
     } catch {
       setAuthError("Authentication failed. Please try again.");
     }
@@ -77,13 +76,15 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    const token = sessionStorage.getItem("auth_token");
-    if (token) {
-      setIsAuthenticated(true);
-      fetchHistory(token);
-    } else {
-      setLoading(false);
-    }
+    const supabase = getSupabaseClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsAuthenticated(true);
+        fetchHistory(session.access_token);
+      } else {
+        setLoading(false);
+      }
+    });
   }, []);
 
   if (!isAuthenticated) {
@@ -184,8 +185,9 @@ export default function DashboardPage() {
             Your Lookup History
           </h1>
           <button
-            onClick={() => {
-              sessionStorage.removeItem("auth_token");
+            onClick={async () => {
+              const supabase = getSupabaseClient();
+              await supabase.auth.signOut();
               setIsAuthenticated(false);
               setLookups([]);
             }}
