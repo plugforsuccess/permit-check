@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { generateReportHtml } from "@/lib/pdf";
+import { generatePdfFromHtml } from "@/lib/pdf-generator";
 
-export const maxDuration = 30; // seconds — requires Vercel Pro
+export const maxDuration = 60; // seconds — attorney PDF generation needs more time
 
 /**
  * GET /api/report/:id/download?token=...
@@ -90,7 +91,26 @@ export async function GET(
     lookupId: lookup.id,
     permits,
     reportType: lookup.report_type || "standard",
+    matterReference: report.matter_reference ?? undefined,
   });
+
+  // Standard: return HTML with auto-print for browser print-to-PDF
+  if (lookup.report_type !== "attorney") {
+    const finalHtml = reportHtml.replace(
+      "</body>",
+      `<script>window.onload = function() { window.print(); }</script></body>`
+    );
+
+    return new NextResponse(finalHtml, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `inline; filename="permitcheck-${lookupId}.html"`,
+      },
+    });
+  }
+
+  // Attorney: generate real PDF binary via Puppeteer
+  const pdfBuffer = await generatePdfFromHtml(reportHtml);
 
   // Update download timestamp
   await supabase
@@ -98,12 +118,11 @@ export async function GET(
     .update({ downloaded_at: new Date().toISOString() })
     .eq("id", report.id);
 
-  // Return as HTML (client can use window.print() for PDF)
-  // In production, pipe through Puppeteer for PDF binary
-  return new NextResponse(reportHtml, {
+  return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Disposition": `inline; filename="permitcheck-${lookupId}.html"`,
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="permitcheck-attorney-report-${lookupId}.pdf"`,
+      "Cache-Control": "private, no-store",
     },
   });
 }
