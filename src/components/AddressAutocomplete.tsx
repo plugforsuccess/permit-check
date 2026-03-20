@@ -76,26 +76,16 @@ export default function AddressAutocomplete({
 
         console.log("[autocomplete] element appended, adding listeners...");
 
-        // Try both event names — the API docs have inconsistent naming
-        placeAutocomplete.addEventListener("gmp-placeselect", (event: Event) => {
-          console.log("[autocomplete] gmp-placeselect fired");
-        });
-
-        placeAutocomplete.addEventListener("gmp-select", (event: Event) => {
-          console.log("[autocomplete] gmp-select fired");
-        });
-
-        // Also listen on the container as a fallback
-        containerRef.current?.addEventListener("gmp-placeselect", (event: Event) => {
-          console.log("[autocomplete] container gmp-placeselect fired");
-        });
-
-        placeAutocomplete.addEventListener("gmp-placeselect", async (event: Event) => {
+        placeAutocomplete.addEventListener("gmp-select", async (event: Event) => {
+          console.log("[autocomplete] gmp-select fired", event);
           // @ts-expect-error
-          const { place } = event;
+          const { placePrediction } = event;
+          const place = placePrediction.toPlace();
+
           await place.fetchFields({
             fields: ["addressComponents", "formattedAddress", "location"],
           });
+
           console.log("[autocomplete] place fetched", place.formattedAddress, place.addressComponents);
 
           const get = (type: string) =>
