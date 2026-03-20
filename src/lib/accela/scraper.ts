@@ -7,6 +7,8 @@
  * Target: https://aca-prod.accela.com/ATLANTA_GA/Default.aspx
  */
 
+import chromium from "@sparticuz/chromium";
+import { chromium as playwrightChromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
 
 export interface PermitRecord {
@@ -29,26 +31,12 @@ const PORTAL_URL = "https://aca-prod.accela.com/ATLANTA_GA";
 const BROWSER_TIMEOUT = 15_000;
 
 async function launchBrowser(): Promise<Browser> {
-  // Use @sparticuz/chromium for serverless environments (Vercel, Lambda)
-  // Falls back to regular playwright chromium for local development
-  try {
-    const chromium = await import("@sparticuz/chromium");
-    const { chromium: playwrightChromium } = await import("playwright-core");
-
-    const executablePath = await chromium.default.executablePath();
-
-    return playwrightChromium.launch({
-      args: chromium.default.args,
-      executablePath,
-      headless: true,
-    });
-  } catch {
-    // Local development fallback — use system Chromium or installed Playwright browser
-    const { chromium: playwrightChromium } = await import("playwright-core");
-    return playwrightChromium.launch({
-      headless: true,
-    });
-  }
+  const browser = await playwrightChromium.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: true,
+  });
+  return browser;
 }
 
 /**
