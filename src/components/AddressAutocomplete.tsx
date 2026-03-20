@@ -25,72 +25,87 @@ export default function AddressAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const elementRef = useRef<HTMLElement | null>(null);
   const [reportType, setReportType] = useState<"standard" | "attorney">("standard");
+  const [mapsReady, setMapsReady] = useState(false);
+
+  // Poll for the google global to be available
+  useEffect(() => {
+    const check = () => {
+      if (typeof google !== "undefined" && google.maps) {
+        setMapsReady(true);
+      } else {
+        setTimeout(check, 100);
+      }
+    };
+    check();
+  }, []);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!mapsReady || !containerRef.current || isLoading) return;
+
+    // Clean up any existing element
+    if (elementRef.current && containerRef.current.contains(elementRef.current)) {
+      containerRef.current.removeChild(elementRef.current);
+      elementRef.current = null;
+    }
 
     const initAutocomplete = async () => {
-      // @ts-expect-error — PlaceAutocompleteElement is not yet in TS types
-      const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
+      try {
+        // @ts-expect-error — PlaceAutocompleteElement not yet in TS types
+        const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
-      const placeAutocomplete = new PlaceAutocompleteElement({
-        componentRestrictions: { country: "us" },
-        types: ["address"],
-        // Restrict to Atlanta metro bounding box
-        locationBias: {
-          center: { lat: 33.749, lng: -84.388 },
-          radius: 80000, // ~50 miles in meters
-        },
-      });
-
-      // Style the web component to match existing input styling
-      placeAutocomplete.style.cssText = `
-        width: 100%;
-        --gmp-mat-filled-input-top-section-shape: 0.75rem;
-        font-size: 1.125rem;
-        border: 2px solid #e5e7eb;
-        border-radius: 0.75rem;
-        padding: 0;
-      `;
-
-      placeAutocomplete.setAttribute("placeholder", "Enter a property address — e.g. 130 Trinity Ave SW");
-
-      if (!isLoading) {
-        containerRef.current?.appendChild(placeAutocomplete);
-      }
-
-      elementRef.current = placeAutocomplete;
-
-      placeAutocomplete.addEventListener("gmp-placeselect", async (event: Event) => {
-        // @ts-expect-error
-        const { place } = event;
-        await place.fetchFields({
-          fields: ["addressComponents", "formattedAddress", "location"],
+        const placeAutocomplete = new PlaceAutocompleteElement({
+          componentRestrictions: { country: "us" },
+          types: ["address"],
+          locationBias: {
+            center: { lat: 33.749, lng: -84.388 },
+            radius: 80000,
+          },
         });
 
-        const get = (type: string) =>
-          place.addressComponents?.find((c: { types: string[]; longText: string }) =>
-            c.types.includes(type)
-          )?.longText ?? "";
+        // Match the existing input styling
+        placeAutocomplete.style.width = "100%";
+        placeAutocomplete.setAttribute(
+          "placeholder",
+          "Enter a property address — e.g. 130 Trinity Ave SW"
+        );
 
-        const getShort = (type: string) =>
-          place.addressComponents?.find((c: { types: string[]; shortText: string }) =>
-            c.types.includes(type)
-          )?.shortText ?? "";
+        containerRef.current?.appendChild(placeAutocomplete);
+        elementRef.current = placeAutocomplete;
 
-        const structured: StructuredAddress = {
-          raw: place.formattedAddress ?? "",
-          streetNumber: get("street_number"),
-          streetName: get("route"),
-          city: get("locality") || get("sublocality"),
-          state: getShort("administrative_area_level_1"),
-          zip: get("postal_code"),
-          lat: place.location?.lat() ?? 0,
-          lng: place.location?.lng() ?? 0,
-        };
+        placeAutocomplete.addEventListener("gmp-placeselect", async (event: Event) => {
+          // @ts-expect-error
+          const { place } = event;
+          await place.fetchFields({
+            fields: ["addressComponents", "formattedAddress", "location"],
+          });
 
-        onSelect(structured, reportType);
-      });
+          const get = (type: string) =>
+            place.addressComponents?.find(
+              (c: { types: string[]; longText: string }) => c.types.includes(type)
+            )?.longText ?? "";
+
+          const getShort = (type: string) =>
+            place.addressComponents?.find(
+              (c: { types: string[]; shortText: string }) => c.types.includes(type)
+            )?.shortText ?? "";
+
+          onSelect(
+            {
+              raw: place.formattedAddress ?? "",
+              streetNumber: get("street_number"),
+              streetName: get("route"),
+              city: get("locality") || get("sublocality"),
+              state: getShort("administrative_area_level_1"),
+              zip: get("postal_code"),
+              lat: place.location?.lat() ?? 0,
+              lng: place.location?.lng() ?? 0,
+            },
+            reportType
+          );
+        });
+      } catch (err) {
+        console.error("[AddressAutocomplete] Failed to initialize:", err);
+      }
     };
 
     initAutocomplete();
@@ -98,12 +113,22 @@ export default function AddressAutocomplete({
     return () => {
       if (elementRef.current && containerRef.current?.contains(elementRef.current)) {
         containerRef.current.removeChild(elementRef.current);
+        elementRef.current = null;
       }
     };
-  }, [reportType, onSelect, isLoading]);
+  }, [mapsReady, reportType, onSelect, isLoading]);
 
   return (
     <div className="w-full max-w-2xl mx-auto">
+      {/* Fallback shown while Maps API loads */}
+      {!mapsReady && (
+        <input
+          type="text"
+          disabled
+          placeholder="Loading address search..."
+          className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl outline-none text-gray-400"
+        />
+      )}
       <div ref={containerRef} className="w-full" />
 
       <div className="mt-4 flex items-center gap-6 justify-center">
