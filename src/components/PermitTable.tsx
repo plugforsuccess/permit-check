@@ -36,7 +36,7 @@ export default function PermitTable({
     });
   };
 
-  if (permits.length === 0) {
+  if (permits.length === 0 && !isBlurred) {
     return (
       <div className="text-center py-12 bg-gray-50 rounded-xl">
         <div className="text-4xl mb-4">&#128203;</div>
@@ -59,10 +59,10 @@ export default function PermitTable({
           <div className="text-center p-8">
             <div className="text-3xl mb-3">&#128274;</div>
             <h3 className="text-lg font-bold text-gray-800 mb-2">
-              Results Ready
+              Search Complete
             </h3>
             <p className="text-gray-600 mb-4">
-              Unlock the full permit history report
+              Unlock the full permit history report for this address
             </p>
           </div>
         </div>
