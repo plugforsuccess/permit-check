@@ -1,6 +1,6 @@
 "use client";
 
-import { DISCLAIMER } from "@/lib/config";
+import { DISCLAIMER } from "@/lib/constants";
 
 export default function Disclaimer() {
   return (
