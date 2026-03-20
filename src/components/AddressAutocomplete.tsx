@@ -181,7 +181,7 @@ export default function AddressAutocomplete({
       </div>
 
       <p className="mt-4 text-sm text-gray-400 text-center">
-        Searching official permit databases across the Atlanta metro
+        Searching official permit databases across supported jurisdictions
       </p>
     </div>
   );

@@ -83,7 +83,7 @@ export default function HomePage() {
             </h1>
             <p className="text-lg text-gray-500 mb-8 leading-relaxed">
               Unpermitted work costs buyers tens of thousands. Search the
-              official government permit database for any Atlanta metro
+              official government permit database for any supported metro area
               property in seconds.
             </p>
             <AddressAutocomplete onSelect={handleSubmit} isLoading={isLoading} />
@@ -167,7 +167,7 @@ export default function HomePage() {
             up to code, or worse, become a liability in a future sale.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            For $9.99, you get the full permit history for any Atlanta property
+            For $9.99, you get the full permit history for any supported property
             — searchable in seconds, not days.
           </p>
         </div>

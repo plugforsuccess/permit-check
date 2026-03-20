@@ -50,7 +50,7 @@ export default function AddressSearch({
             setAddress(e.target.value);
             setError(null);
           }}
-          placeholder="Enter Atlanta property address (e.g., 123 Peachtree St)"
+          placeholder="Enter a property address (e.g., 130 Trinity Ave SW, Atlanta, GA)"
           className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-gray-900 placeholder-gray-400"
           disabled={isLoading}
           aria-label="Property address"
