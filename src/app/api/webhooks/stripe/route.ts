@@ -69,16 +69,20 @@ export async function POST(req: Request) {
     }
 
     // Fetch lookup and permits for report generation
-    const { data: lookup } = await supabase
+    const { data: lookup, error: lookupFetchError } = await supabase
       .from("lookups")
       .select("*")
       .eq("id", lookupId)
       .single();
 
-    const { data: permits } = await supabase
+    console.log("[webhook] lookup fetch:", lookup?.id, "error:", lookupFetchError);
+
+    const { data: permits, error: permitsFetchError } = await supabase
       .from("permits")
       .select("*")
       .eq("lookup_id", lookupId);
+
+    console.log("[webhook] permits fetch:", permits?.length, "error:", permitsFetchError);
 
     if (lookup && permits) {
       // Generate report HTML (used in production PDF pipeline)
@@ -96,16 +100,26 @@ export async function POST(req: Request) {
 
       const downloadToken = randomBytes(32).toString("hex");
 
-      const { error: reportError } = await supabase.from("reports").insert({
-        lookup_id: lookupId,
-        pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
-        expires_at: expiresAt.toISOString(),
-        download_token: downloadToken,
-      });
+      console.log("[webhook] inserting report for lookup:", lookupId, "token:", downloadToken.slice(0, 8) + "...");
+
+      const { data: reportData, error: reportError } = await supabase
+        .from("reports")
+        .insert({
+          lookup_id: lookupId,
+          pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
+          expires_at: expiresAt.toISOString(),
+          download_token: downloadToken,
+        })
+        .select()
+        .single();
+
+      console.log("[webhook] report insert result:", reportData?.id, "error:", reportError);
 
       if (reportError) {
-        console.error("Failed to create report:", reportError);
+        console.error("[webhook] report insert failed:", reportError);
       }
+    } else {
+      console.log("[webhook] skipped report insert — lookup:", !!lookup, "permits:", !!permits);
     }
   }
 
