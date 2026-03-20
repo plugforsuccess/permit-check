@@ -1,12 +1,13 @@
 /**
  * Accela Citizen Access scraper using Playwright.
  *
- * The Atlanta portal is JavaScript-rendered — cheerio alone cannot parse it.
- * Uses playwright-core + @sparticuz/chromium for serverless compatibility.
+ * Target: https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Building&customglobalsearch=true
  *
- * Target: https://aca-prod.accela.com/ATLANTA_GA/Default.aspx
+ * Selectors verified via DevTools on 2026-03-20.
+ * The Atlanta portal uses a custom global search form (not the standard ACA
+ * address form), with separate fields for street number, street name,
+ * street type (suffix dropdown), and quadrant (NE/NW/SE/SW dropdown).
  */
-
 import chromium from "@sparticuz/chromium";
 import { chromium as playwrightChromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
@@ -28,25 +29,119 @@ export interface PermitRecord {
 }
 
 const PORTAL_URL = "https://aca-prod.accela.com/ATLANTA_GA";
-const BROWSER_TIMEOUT = 15_000;
+const SEARCH_URL = `${PORTAL_URL}/Cap/CapHome.aspx?module=Building&customglobalsearch=true`;
+const BROWSER_TIMEOUT = 20_000;
+const SELECTOR_TIMEOUT = 15_000;
+
+// Confirmed field IDs (DevTools-verified 2026-03-20)
+const SELECTORS = {
+  streetNumberFrom: "#ctl00_PlaceHolderMain_generalSearchForm_txtGSNumber_ChildControl0",
+  streetName:       "#ctl00_PlaceHolderMain_generalSearchForm_txtGSStreetName",
+  streetSuffix:     "#ctl00_PlaceHolderMain_generalSearchForm_ddlGSStreetSuffix",
+  quadrant:         "#ctl00_PlaceHolderMain_generalSearchForm_ddlGSStreetSuffixDirection",
+  startDate:        "#ctl00_PlaceHolderMain_generalSearchForm_txtGSStartDate",
+  endDate:          "#ctl00_PlaceHolderMain_generalSearchForm_txtGSEndDate",
+  searchButton:     "#ctl00_PlaceHolderMain_btnNewSearch",
+  // Results table — confirmed id and class
+  resultsTable:     "#ctl00_PlaceHolderMain_dgvPermitList_gdvPermitList",
+  // Pagination
+  nextPage:         "a.aca_pagination_PagerNextStyle",
+} as const;
+
+// Street type suffix values accepted by the Atlanta portal dropdown
+const SUFFIX_MAP: Record<string, string> = {
+  ALY: "ALY", ALLEY: "ALY",
+  AVE: "AVE", AVENUE: "AVE",
+  BLVD: "BLVD", BOULEVARD: "BLVD",
+  CIR: "CIR", CIRCLE: "CIR",
+  CT: "CT", COURT: "CT",
+  DR: "DR", DRIVE: "DR",
+  EXT: "EXT", EXTENSION: "EXT",
+  HWY: "HWY", HIGHWAY: "HWY",
+  LN: "LN", LANE: "LN",
+  PKWY: "PKWY", PARKWAY: "PKWY",
+  PL: "PL", PLACE: "PL",
+  PLZ: "PLZ", PLAZA: "PLZ",
+  RD: "RD", ROAD: "RD",
+  ST: "ST", STREET: "ST",
+  TER: "TER", TERRACE: "TER",
+  TRL: "TRL", TRAIL: "TRL",
+  WAY: "WAY",
+};
+
+// Quadrant values accepted by the portal dropdown
+const QUADRANT_VALUES = new Set(["NE", "NW", "SE", "SW"]);
+
+/**
+ * Parse a normalized address string into portal field components.
+ *
+ * Input examples (from normalizeAddress() in address.ts):
+ *   "55 TRINITY AVE SW"       → { number: "55", name: "TRINITY", suffix: "AVE", quadrant: "SW" }
+ *   "130 PEACHTREE ST NW"     → { number: "130", name: "PEACHTREE", suffix: "ST", quadrant: "NW" }
+ *   "1278 GREENWICH ST SW"    → { number: "1278", name: "GREENWICH", suffix: "ST", quadrant: "SW" }
+ *   "100 MAIN ST"             → { number: "100", name: "MAIN", suffix: "ST", quadrant: "" }
+ */
+function parseAddressForPortal(normalizedAddress: string): {
+  streetNumber: string;
+  streetName: string;
+  streetSuffix: string;  // portal dropdown value e.g. "AVE"
+  quadrant: string;      // portal dropdown value e.g. "SW" or ""
+} {
+  const parts = normalizedAddress.trim().toUpperCase().split(/\s+/);
+
+  // First token is always the street number
+  const streetNumber = parts[0] ?? "";
+  const rest = parts.slice(1);
+
+  // Check if last token is a quadrant (NE/NW/SE/SW)
+  const lastToken = rest[rest.length - 1] ?? "";
+  let quadrant = "";
+  let suffixAndNameParts = rest;
+  if (QUADRANT_VALUES.has(lastToken)) {
+    quadrant = lastToken;
+    suffixAndNameParts = rest.slice(0, -1);
+  }
+
+  // Check if the new last token is a street suffix
+  const newLast = suffixAndNameParts[suffixAndNameParts.length - 1] ?? "";
+  let streetSuffix = "";
+  let nameParts = suffixAndNameParts;
+  if (SUFFIX_MAP[newLast]) {
+    streetSuffix = SUFFIX_MAP[newLast];
+    nameParts = suffixAndNameParts.slice(0, -1);
+  }
+
+  // Remaining tokens are the street name
+  const streetName = nameParts.join(" ");
+
+  return { streetNumber, streetName, streetSuffix, quadrant };
+}
 
 async function launchBrowser(): Promise<Browser> {
-  const browser = await playwrightChromium.launch({
+  return playwrightChromium.launch({
     args: chromium.args,
     executablePath: await chromium.executablePath(),
     headless: true,
   });
-  return browser;
 }
 
 /**
- * Scrape permit records from the Accela Citizen Access portal for Atlanta.
+ * Scrape permit records from the Atlanta Accela portal.
+ * Returns all pages of results. Never throws — returns [] on failure.
  */
 export async function scrapeAccelaPermits(
   streetNumber: string,
   streetName: string
 ): Promise<PermitRecord[]> {
   let browser: Browser | null = null;
+
+  // Reconstruct a normalized address string to parse into portal fields
+  // streetNumber and streetName arrive already split from normalizeAddress()
+  const normalizedAddress = `${streetNumber} ${streetName}`;
+  const parsed = parseAddressForPortal(normalizedAddress);
+  console.log(
+    `[accela-scraper] Parsed address: number="${parsed.streetNumber}" name="${parsed.streetName}" suffix="${parsed.streetSuffix}" quadrant="${parsed.quadrant}"`
+  );
 
   try {
     browser = await launchBrowser();
@@ -57,418 +152,180 @@ export async function scrapeAccelaPermits(
     const page = await context.newPage();
     page.setDefaultTimeout(BROWSER_TIMEOUT);
 
-    // Step 1: Navigate to the portal homepage to establish session
+    // Step 1: Navigate to the custom global search page
     console.log("[accela-scraper] Navigating to portal...");
-    await page.goto(`${PORTAL_URL}/Default.aspx`, {
+    await page.goto(SEARCH_URL, {
       waitUntil: "networkidle",
       timeout: BROWSER_TIMEOUT,
     });
 
-    // Step 2: Navigate to the address search page
-    console.log("[accela-scraper] Navigating to search page...");
-    await page.goto(
-      `${PORTAL_URL}/Cap/CapHome.aspx?module=Building&TabName=Building`,
-      {
-        waitUntil: "networkidle",
-        timeout: BROWSER_TIMEOUT,
-      }
-    );
+    // Step 2: Fill the street number (From field only)
+    console.log("[accela-scraper] Filling search form...");
+    await page.fill(SELECTORS.streetNumberFrom, parsed.streetNumber);
 
-    // Step 3: Fill in the address search form
-    console.log(
-      `[accela-scraper] Searching for: ${streetNumber} ${streetName}`
-    );
+    // Step 3: Fill street name
+    await page.fill(SELECTORS.streetName, parsed.streetName);
 
-    // Try to find and fill the street number field
-    const streetNumberInput = await findInputField(page, [
-      'input[id*="txtHouseNumberFrom"]',
-      'input[id*="HouseNumberFrom"]',
-      'input[name*="HouseNumberFrom"]',
-      'input[id*="txtStreetNo"]',
-    ]);
-
-    if (streetNumberInput) {
-      await page.fill(streetNumberInput, streetNumber);
-    } else {
-      console.warn(
-        "[accela-scraper] Could not find street number input field"
-      );
+    // Step 4: Select street suffix from dropdown if we have one
+    if (parsed.streetSuffix) {
+      await page.selectOption(SELECTORS.streetSuffix, parsed.streetSuffix);
     }
 
-    // Try to find and fill the street name field
-    const streetNameInput = await findInputField(page, [
-      'input[id*="txtStreetName"]',
-      'input[id*="StreetName"]',
-      'input[name*="StreetName"]',
-    ]);
-
-    if (streetNameInput) {
-      await page.fill(streetNameInput, streetName);
-    } else {
-      console.warn("[accela-scraper] Could not find street name input field");
+    // Step 5: Select quadrant from dropdown if we have one
+    if (parsed.quadrant) {
+      await page.selectOption(SELECTORS.quadrant, parsed.quadrant);
     }
 
-    // Step 4: Submit the search
-    const searchButton = await findInputField(page, [
-      'a[id*="btnNewSearch"]',
-      'input[id*="btnSearch"]',
-      'button[id*="btnSearch"]',
-      'a[id*="btnSearch"]',
-      'input[type="submit"][value*="Search"]',
-      'button:has-text("Search")',
-      'a:has-text("Search")',
-    ]);
+    // Step 6: Widen date range to capture full history
+    // Default is last 5 years — clear start date to get all records
+    await page.fill(SELECTORS.startDate, "01/01/2000");
+    await page.fill(SELECTORS.endDate, new Date().toLocaleDateString("en-US", {
+      month: "2-digit", day: "2-digit", year: "numeric"
+    }));
 
-    if (searchButton) {
-      await page.click(searchButton);
-    } else {
-      console.warn(
-        "[accela-scraper] Could not find search button, trying form submit"
-      );
-      await page.keyboard.press("Enter");
-    }
+    // Step 7: Submit
+    console.log("[accela-scraper] Submitting search...");
+    await page.click(SELECTORS.searchButton);
 
-    // Step 5: Wait for results to load
-    console.log("[accela-scraper] Waiting for results...");
+    // Step 8: Wait for results table
     try {
-      await page.waitForSelector(
-        'table[id*="GridView"], div[id*="resultList"], .ACA_Grid_Caption, table[id*="gdvPermitList"]',
-        { timeout: BROWSER_TIMEOUT }
-      );
+      await page.waitForSelector(SELECTORS.resultsTable, {
+        timeout: SELECTOR_TIMEOUT,
+      });
     } catch {
-      // Results table may not appear — could mean no results or different layout
-      console.log(
-        "[accela-scraper] No results table found, checking for alternative layouts"
-      );
+      console.log("[accela-scraper] No results table found — zero results or search error");
+      return [];
     }
 
-    // Step 6: Parse results
-    const permits = await parseResults(page, streetNumber, streetName);
+    // Step 9: Collect all pages
+    const allPermits: PermitRecord[] = [];
+    let pageNum = 1;
 
-    // If no results, try with full street name (e.g., "Avenue" instead of "Ave")
-    if (permits.length === 0) {
-      console.log(
-        "[accela-scraper] No results found, trying alternate street name formats..."
-      );
-      const altPermits = await retryWithAlternateNames(
-        page,
-        streetNumber,
-        streetName
-      );
-      if (altPermits.length > 0) {
-        return altPermits;
+    while (true) {
+      console.log(`[accela-scraper] Parsing results page ${pageNum}...`);
+      const pagePermits = await parseResultsTable(page, normalizedAddress);
+      allPermits.push(...pagePermits);
+
+      // Try to go to next page
+      const nextLink = await page.$(SELECTORS.nextPage);
+      if (!nextLink) break;
+
+      await nextLink.click();
+      try {
+        await page.waitForSelector(SELECTORS.resultsTable, {
+          timeout: SELECTOR_TIMEOUT,
+        });
+        await page.waitForLoadState("networkidle", { timeout: SELECTOR_TIMEOUT });
+      } catch {
+        break;
       }
+      pageNum++;
     }
 
-    console.log(`[accela-scraper] Found ${permits.length} permit records`);
-    return permits;
+    console.log(`[accela-scraper] Found ${allPermits.length} total permit records`);
+    return allPermits;
   } catch (error) {
     console.error("[accela-scraper] Scraping failed:", error);
     return [];
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    if (browser) await browser.close();
   }
 }
 
 /**
- * Find an input field by trying multiple selectors.
+ * Parse the confirmed results table.
+ *
+ * Column order (verified via DevTools 2026-03-20):
+ *   0: Date (filed date)
+ *   1: (empty / sort control)
+ *   2: Record Number
+ *   3: (empty)
+ *   4: Record Type
+ *   5: (empty)
+ *   6: Address
+ *   7: (empty)
+ *   8: Description
+ *   9: (empty)
+ *   10: Permit Name
+ *   11: (empty)
+ *   12: Status
+ *   13: (empty)
+ *   14: Action
+ *   15: (empty)
+ *   16: Short Notes
+ *
+ * The table uses alternating empty spacer columns — we read every other col
+ * starting at 0.
  */
-async function findInputField(
+async function parseResultsTable(
   page: Page,
-  selectors: string[]
-): Promise<string | null> {
-  for (const selector of selectors) {
-    try {
-      const element = await page.$(selector);
-      if (element) {
-        return selector;
-      }
-    } catch {
-      // Selector not found, try next
-    }
-  }
-  return null;
-}
-
-/**
- * Parse permit records from the results page.
- */
-async function parseResults(
-  page: Page,
-  streetNumber: string,
-  streetName: string
+  address: string
 ): Promise<PermitRecord[]> {
   return page.evaluate(
-    ({ streetNum, streetNm }) => {
+    ({ tableSelector, addr }) => {
+      const table = document.querySelector(tableSelector) as HTMLTableElement | null;
+      if (!table) return [];
+
       const permits: PermitRecord[] = [];
-      const address = `${streetNum} ${streetNm}`;
+      const rows = table.querySelectorAll("tr");
 
-      // Find result rows — Accela uses GridView tables or div-based layouts
-      const tables = document.querySelectorAll(
-        'table[id*="GridView"], table[id*="gdvPermitList"], table.ACA_Grid_Caption'
-      );
+      // Skip row 0 (pagination/count header) and row 1 (column headers)
+      // Data rows start at index 2
+      for (let i = 2; i < rows.length; i++) {
+        const cells = rows[i].querySelectorAll("td");
+        if (cells.length < 7) continue;
 
-      for (const table of tables) {
-        const rows = table.querySelectorAll("tr");
-        // Skip header row
-        for (let i = 1; i < rows.length; i++) {
-          const cells = rows[i].querySelectorAll("td");
-          if (cells.length < 3) continue;
+        const getText = (cell: Element | undefined): string => {
+          if (!cell) return "";
+          const link = cell.querySelector("a");
+          return (link?.textContent || cell.textContent || "").trim();
+        };
 
-          // Extract text from cells — handle links inside cells
-          const getText = (cell: Element): string => {
-            const link = cell.querySelector("a");
-            return (link?.textContent || cell.textContent || "").trim();
-          };
+        const parseDate = (dateStr: string): string | null => {
+          if (!dateStr || dateStr === "N/A" || dateStr === "") return null;
+          try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return null;
+            return d.toISOString().split("T")[0];
+          } catch {
+            return null;
+          }
+        };
 
-          const recordNumber = getText(cells[0]);
-          if (!recordNumber || recordNumber === "") continue;
+        const mapStatus = (
+          raw: string
+        ): "Issued" | "Finaled" | "Expired" | "Void" | "In Review" | "Unknown" => {
+          const s = raw.toUpperCase().trim();
+          if (s.includes("ISSUED") || s.includes("APPROVED")) return "Issued";
+          if (s.includes("FINAL") || s.includes("CLOSED") || s.includes("COMPLETE")) return "Finaled";
+          if (s.includes("EXPIRED")) return "Expired";
+          if (s.includes("VOID") || s.includes("CANCEL")) return "Void";
+          if (s.includes("REVIEW") || s.includes("PENDING") || s.includes("SUBMITTED")) return "In Review";
+          return "Unknown";
+        };
 
-          const mapStatus = (
-            raw: string
-          ):
-            | "Issued"
-            | "Finaled"
-            | "Expired"
-            | "Void"
-            | "In Review"
-            | "Unknown" => {
-            const s = raw.toUpperCase().trim();
-            if (s.includes("ISSUED") || s.includes("APPROVED"))
-              return "Issued";
-            if (
-              s.includes("FINAL") ||
-              s.includes("CLOSED") ||
-              s.includes("COMPLETE")
-            )
-              return "Finaled";
-            if (s.includes("EXPIRED")) return "Expired";
-            if (s.includes("VOID") || s.includes("CANCEL")) return "Void";
-            if (
-              s.includes("REVIEW") ||
-              s.includes("PENDING") ||
-              s.includes("SUBMITTED")
-            )
-              return "In Review";
-            return "Unknown";
-          };
+        // Extract data columns (skipping spacer columns)
+        const filedDateRaw = getText(cells[0]);
+        const recordNumber  = getText(cells[2]);
+        const recordType    = getText(cells[4]);
+        const description   = getText(cells[8]);
+        const statusRaw     = getText(cells[12]);
 
-          const parseDate = (dateStr: string): string | null => {
-            if (!dateStr || dateStr === "N/A" || dateStr === "") return null;
-            try {
-              const d = new Date(dateStr);
-              if (isNaN(d.getTime())) return null;
-              return d.toISOString().split("T")[0];
-            } catch {
-              return null;
-            }
-          };
+        if (!recordNumber) continue;
 
-          const permit: PermitRecord = {
-            recordNumber,
-            type: cells.length > 1 ? getText(cells[1]) : "Unknown",
-            status: cells.length > 2 ? mapStatus(getText(cells[2])) : "Unknown",
-            filedDate:
-              cells.length > 3 ? parseDate(getText(cells[3])) : null,
-            issuedDate:
-              cells.length > 4 ? parseDate(getText(cells[4])) : null,
-            description:
-              cells.length > 5 ? getText(cells[5]) : "",
-            address,
-          };
-
-          permits.push(permit);
-        }
-      }
-
-      // Also try div-based result layouts (some Accela configs use divs)
-      if (permits.length === 0) {
-        const resultDivs = document.querySelectorAll(
-          'div[id*="resultList"] .ACA_TabRow, div[id*="resultList"] tr'
-        );
-        for (const div of resultDivs) {
-          const links = div.querySelectorAll("a");
-          const spans = div.querySelectorAll("span, td");
-          if (links.length === 0 && spans.length === 0) continue;
-
-          const allText = Array.from(spans)
-            .map((s) => s.textContent?.trim() || "")
-            .filter(Boolean);
-          if (allText.length < 2) continue;
-
-          const mapStatus = (
-            raw: string
-          ):
-            | "Issued"
-            | "Finaled"
-            | "Expired"
-            | "Void"
-            | "In Review"
-            | "Unknown" => {
-            const s = raw.toUpperCase().trim();
-            if (s.includes("ISSUED") || s.includes("APPROVED"))
-              return "Issued";
-            if (
-              s.includes("FINAL") ||
-              s.includes("CLOSED") ||
-              s.includes("COMPLETE")
-            )
-              return "Finaled";
-            if (s.includes("EXPIRED")) return "Expired";
-            if (s.includes("VOID") || s.includes("CANCEL")) return "Void";
-            if (
-              s.includes("REVIEW") ||
-              s.includes("PENDING") ||
-              s.includes("SUBMITTED")
-            )
-              return "In Review";
-            return "Unknown";
-          };
-
-          const parseDate = (dateStr: string): string | null => {
-            if (!dateStr || dateStr === "N/A" || dateStr === "") return null;
-            try {
-              const d = new Date(dateStr);
-              if (isNaN(d.getTime())) return null;
-              return d.toISOString().split("T")[0];
-            } catch {
-              return null;
-            }
-          };
-
-          permits.push({
-            recordNumber: links[0]?.textContent?.trim() || allText[0],
-            type: allText[1] || "Unknown",
-            status: allText[2] ? mapStatus(allText[2]) : "Unknown",
-            filedDate: allText[3] ? parseDate(allText[3]) : null,
-            issuedDate: allText[4] ? parseDate(allText[4]) : null,
-            description: allText[5] || "",
-            address,
-          });
-        }
+        permits.push({
+          recordNumber,
+          type: recordType || "Unknown",
+          status: mapStatus(statusRaw),
+          filedDate: parseDate(filedDateRaw),
+          issuedDate: null, // not exposed in list view — available on detail page
+          description,
+          address: addr,
+        });
       }
 
       return permits;
     },
-    { streetNum: streetNumber, streetNm: streetName }
+    { tableSelector: SELECTORS.resultsTable, addr: address }
   );
-}
-
-/**
- * Retry search with alternate street name formats.
- * E.g., "Ave" → "Avenue", "St" → "Street"
- */
-async function retryWithAlternateNames(
-  page: Page,
-  streetNumber: string,
-  streetName: string
-): Promise<PermitRecord[]> {
-  const expansions: Record<string, string> = {
-    Ave: "Avenue",
-    St: "Street",
-    Blvd: "Boulevard",
-    Dr: "Drive",
-    Rd: "Road",
-    Ln: "Lane",
-    Ct: "Court",
-    Pl: "Place",
-    Pkwy: "Parkway",
-  };
-
-  const contractions: Record<string, string> = {
-    Avenue: "Ave",
-    Street: "St",
-    Boulevard: "Blvd",
-    Drive: "Dr",
-    Road: "Rd",
-    Lane: "Ln",
-    Court: "Ct",
-    Place: "Pl",
-    Parkway: "Pkwy",
-  };
-
-  // Build alternate name
-  let alternateName = streetName;
-  let found = false;
-
-  for (const [abbrev, full] of Object.entries(expansions)) {
-    const regex = new RegExp(`\\b${abbrev}\\b`, "i");
-    if (regex.test(streetName)) {
-      alternateName = streetName.replace(regex, full);
-      found = true;
-      break;
-    }
-  }
-
-  if (!found) {
-    for (const [full, abbrev] of Object.entries(contractions)) {
-      const regex = new RegExp(`\\b${full}\\b`, "i");
-      if (regex.test(streetName)) {
-        alternateName = streetName.replace(regex, abbrev);
-        found = true;
-        break;
-      }
-    }
-  }
-
-  if (!found || alternateName === streetName) return [];
-
-  console.log(
-    `[accela-scraper] Retrying with alternate name: ${streetNumber} ${alternateName}`
-  );
-
-  // Navigate back to search and retry
-  try {
-    await page.goto(
-      `${PORTAL_URL}/Cap/CapHome.aspx?module=Building&TabName=Building`,
-      {
-        waitUntil: "networkidle",
-        timeout: BROWSER_TIMEOUT,
-      }
-    );
-
-    const streetNumberInput = await findInputField(page, [
-      'input[id*="txtHouseNumberFrom"]',
-      'input[id*="HouseNumberFrom"]',
-      'input[name*="HouseNumberFrom"]',
-    ]);
-
-    const streetNameInput = await findInputField(page, [
-      'input[id*="txtStreetName"]',
-      'input[id*="StreetName"]',
-      'input[name*="StreetName"]',
-    ]);
-
-    if (streetNumberInput) await page.fill(streetNumberInput, streetNumber);
-    if (streetNameInput) await page.fill(streetNameInput, alternateName);
-
-    const searchButton = await findInputField(page, [
-      'a[id*="btnNewSearch"]',
-      'input[id*="btnSearch"]',
-      'button[id*="btnSearch"]',
-      'a[id*="btnSearch"]',
-      'input[type="submit"][value*="Search"]',
-    ]);
-
-    if (searchButton) {
-      await page.click(searchButton);
-    } else {
-      await page.keyboard.press("Enter");
-    }
-
-    try {
-      await page.waitForSelector(
-        'table[id*="GridView"], div[id*="resultList"], .ACA_Grid_Caption, table[id*="gdvPermitList"]',
-        { timeout: BROWSER_TIMEOUT }
-      );
-    } catch {
-      // No results table
-    }
-
-    return parseResults(page, streetNumber, alternateName);
-  } catch {
-    return [];
-  }
 }
