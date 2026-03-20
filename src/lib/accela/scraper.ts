@@ -254,20 +254,14 @@ export async function scrapeAccelaPermits(
  * Parse the confirmed results table.
  *
  * Column order (verified via DevTools 2026-03-20):
- * Two spacer <td> columns between each data column.
- *   0: Date (filed date)
- *   1-3: (spacers)
- *   4: Record Number
- *   5-7: (spacers)
- *   8: Record Type
- *   9-11: (spacers)
- *   12: Address
- *   13-15: (spacers)
- *   16: Description
- *   17-19: (spacers)
- *   20: Permit Name
- *   21-23: (spacers)
- *   24: Status
+ *   0: (row selector / checkbox)
+ *   1: Date (filed date)
+ *   2: Record Number
+ *   3: Record Type
+ *   4: Address (not used — we already have addr from search)
+ *   5: Description
+ *   6: Permit Name
+ *   7: Status
  */
 async function parseResultsTable(
   page: Page,
@@ -316,24 +310,24 @@ async function parseResultsTable(
           return "Unknown";
         };
 
-        // Extract data columns (2 spacer <td>s between each data column)
-        const filedDateRaw = getText(cells[0]);
-        const recordNumber  = getText(cells[4]);
-        const recordType    = getText(cells[8]);
-        const address       = getText(cells[12]);
-        const description   = getText(cells[16]);
-        const statusRaw     = getText(cells[24]);
+        // Extract data columns (no spacer columns — confirmed via DevTools)
+        const filedDateRaw = getText(cells[1]);
+        const recordNumber  = getText(cells[2]);
+        const recordType    = getText(cells[3]);
+        const description   = getText(cells[5]);
+        const permitName    = getText(cells[6]);
+        const statusRaw     = getText(cells[7]);
 
-        if (!recordNumber) continue;
+        if (!recordNumber || recordNumber.includes(" ")) continue;
 
         permits.push({
           recordNumber,
           type: recordType || "Unknown",
           status: mapStatus(statusRaw),
           filedDate: parseDate(filedDateRaw),
-          issuedDate: null, // not exposed in list view — available on detail page
-          description,
-          address: address || addr,
+          issuedDate: null,
+          description: description || permitName,
+          address: addr,
         });
       }
 
