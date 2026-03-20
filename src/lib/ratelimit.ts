@@ -1,25 +1,21 @@
-import { LRUCache } from "lru-cache";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
-const cache = new LRUCache<string, number[]>({ max: 500 });
+// Lazy singleton — only instantiated on first call
+let _ratelimit: Ratelimit | null = null;
 
-/**
- * Simple in-memory rate limiter using LRU cache.
- * Returns true if the request is allowed, false if rate limited.
- *
- * For production, replace with @upstash/ratelimit + @upstash/redis
- * for distributed rate limiting across multiple instances.
- */
-export function rateLimit(
-  identifier: string,
-  limit = 5,
-  windowMs = 60_000
-): boolean {
-  const now = Date.now();
-  const timestamps = (cache.get(identifier) ?? []).filter(
-    (t) => now - t < windowMs
-  );
-  if (timestamps.length >= limit) return false;
-  timestamps.push(now);
-  cache.set(identifier, timestamps);
-  return true;
+function getRatelimit(): Ratelimit {
+  if (!_ratelimit) {
+    _ratelimit = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(5, "60 s"),
+      analytics: true,
+    });
+  }
+  return _ratelimit;
+}
+
+export async function rateLimit(identifier: string): Promise<boolean> {
+  const { success } = await getRatelimit().limit(identifier);
+  return success;
 }

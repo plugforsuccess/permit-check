@@ -1,39 +1,23 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AddressSearch from "@/components/AddressSearch";
 import Disclaimer from "@/components/Disclaimer";
 
 export default function HomePage() {
   const router = useRouter();
-  const [address, setAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (address: string, reportType: "standard" | "attorney") => {
     setError(null);
-
-    const trimmed = address.trim();
-    if (!trimmed) {
-      setError("Please enter an address");
-      return;
-    }
-    if (!/^\d+/.test(trimmed)) {
-      setError("Address must start with a street number");
-      return;
-    }
-    if (trimmed.split(/\s+/).length < 2) {
-      setError("Please enter a complete street address");
-      return;
-    }
-
     setIsLoading(true);
     try {
       const response = await fetch("/api/lookup/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: trimmed }),
+        body: JSON.stringify({ address, report_type: reportType }),
       });
 
       const data = await response.json();
@@ -67,60 +51,13 @@ export default function HomePage() {
             Instantly check the complete permit history for any Atlanta property.
           </p>
 
-          <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-            <div className="relative">
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Enter a property address — e.g. 130 Trinity Ave SW"
-                className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-gray-900 placeholder-gray-400"
-                disabled={isLoading}
-                aria-label="Property address"
-              />
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <svg
-                      className="animate-spin h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                    Searching...
-                  </span>
-                ) : (
-                  "Check Permits"
-                )}
-              </button>
-            </div>
+          <AddressSearch onSearch={handleSubmit} isLoading={isLoading} />
 
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-          </form>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm max-w-2xl mx-auto">
+              {error}
+            </div>
+          )}
 
           <p className="mt-6 text-sm text-gray-400">
             Searching the City of Atlanta&apos;s Accela public records database

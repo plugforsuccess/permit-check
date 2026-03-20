@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const clientIp =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       "unknown";
-    const allowed = rateLimit(clientIp, 5, 60_000);
+    const allowed = await rateLimit(clientIp);
     if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again shortly." },
@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
         address_raw: address,
         address_normalized: addressNormalized,
         permit_count: permits.length,
+        report_type: parsed.data.report_type,
       })
       .select()
       .single();

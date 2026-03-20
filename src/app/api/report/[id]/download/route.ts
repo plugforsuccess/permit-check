@@ -3,17 +3,48 @@ import { createServerClient } from "@/lib/supabase";
 import { generateReportHtml } from "@/lib/pdf";
 
 /**
- * GET /api/report/:id/download
+ * GET /api/report/:id/download?token=...
  * Returns the generated PDF report as HTML (print-to-PDF).
- * In production, use Puppeteer to generate actual PDF binary.
+ * Requires a valid download_token for authorization.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+  const token = request.nextUrl.searchParams.get("token");
+
+  if (!token) {
+    return NextResponse.json(
+      { error: "Missing download token" },
+      { status: 401 }
+    );
+  }
 
   const supabase = createServerClient();
+
+  // Validate token and fetch report in one query
+  const { data: report } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("lookup_id", lookupId)
+    .eq("download_token", token)
+    .single();
+
+  if (!report) {
+    return NextResponse.json(
+      { error: "Invalid or expired token" },
+      { status: 401 }
+    );
+  }
+
+  // Check report expiry
+  if (new Date(report.expires_at) < new Date()) {
+    return NextResponse.json(
+      { error: "Report has expired. Please create a new lookup." },
+      { status: 410 }
+    );
+  }
 
   // Verify the lookup exists and is paid
   const { data: lookup, error: lookupError } = await supabase
@@ -33,20 +64,6 @@ export async function GET(
     return NextResponse.json(
       { error: "Payment required" },
       { status: 402 }
-    );
-  }
-
-  // Check report expiry
-  const { data: report } = await supabase
-    .from("reports")
-    .select("*")
-    .eq("lookup_id", lookupId)
-    .single();
-
-  if (report && new Date(report.expires_at) < new Date()) {
-    return NextResponse.json(
-      { error: "Report has expired. Please create a new lookup." },
-      { status: 410 }
     );
   }
 
@@ -74,12 +91,10 @@ export async function GET(
   });
 
   // Update download timestamp
-  if (report) {
-    await supabase
-      .from("reports")
-      .update({ downloaded_at: new Date().toISOString() })
-      .eq("id", report.id);
-  }
+  await supabase
+    .from("reports")
+    .update({ downloaded_at: new Date().toISOString() })
+    .eq("id", report.id);
 
   // Return as HTML (client can use window.print() for PDF)
   // In production, pipe through Puppeteer for PDF binary

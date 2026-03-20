@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
@@ -91,10 +92,13 @@ export async function POST(req: Request) {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + config.app.reportExpiryHours);
 
+      const downloadToken = randomBytes(32).toString("hex");
+
       const { error: reportError } = await supabase.from("reports").insert({
         lookup_id: lookupId,
-        pdf_url: `/api/report/${lookupId}/download`,
+        pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
         expires_at: expiresAt.toISOString(),
+        download_token: downloadToken,
       });
 
       if (reportError) {
