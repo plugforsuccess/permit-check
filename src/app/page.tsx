@@ -105,7 +105,7 @@ export default function HomePage() {
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
               {/* Mock results header */}
               <div className="px-6 py-4 border-b border-gray-100">
-                <div className="text-sm text-gray-500 mb-1">1278 Greenwich St SW, Atlanta, GA</div>
+                <div className="text-sm text-gray-500 mb-1">55 Trinity Ave SW, Atlanta, GA</div>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
                     10 permit records found
