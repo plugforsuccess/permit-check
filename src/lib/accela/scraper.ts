@@ -254,26 +254,20 @@ export async function scrapeAccelaPermits(
  * Parse the confirmed results table.
  *
  * Column order (verified via DevTools 2026-03-20):
+ * Two spacer <td> columns between each data column.
  *   0: Date (filed date)
- *   1: (empty / sort control)
- *   2: Record Number
- *   3: (empty)
- *   4: Record Type
- *   5: (empty)
- *   6: Address
- *   7: (empty)
- *   8: Description
- *   9: (empty)
- *   10: Permit Name
- *   11: (empty)
- *   12: Status
- *   13: (empty)
- *   14: Action
- *   15: (empty)
- *   16: Short Notes
- *
- * The table uses alternating empty spacer columns — we read every other col
- * starting at 0.
+ *   1-3: (spacers)
+ *   4: Record Number
+ *   5-7: (spacers)
+ *   8: Record Type
+ *   9-11: (spacers)
+ *   12: Address
+ *   13-15: (spacers)
+ *   16: Description
+ *   17-19: (spacers)
+ *   20: Permit Name
+ *   21-23: (spacers)
+ *   24: Status
  */
 async function parseResultsTable(
   page: Page,
@@ -322,19 +316,13 @@ async function parseResultsTable(
           return "Unknown";
         };
 
-        // Temporarily log all cells on first row to confirm indices
-        if (permits.length === 0) {
-          const allCells = Array.from(cells).map((c, i) => `[${i}]: ${getText(c)}`);
-          console.log("[accela-scraper] First row cells:", allCells.join(" | "));
-        }
-
-        // Extract data columns (skipping spacer columns)
+        // Extract data columns (2 spacer <td>s between each data column)
         const filedDateRaw = getText(cells[0]);
-        const recordNumber  = getText(cells[2]);
-        const recordType    = getText(cells[4]);
-        const address       = getText(cells[6]);
-        const description   = getText(cells[8]);
-        const statusRaw     = getText(cells[12]);
+        const recordNumber  = getText(cells[4]);
+        const recordType    = getText(cells[8]);
+        const address       = getText(cells[12]);
+        const description   = getText(cells[16]);
+        const statusRaw     = getText(cells[24]);
 
         if (!recordNumber) continue;
 
