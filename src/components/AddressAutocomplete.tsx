@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useMapsLibrary } from "@vis.gl/react-google-maps";
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface StructuredAddress {
   raw: string;
@@ -24,106 +22,89 @@ export default function AddressAutocomplete({
   onSelect,
   isLoading,
 }: AddressAutocompleteProps) {
-  const placesLib = useMapsLibrary("places");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const elementRef = useRef<HTMLElement | null>(null);
   const [reportType, setReportType] = useState<"standard" | "attorney">("standard");
-  const [inputValue, setInputValue] = useState("");
-  const [selected, setSelected] = useState(false);
-
-  const onSelectStable = useCallback(onSelect, [onSelect]);
 
   useEffect(() => {
-    if (!placesLib || !inputRef.current) return;
+    if (!containerRef.current) return;
 
-    autocompleteRef.current = new placesLib.Autocomplete(inputRef.current, {
-      bounds: {
-        north: 34.2,
-        south: 33.4,
-        east: -83.8,
-        west: -84.9,
-      },
-      strictBounds: false,
-      componentRestrictions: { country: "us" },
-      fields: ["address_components", "formatted_address", "geometry"],
-      types: ["address"],
-    });
+    const initAutocomplete = async () => {
+      // @ts-expect-error — PlaceAutocompleteElement is not yet in TS types
+      const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
-    autocompleteRef.current.addListener("place_changed", () => {
-      const place = autocompleteRef.current!.getPlace();
-      if (!place.address_components || !place.geometry) return;
+      const placeAutocomplete = new PlaceAutocompleteElement({
+        componentRestrictions: { country: "us" },
+        types: ["address"],
+        // Restrict to Atlanta metro bounding box
+        locationBias: {
+          center: { lat: 33.749, lng: -84.388 },
+          radius: 80000, // ~50 miles in meters
+        },
+      });
 
-      const get = (type: string) =>
-        place.address_components!.find((c) => c.types.includes(type))
-          ?.long_name ?? "";
+      // Style the web component to match existing input styling
+      placeAutocomplete.style.cssText = `
+        width: 100%;
+        --gmp-mat-filled-input-top-section-shape: 0.75rem;
+        font-size: 1.125rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 0;
+      `;
 
-      const getShort = (type: string) =>
-        place.address_components!.find((c) => c.types.includes(type))
-          ?.short_name ?? "";
+      placeAutocomplete.setAttribute("placeholder", "Enter a property address — e.g. 130 Trinity Ave SW");
 
-      const streetNumber = get("street_number");
-      const route = get("route");
-      const city = get("locality") || get("sublocality");
-      const state = getShort("administrative_area_level_1");
-      const zip = get("postal_code");
-      const lat = place.geometry!.location!.lat();
-      const lng = place.geometry!.location!.lng();
+      if (!isLoading) {
+        containerRef.current?.appendChild(placeAutocomplete);
+      }
 
-      const structured: StructuredAddress = {
-        raw: place.formatted_address ?? "",
-        streetNumber,
-        streetName: route,
-        city,
-        state,
-        zip,
-        lat,
-        lng,
-      };
+      elementRef.current = placeAutocomplete;
 
-      setInputValue(place.formatted_address ?? "");
-      setSelected(true);
-      onSelectStable(structured, reportType);
-    });
+      placeAutocomplete.addEventListener("gmp-placeselect", async (event: Event) => {
+        // @ts-expect-error
+        const { place } = event;
+        await place.fetchFields({
+          fields: ["addressComponents", "formattedAddress", "location"],
+        });
+
+        const get = (type: string) =>
+          place.addressComponents?.find((c: { types: string[]; longText: string }) =>
+            c.types.includes(type)
+          )?.longText ?? "";
+
+        const getShort = (type: string) =>
+          place.addressComponents?.find((c: { types: string[]; shortText: string }) =>
+            c.types.includes(type)
+          )?.shortText ?? "";
+
+        const structured: StructuredAddress = {
+          raw: place.formattedAddress ?? "",
+          streetNumber: get("street_number"),
+          streetName: get("route"),
+          city: get("locality") || get("sublocality"),
+          state: getShort("administrative_area_level_1"),
+          zip: get("postal_code"),
+          lat: place.location?.lat() ?? 0,
+          lng: place.location?.lng() ?? 0,
+        };
+
+        onSelect(structured, reportType);
+      });
+    };
+
+    initAutocomplete();
 
     return () => {
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      if (elementRef.current && containerRef.current?.contains(elementRef.current)) {
+        containerRef.current.removeChild(elementRef.current);
       }
     };
-  }, [placesLib, reportType, onSelectStable]);
+  }, [reportType, onSelect, isLoading]);
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            setSelected(false);
-          }}
-          placeholder="Enter a property address — e.g. 130 Trinity Ave SW"
-          className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-gray-900 placeholder-gray-400"
-          disabled={isLoading}
-          aria-label="Property address"
-          autoComplete="off"
-        />
-        {selected && (
-          <button
-            type="button"
-            onClick={() => {
-              setInputValue("");
-              setSelected(false);
-              inputRef.current?.focus();
-            }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            aria-label="Clear address"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+      <div ref={containerRef} className="w-full" />
 
       <div className="mt-4 flex items-center gap-6 justify-center">
         <label className="flex items-center gap-2 cursor-pointer">
