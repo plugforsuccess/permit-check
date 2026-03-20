@@ -86,26 +86,35 @@ export default function AddressAutocomplete({
             fields: ["addressComponents", "formattedAddress", "location"],
           });
 
-          console.log("[autocomplete] place fetched", place.formattedAddress, place.addressComponents);
+          // Use the Place object's built-in accessor instead of manual component parsing
+          const formattedAddress = place.formattedAddress ?? "";
 
-          const get = (type: string) =>
-            place.addressComponents?.find(
-              (c: { types: string[]; longText: string }) => c.types.includes(type)
-            )?.longText ?? "";
+          // Parse from the formatted address string as fallback
+          // Google returns: "1278 Greenwich St SW, Atlanta, GA 30310, USA"
+          const parts = formattedAddress.replace(", USA", "").split(", ");
+          // parts[0] = "1278 Greenwich St SW"
+          // parts[1] = "Atlanta"
+          // parts[2] = "GA 30310"
 
-          const getShort = (type: string) =>
-            place.addressComponents?.find(
-              (c: { types: string[]; shortText: string }) => c.types.includes(type)
-            )?.shortText ?? "";
+          const streetPart = parts[0] ?? "";
+          const streetMatch = streetPart.match(/^(\d+)\s+(.+)$/);
+          const streetNumber = streetMatch?.[1] ?? "";
+          const streetName = streetMatch?.[2] ?? "";
+          const city = parts[1] ?? "";
+          const stateZip = parts[2] ?? "";
+          const state = stateZip.split(" ")[0] ?? "";
+          const zip = stateZip.split(" ")[1] ?? "";
+
+          console.log("[autocomplete] parsed:", { streetNumber, streetName, city, state, zip });
 
           onSelect(
             {
-              raw: place.formattedAddress ?? "",
-              streetNumber: get("street_number"),
-              streetName: get("route"),
-              city: get("locality") || get("sublocality"),
-              state: getShort("administrative_area_level_1"),
-              zip: get("postal_code"),
+              raw: formattedAddress,
+              streetNumber,
+              streetName,
+              city,
+              state,
+              zip,
               lat: place.location?.lat() ?? 0,
               lng: place.location?.lng() ?? 0,
             },
