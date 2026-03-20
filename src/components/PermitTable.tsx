@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Permit } from "@/types";
 
 interface PermitTableProps {
@@ -8,23 +9,37 @@ interface PermitTableProps {
 }
 
 const statusStyles: Record<string, string> = {
-  Issued: "bg-green-100 text-green-800",
-  Expired: "bg-red-100 text-red-800",
-  "In Review": "bg-yellow-100 text-yellow-800",
-  Finaled: "bg-blue-100 text-blue-800",
-  Void: "bg-gray-100 text-gray-600",
-  Pending: "bg-yellow-100 text-yellow-800",
-  Unknown: "bg-gray-100 text-gray-500",
+  Issued: "border-l-2 border-green-500 bg-green-50 text-green-800",
+  Expired: "border-l-2 border-red-400 bg-red-50 text-red-700",
+  "In Review": "border-l-2 border-yellow-400 bg-yellow-50 text-yellow-800",
+  Finaled: "border-l-2 border-blue-400 bg-blue-50 text-blue-800",
+  Void: "border-l-2 border-gray-300 bg-gray-50 text-gray-500",
+  Pending: "border-l-2 border-yellow-400 bg-yellow-50 text-yellow-800",
+  Unknown: "border-l-2 border-gray-200 bg-gray-50 text-gray-400",
 };
 
 export default function PermitTable({
   permits,
   isBlurred = false,
 }: PermitTableProps) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   if (permits.length === 0) {
     return (
       <div className="text-center py-12 bg-gray-50 rounded-xl">
-        <div className="text-4xl mb-4">📋</div>
+        <div className="text-4xl mb-4">&#128203;</div>
         <h3 className="text-lg font-semibold text-gray-700 mb-2">
           No Permit Records Found
         </h3>
@@ -42,7 +57,7 @@ export default function PermitTable({
       {isBlurred && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
           <div className="text-center p-8">
-            <div className="text-3xl mb-3">🔒</div>
+            <div className="text-3xl mb-3">&#128274;</div>
             <h3 className="text-lg font-bold text-gray-800 mb-2">
               Results Ready
             </h3>
@@ -53,9 +68,41 @@ export default function PermitTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      {/* Mobile cards — shown on small screens */}
+      <div className="md:hidden space-y-3">
+        {permits.map((permit, index) => (
+          <div
+            key={permit.id || index}
+            className="bg-white border border-gray-200 rounded-xl p-4"
+            style={{ animation: `fadeIn 0.2s ease both ${index * 0.05}s` }}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <span className="font-mono text-sm font-medium text-gray-900">
+                {permit.record_number}
+              </span>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full ${statusStyles[permit.status] || statusStyles.Unknown}`}
+              >
+                {permit.status}
+              </span>
+            </div>
+            <div className="text-sm text-gray-700 mb-1">{permit.type}</div>
+            {permit.description && (
+              <div className="text-xs text-gray-500 mb-2 leading-relaxed">
+                {permit.description}
+              </div>
+            )}
+            <div className="text-xs text-gray-400">
+              Filed: {permit.filed_date || "\u2014"}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table — hidden on small screens */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-blue-600">
+          <thead className="bg-blue-600 sticky top-0 z-10">
             <tr>
               {[
                 "Record #",
@@ -80,6 +127,7 @@ export default function PermitTable({
               <tr
                 key={permit.id || index}
                 className="hover:bg-gray-50 transition-colors"
+                style={{ animation: `fadeIn 0.2s ease both ${index * 0.05}s` }}
               >
                 <td className="px-4 py-3 text-sm font-mono text-gray-900">
                   {permit.record_number}
@@ -89,22 +137,28 @@ export default function PermitTable({
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusStyles[permit.status] || statusStyles.Unknown}`}
+                    className={`inline-flex px-2.5 py-0.5 text-xs font-semibold ${statusStyles[permit.status] || statusStyles.Unknown}`}
                   >
                     {permit.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {permit.filed_date || "—"}
+                  {permit.filed_date || "\u2014"}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {permit.issued_date || "—"}
+                  {permit.issued_date || "\u2014"}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                  {permit.description || "—"}
+                <td
+                  className="px-4 py-3 text-sm text-gray-600 max-w-xs cursor-pointer"
+                  onClick={() => toggleExpanded(permit.record_number)}
+                >
+                  {expanded.has(permit.record_number)
+                    ? permit.description || "\u2014"
+                    : (permit.description?.slice(0, 60) ?? "\u2014") +
+                      ((permit.description?.length ?? 0) > 60 ? "..." : "")}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {permit.contractor || "—"}
+                  {permit.contractor || "\u2014"}
                 </td>
               </tr>
             ))}

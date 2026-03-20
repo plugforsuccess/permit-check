@@ -66,25 +66,86 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Hero Section */}
-      <section className="pt-24 pb-20 px-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-            Verify Atlanta Property Permits
-            <br />
-            <span className="text-blue-600">Before You Buy</span>
-          </h1>
-          <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto">
-            Instantly check the complete permit history for any Atlanta metro property.
-          </p>
+      {/* Hero — split layout */}
+      <section className="pt-16 pb-12 px-4">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
 
-          <AddressAutocomplete onSelect={handleSubmit} isLoading={isLoading} />
-
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm max-w-2xl mx-auto">
-              {error}
+          {/* Left: CTA */}
+          <div>
+            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              Now covering Atlanta + Gwinnett County
             </div>
-          )}
+            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
+              Verify permits before
+              <br />
+              <span className="text-blue-600">you close.</span>
+            </h1>
+            <p className="text-lg text-gray-500 mb-8 leading-relaxed">
+              Unpermitted work costs buyers tens of thousands. Search the
+              official government permit database for any Atlanta metro
+              property in seconds.
+            </p>
+            <AddressAutocomplete onSelect={handleSubmit} isLoading={isLoading} />
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+            {/* Trust signals */}
+            <div className="mt-8 flex items-center gap-6 text-sm text-gray-400">
+              <span>&#10003; Official government data</span>
+              <span>&#10003; Results in ~20 seconds</span>
+              <span>&#10003; $9.99 one-time</span>
+            </div>
+          </div>
+
+          {/* Right: Product preview */}
+          <div className="hidden lg:block relative">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+              {/* Mock results header */}
+              <div className="px-6 py-4 border-b border-gray-100">
+                <div className="text-sm text-gray-500 mb-1">1278 Greenwich St SW, Atlanta, GA</div>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                    10 permit records found
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
+                    Locked
+                  </span>
+                </div>
+              </div>
+              {/* Blurred table preview */}
+              <div className="relative">
+                <div className="blur-sm select-none p-4">
+                  <div className="space-y-2">
+                    {["BM-202403948", "BE-202505738", "BP-202502458", "CC-2025-00302", "BT-202501504"].map((rec, i) => (
+                      <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50">
+                        <span className="font-mono text-xs text-gray-700 w-32">{rec}</span>
+                        <span className="text-xs text-gray-500 flex-1">
+                          {["Residential - HVAC", "Residential - Electrical", "Residential - Plumbing", "Code Complaint", "Temporary Power"][i]}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${["bg-green-100 text-green-700", "bg-green-100 text-green-700", "bg-red-100 text-red-700", "bg-blue-100 text-blue-700", "bg-green-100 text-green-700"][i]}`}>
+                          {["Issued", "Issued", "Expired", "Finaled", "Issued"][i]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Lock overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+                  <div className="text-center">
+                    <div className="text-3xl mb-2">&#128274;</div>
+                    <div className="text-sm font-semibold text-gray-700">Unlock for $9.99</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Decorative elements */}
+            <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-50 rounded-full -z-10" />
+            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-green-50 rounded-full -z-10" />
+          </div>
+
         </div>
       </section>
 
