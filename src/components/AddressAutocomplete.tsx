@@ -73,6 +73,7 @@ export default function AddressAutocomplete({
         elementRef.current = placeAutocomplete;
 
         placeAutocomplete.addEventListener("gmp-placeselect", async (event: Event) => {
+            console.log("[autocomplete] gmp-placeselect fired", event);
           // @ts-expect-error
           const { place } = event;
           await place.fetchFields({
