@@ -18,7 +18,3 @@ export const lookupInitiateSchema = z.object({
   report_type: z.enum(["standard", "attorney"]).default("standard"),
 });
 
-export const registerSchema = z.object({
-  email: z.string().email().max(255),
-  password: z.string().min(8).max(128),
-});

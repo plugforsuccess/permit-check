@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import {
-  scrapeAccelaPermits,
-  normalizeAddress as normalizeAccelaAddress,
-} from "@/lib/accela/index";
+import { scrapeAccelaPermits } from "@/lib/accela/index";
 import type { PermitRecord } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { lookupInitiateSchema } from "@/lib/schemas";
@@ -48,7 +45,12 @@ export async function POST(request: NextRequest) {
 
     // 2. Normalize address
     const addressNormalized = normalizeAddress(address);
-    const { streetNumber, streetName } = normalizeAccelaAddress(address);
+
+    // Split the canonical normalized form for the scraper
+    // normalizeAddress already strips city/state/unit — safe to split directly
+    const parts = addressNormalized.split(/\s+/);
+    const streetNumber = parts[0];
+    const streetName = parts.slice(1).join(" ");
 
     // 3. Check Supabase cache — if address looked up in last 24h, return cached result
     const supabase = createServerClient();
