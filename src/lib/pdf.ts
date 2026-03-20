@@ -139,20 +139,20 @@ export function generateReportHtml(data: ReportData): string {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 3px solid #1e40af;
+      border-bottom: 3px solid #0f1f3d;
       padding-bottom: 16px;
       margin-bottom: 24px;
     }
     .logo { font-size: 24px; line-height: 1; }
     .meta { text-align: right; color: #666; font-size: 11px; }
-    h2 { color: #1e40af; font-size: 16px; margin: 24px 0 12px; }
+    h2 { color: #0f1f3d; font-size: 16px; margin: 24px 0 12px; }
     table {
       width: 100%;
       border-collapse: collapse;
       margin: 16px 0;
     }
     th {
-      background: #1e40af;
+      background: #0f1f3d;
       color: white;
       padding: 8px 10px;
       text-align: left;

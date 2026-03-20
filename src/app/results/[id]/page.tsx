@@ -174,7 +174,7 @@ export default function ResultsPage() {
           <p className="text-gray-600 mb-6">{error}</p>
           <a
             href="/"
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            className="inline-block px-6 py-3 bg-[#0f1f3d] text-white rounded-lg font-semibold hover:bg-[#1a3560] transition-colors"
           >
             Try Another Address
           </a>
@@ -266,7 +266,7 @@ export default function ResultsPage() {
                   href={result.report.download_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors"
                 >
                   <svg
                     className="w-5 h-5"
@@ -377,7 +377,7 @@ export default function ResultsPage() {
                 <button
                   onClick={handleCheckout}
                   disabled={checkoutLoading}
-                  className="w-full sm:w-auto px-8 py-4 bg-blue-600 text-white rounded-xl font-bold text-base sm:text-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                  className="w-full sm:w-auto px-8 py-4 bg-[#0f1f3d] text-white rounded-xl font-bold text-base sm:text-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
                 >
                   {checkoutLoading ? (
                     <span className="flex items-center gap-2">
