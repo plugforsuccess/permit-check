@@ -55,7 +55,7 @@ export default function HomePage() {
             <span className="text-blue-600">Before You Buy</span>
           </h1>
           <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto">
-            Instantly check the complete permit history for any Atlanta property.
+            Instantly check the complete permit history for any Atlanta metro property.
           </p>
 
           <AddressSearch onSearch={handleSubmit} isLoading={isLoading} />
@@ -67,7 +67,7 @@ export default function HomePage() {
           )}
 
           <p className="mt-6 text-sm text-gray-400">
-            Searching the City of Atlanta&apos;s Accela public records database
+            Searching official Accela permit databases across the Atlanta metro
           </p>
         </div>
       </section>
@@ -79,10 +79,9 @@ export default function HomePage() {
             What is PermitCheck?
           </h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            PermitCheck searches the City of Atlanta&apos;s official Accela
-            database for building permits, renovation permits, and other public
-            records tied to a property address. Buyers use it to verify that
-            renovations were properly permitted before closing on a home.
+            PermitCheck searches official Accela permit databases across the
+            Atlanta metro — including the City of Atlanta and Gwinnett County,
+            with more jurisdictions coming soon.
           </p>
           <p className="text-gray-600 leading-relaxed mb-4">
             Unpermitted work is one of the most common — and most expensive —
@@ -111,7 +110,7 @@ export default function HomePage() {
                 <li>✓ All permit types — building, electrical, plumbing, HVAC</li>
                 <li>✓ Filed date, issued date, status, contractor</li>
                 <li>✓ Downloadable PDF report</li>
-                <li>✓ Data sourced directly from City of Atlanta Accela</li>
+                <li>✓ Data sourced directly from official government permit databases</li>
               </ul>
             </div>
 
