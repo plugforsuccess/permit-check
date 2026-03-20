@@ -6,22 +6,38 @@ import {
 } from "@/lib/accela/index";
 import type { PermitRecord } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress } from "@/lib/address";
+import { lookupInitiateSchema } from "@/lib/schemas";
+import { rateLimit } from "@/lib/ratelimit";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { address } = body;
-
-    if (!address || typeof address !== "string") {
+    // Rate limit: 5 requests per minute per IP
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    const allowed = rateLimit(clientIp, 5, 60_000);
+    if (!allowed) {
       return NextResponse.json(
-        { error: "Address is required" },
+        { error: "Too many requests. Please try again shortly." },
+        { status: 429 }
+      );
+    }
+
+    const raw = await request.json();
+    const parsed = lookupInitiateSchema.safeParse(raw);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
 
-    // 1. Validate input
+    const { address } = parsed.data;
+
+    // Validate address format
     const validation = validateAddress(address);
     if (!validation.valid) {
       return NextResponse.json(
@@ -68,10 +84,17 @@ export async function POST(request: NextRequest) {
     console.log(
       `[lookup/initiate] Scraping Accela for: ${streetNumber} ${streetName}`
     );
-    const permits: PermitRecord[] = await scrapeAccelaPermits(
-      streetNumber,
-      streetName
-    );
+
+    let permits: PermitRecord[] = [];
+    let warning: string | undefined;
+
+    try {
+      permits = await scrapeAccelaPermits(streetNumber, streetName);
+    } catch (error) {
+      console.error("Accela scraping failed:", error);
+      warning =
+        "Permit data temporarily unavailable. Please try again shortly.";
+    }
 
     // 5. Store result in Supabase (lookups + permits tables)
     const { data: lookup, error: lookupError } = await supabase
@@ -122,6 +145,7 @@ export async function POST(request: NextRequest) {
       total_count: permits.length,
       source: "accela_scraper",
       cached: false,
+      ...(warning ? { warning } : {}),
     });
   } catch (error) {
     console.error("Lookup initiation error:", error);

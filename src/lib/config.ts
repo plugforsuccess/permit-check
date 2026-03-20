@@ -29,4 +29,5 @@ export const config = {
   },
 } as const;
 
-export const DISCLAIMER = `DISCLAIMER: PermitCheck retrieves publicly available permit records from the City of Atlanta's Accela database. Results reflect records found in that system as of the date of lookup. Incomplete municipal records, address formatting variations, or data entry errors may affect results. This report does not constitute a legal determination of code compliance, permit status, or property condition. Consult a licensed attorney or building inspector for legal or professional advice.`;
+// Re-export for backward compatibility in server code
+export { DISCLAIMER } from "./constants";

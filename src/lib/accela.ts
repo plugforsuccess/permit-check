@@ -14,34 +14,39 @@ import { config } from "./config";
 import { normalizeAddress } from "./address";
 import type { Permit, PermitStatus, PermitSearchResult } from "@/types";
 import * as cheerio from "cheerio";
+import { LRUCache } from "lru-cache";
 
-// In-memory cache (replace with Redis/Supabase cache in production)
-const permitCache = new Map<
-  string,
-  { data: PermitSearchResult; timestamp: number }
->();
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+// LRU cache with 24-hour TTL and max 1000 entries
+const permitCache = new LRUCache<string, PermitSearchResult>({
+  max: 1000,
+  ttl: 24 * 60 * 60 * 1000, // 24 hours
+});
+
+export interface PermitFetchResult extends PermitSearchResult {
+  warning?: string;
+}
 
 /**
  * Main entry point: fetch permits for an address.
  * Tries cache → Accela API → scraper fallback.
+ * Never throws — returns empty results with a warning on failure.
  */
 export async function fetchPermits(
   addressRaw: string
-): Promise<PermitSearchResult> {
+): Promise<PermitFetchResult> {
   const normalized = normalizeAddress(addressRaw);
 
-  // Check cache
+  // Check cache first
   const cached = permitCache.get(normalized);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return { ...cached.data, source: "cache" };
+  if (cached) {
+    return { ...cached, source: "cache" };
   }
 
   // Try Accela API first
   if (config.accela.appId && config.accela.appSecret) {
     try {
       const result = await fetchFromAccelaApi(normalized);
-      permitCache.set(normalized, { data: result, timestamp: Date.now() });
+      permitCache.set(normalized, result);
       return result;
     } catch (error) {
       console.warn("Accela API failed, falling back to scraper:", error);
@@ -49,9 +54,20 @@ export async function fetchPermits(
   }
 
   // Fall back to public portal scraping
-  const result = await fetchFromAccelaPortal(normalized);
-  permitCache.set(normalized, { data: result, timestamp: Date.now() });
-  return result;
+  try {
+    const result = await fetchFromAccelaPortal(normalized);
+    permitCache.set(normalized, result);
+    return result;
+  } catch (error) {
+    console.error("All Accela data sources failed:", error);
+    return {
+      permits: [],
+      total_count: 0,
+      source: "accela_scraper",
+      warning:
+        "Permit data temporarily unavailable. Please try again shortly.",
+    };
+  }
 }
 
 /**
@@ -189,12 +205,7 @@ async function fetchFromAccelaPortal(
     };
   } catch (error) {
     console.error("Accela portal scraping failed:", error);
-    // Return empty results rather than throwing — "no records found" is valid
-    return {
-      permits: [],
-      total_count: 0,
-      source: "accela_scraper",
-    };
+    throw error;
   }
 }
 

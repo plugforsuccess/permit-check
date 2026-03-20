@@ -1,17 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
-import { config } from "./config";
+import "server-only";
+import { getSupabaseAdmin } from "./supabase/server";
 
-// Client-side Supabase client (uses anon key)
-export function createBrowserClient() {
-  return createClient(config.supabase.url, config.supabase.anonKey);
-}
-
-// Server-side Supabase client (uses service role key for admin operations)
+// Wrapper function for API routes. Returns the server-only admin client.
+// Client components should import from "@/lib/supabase/client" instead.
 export function createServerClient() {
-  return createClient(config.supabase.url, config.supabase.serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  return getSupabaseAdmin();
 }
