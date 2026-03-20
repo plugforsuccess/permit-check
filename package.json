@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
-    "@sparticuz/chromium": "^143.0.4",
+    "@sparticuz/chromium": "^131.0.0",
     "@supabase/supabase-js": "^2.99.3",
     "cheerio": "^1.2.0",
     "date-fns": "^4.1.0",
