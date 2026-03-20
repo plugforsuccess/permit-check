@@ -39,6 +39,20 @@ gmp-place-autocomplete {
   --gmp-input-height: 60px;
 }
 
+/* Mobile tap optimizations */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
 /* Phase 3 — Row fade-in animation for permit table */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
