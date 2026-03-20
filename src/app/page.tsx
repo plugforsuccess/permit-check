@@ -74,7 +74,7 @@ export default function HomePage() {
           <div>
             <div className="inline-flex flex-wrap items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
               <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-              Now covering Atlanta + Gwinnett County
+              Now covering Atlanta Metro + Gwinnett County
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
               Verify permits before
@@ -156,9 +156,9 @@ export default function HomePage() {
             What is PermitCheck?
           </h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            PermitCheck searches official Accela permit databases across the
-            Atlanta metro — including the City of Atlanta and Gwinnett County,
-            with more jurisdictions coming soon.
+            PermitCheck searches official government permit databases across
+            supported jurisdictions — currently covering Atlanta and Gwinnett
+            County, with more coming soon.
           </p>
           <p className="text-gray-600 leading-relaxed mb-4">
             Unpermitted work is one of the most common — and most expensive —

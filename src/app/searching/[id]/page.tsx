@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Logo from "@/components/Logo";
 
 interface Step {
   id: string;
@@ -114,8 +115,8 @@ export default function SearchingPage() {
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-16">
 
       {/* Brand */}
-      <div className="text-xl font-bold text-blue-600 mb-1">PermitCheck</div>
-      <div className="text-sm text-gray-400 mb-12">Atlanta Metro Permit Verification</div>
+      <Logo size="md" variant="light" className="mb-1" />
+      <div className="text-sm text-gray-400 mb-12">Property Permit Verification</div>
 
       {/* Address pill */}
       {address && (
