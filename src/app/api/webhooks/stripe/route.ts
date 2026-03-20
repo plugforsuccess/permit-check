@@ -109,6 +109,7 @@ export async function POST(req: Request) {
           pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
           expires_at: expiresAt.toISOString(),
           download_token: downloadToken,
+          matter_reference: session.metadata?.matter_reference || null,
         })
         .select()
         .single();

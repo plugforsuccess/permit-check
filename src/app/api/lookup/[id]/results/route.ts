@@ -35,6 +35,7 @@ export async function GET(
       address: lookup.address_normalized,
       permit_count: lookup.permit_count,
       payment_status: lookup.payment_status,
+      report_type: lookup.report_type || "standard",
       permits: null, // Not revealed until paid
     });
   }
@@ -66,6 +67,7 @@ export async function GET(
     address: lookup.address_normalized,
     permit_count: lookup.permit_count,
     payment_status: lookup.payment_status,
+    report_type: lookup.report_type || "standard",
     permits,
     report: report
       ? {

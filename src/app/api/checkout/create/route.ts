@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 
 const checkoutSchema = z.object({
   lookup_id: z.string().uuid(),
+  matter_reference: z.string().max(100).optional(),
 });
 
 /**
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { lookup_id } = parsed.data;
+    const { lookup_id, matter_reference } = parsed.data;
 
     // Verify lookup exists and hasn't already been paid
     const supabase = createServerClient();
@@ -71,7 +72,8 @@ export async function POST(request: NextRequest) {
       amount,
       reportType as "standard" | "attorney",
       successUrl,
-      cancelUrl
+      cancelUrl,
+      matter_reference
     );
 
     return NextResponse.json({ checkout_url: session.url });

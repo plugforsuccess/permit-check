@@ -91,6 +91,7 @@ export async function GET(
     lookupId: lookup.id,
     permits,
     reportType: lookup.report_type || "standard",
+    matterReference: report.matter_reference ?? undefined,
   });
 
   // Standard: return HTML with auto-print for browser print-to-PDF

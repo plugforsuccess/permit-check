@@ -34,7 +34,8 @@ export async function createCheckoutSession(
   amount: number,
   reportType: "standard" | "attorney",
   successUrl: string,
-  cancelUrl: string
+  cancelUrl: string,
+  matterReference?: string
 ): Promise<Stripe.Checkout.Session> {
   const stripe = getStripe();
   return stripe.checkout.sessions.create({
@@ -64,6 +65,7 @@ export async function createCheckoutSession(
     metadata: {
       lookup_id: lookupId,
       report_type: reportType,
+      matter_reference: matterReference ?? "",
     },
   });
 }

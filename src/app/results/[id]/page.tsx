@@ -12,6 +12,7 @@ interface LookupResult {
   address: string;
   permit_count: number;
   payment_status: "pending" | "paid" | "failed";
+  report_type: "standard" | "attorney";
   permits: Permit[] | null;
   report: {
     id: string;
@@ -38,6 +39,7 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [pollingForPayment, setPollingForPayment] = useState(false);
+  const [matterReference, setMatterReference] = useState("");
 
   const fetchResults = useCallback(async () => {
     try {
@@ -107,7 +109,10 @@ export default function ResultsPage() {
       const response = await fetch("/api/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lookup_id: lookupId }),
+        body: JSON.stringify({
+          lookup_id: lookupId,
+          matter_reference: matterReference || undefined,
+        }),
       });
 
       const data = await response.json();
@@ -332,6 +337,26 @@ export default function ResultsPage() {
               )}
               isBlurred={true}
             />
+
+            {/* Matter Reference — attorney reports only */}
+            {result.report_type === "attorney" && (
+              <div className="mt-8 max-w-md mx-auto">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Matter Reference <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={matterReference}
+                  onChange={(e) => setMatterReference(e.target.value)}
+                  placeholder="e.g. Smith v. Jones — File #2024-001"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  maxLength={100}
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Appears on the cover page of your report for case identification
+                </p>
+              </div>
+            )}
 
             {/* Payment CTA */}
             <div className="mt-8 text-center">
