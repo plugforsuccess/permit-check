@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { scrapeAccelaPermits } from "@/lib/accela/index";
+import {
+  scrapeAccelaPermits,
+  detectJurisdiction,
+} from "@/lib/accela/index";
 import type { PermitRecord } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { lookupInitiateSchema } from "@/lib/schemas";
@@ -64,6 +67,10 @@ export async function POST(request: NextRequest) {
     const streetNumber = parts[0];
     const streetName = parts.slice(1).join(" ");
 
+    // Detect jurisdiction from the full address (before normalization strips zip)
+    const jurisdictionId = detectJurisdiction(address);
+    console.log(`[lookup/initiate] Jurisdiction detected: ${jurisdictionId}`);
+
     // 3. Check Supabase cache — if address looked up in last 24h, return cached result
     const supabase = createServerClient();
     const cutoff = new Date(Date.now() - CACHE_TTL_MS).toISOString();
@@ -103,7 +110,7 @@ export async function POST(request: NextRequest) {
     let warning: string | undefined;
 
     try {
-      permits = await scrapeAccelaPermits(streetNumber, streetName);
+      permits = await scrapeAccelaPermits(streetNumber, streetName, jurisdictionId);
     } catch (error) {
       console.error("Accela scraping failed:", error);
       warning =
@@ -119,6 +126,7 @@ export async function POST(request: NextRequest) {
         permit_count: permits.length,
         report_type: parsed.data.report_type,
         user_id: userId,
+        jurisdiction_id: jurisdictionId,
       })
       .select()
       .single();

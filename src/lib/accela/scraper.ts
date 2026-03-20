@@ -14,6 +14,7 @@ import { chromium as playwrightChromium } from "playwright-core";
 const CHROMIUM_REMOTE_URL =
   "https://github.com/Sparticuz/chromium/releases/download/v137.0.0/chromium-v137.0.0-pack.x64.tar";
 import type { Browser, Page } from "playwright-core";
+import { getJurisdiction, type JurisdictionConfig } from "./jurisdictions";
 
 export interface PermitRecord {
   recordNumber: string;
@@ -31,8 +32,6 @@ export interface PermitRecord {
   address: string;
 }
 
-const PORTAL_URL = "https://aca-prod.accela.com/ATLANTA_GA";
-const SEARCH_URL = `${PORTAL_URL}/Cap/CapHome.aspx?module=Building&customglobalsearch=true`;
 const BROWSER_TIMEOUT = 20_000;
 const SELECTOR_TIMEOUT = 15_000;
 
@@ -129,21 +128,22 @@ async function launchBrowser(): Promise<Browser> {
 }
 
 /**
- * Scrape permit records from the Atlanta Accela portal.
+ * Scrape permit records from an Accela portal.
  * Returns all pages of results. Never throws — returns [] on failure.
  */
 export async function scrapeAccelaPermits(
   streetNumber: string,
-  streetName: string
+  streetName: string,
+  jurisdictionId: string = "ATLANTA_GA"
 ): Promise<PermitRecord[]> {
   let browser: Browser | null = null;
+  const jurisdiction = getJurisdiction(jurisdictionId);
 
-  // Reconstruct a normalized address string to parse into portal fields
-  // streetNumber and streetName arrive already split from normalizeAddress()
   const normalizedAddress = `${streetNumber} ${streetName}`;
   const parsed = parseAddressForPortal(normalizedAddress);
+
   console.log(
-    `[accela-scraper] Parsed address: number="${parsed.streetNumber}" name="${parsed.streetName}" suffix="${parsed.streetSuffix}" quadrant="${parsed.quadrant}"`
+    `[accela-scraper] Jurisdiction: ${jurisdiction.name} | address: number="${parsed.streetNumber}" name="${parsed.streetName}" suffix="${parsed.streetSuffix}" quadrant="${parsed.quadrant}"`
   );
 
   try {
@@ -155,76 +155,78 @@ export async function scrapeAccelaPermits(
     const page = await context.newPage();
     page.setDefaultTimeout(BROWSER_TIMEOUT);
 
-    // Step 1: Navigate to the custom global search page
     console.log("[accela-scraper] Navigating to portal...");
-    await page.goto(SEARCH_URL, {
+    await page.goto(jurisdiction.searchUrl, {
       waitUntil: "networkidle",
       timeout: BROWSER_TIMEOUT,
     });
 
-    // Wait for the search form to be fully interactive
-    await page.waitForSelector(SELECTORS.streetNumberFrom, { timeout: SELECTOR_TIMEOUT });
+    await page.waitForSelector(SELECTORS.streetNumberFrom, {
+      timeout: SELECTOR_TIMEOUT,
+    });
     await page.waitForTimeout(1000);
 
-    // Step 2: Click then fill street number — ASP.NET watermark fields need
-    // a click to clear the watermark before fill() will work correctly
     console.log("[accela-scraper] Filling search form...");
     await page.click(SELECTORS.streetNumberFrom);
     await page.fill(SELECTORS.streetNumberFrom, parsed.streetNumber);
 
-    // Step 3: Click then fill street name
     await page.click(SELECTORS.streetName);
     await page.fill(SELECTORS.streetName, parsed.streetName);
 
-    // Step 4: Select street suffix from dropdown if we have one
     if (parsed.streetSuffix) {
       await page.selectOption(SELECTORS.streetSuffix, parsed.streetSuffix);
     }
 
-    // Step 5: Select quadrant from dropdown if we have one
-    if (parsed.quadrant) {
+    // Only Atlanta has the quadrant dropdown
+    if (jurisdiction.hasQuadrant && parsed.quadrant) {
       await page.selectOption(SELECTORS.quadrant, parsed.quadrant);
     }
 
-    // Step 6: Widen date range to capture full history
-    // Default is last 5 years — click to clear watermark before filling
-    await page.click(SELECTORS.startDate);
-    await page.fill(SELECTORS.startDate, "01/01/2000");
-    await page.click(SELECTORS.endDate);
-    await page.fill(SELECTORS.endDate, new Date().toLocaleDateString("en-US", {
-      month: "2-digit", day: "2-digit", year: "numeric"
-    }));
+    // Only Atlanta has date range fields
+    if (jurisdiction.hasDateRange) {
+      await page.click(SELECTORS.startDate);
+      await page.fill(SELECTORS.startDate, "01/01/2000");
+      await page.click(SELECTORS.endDate);
+      await page.fill(
+        SELECTORS.endDate,
+        new Date().toLocaleDateString("en-US", {
+          month: "2-digit",
+          day: "2-digit",
+          year: "numeric",
+        })
+      );
+    }
 
-    // Brief pause to let any ASP.NET postback JS settle before submitting
     await page.waitForTimeout(500);
 
-    // Step 7: Submit
     console.log("[accela-scraper] Submitting search...");
     await page.click(SELECTORS.searchButton);
 
-    // Step 8: Wait for results table or no-results state
     try {
       await page.waitForSelector(SELECTORS.resultsTable, {
         timeout: SELECTOR_TIMEOUT,
       });
     } catch {
-      // Log the page title and URL to help diagnose what happened
       const title = await page.title();
       const url = page.url();
-      console.log(`[accela-scraper] No results table found. Page: "${title}" URL: ${url}`);
+      console.log(
+        `[accela-scraper] No results table found. Page: "${title}" URL: ${url}`
+      );
       return [];
     }
 
-    // Step 9: Collect all pages
     const allPermits: PermitRecord[] = [];
     let pageNum = 1;
 
     while (true) {
       console.log(`[accela-scraper] Parsing results page ${pageNum}...`);
-      const pagePermits = await parseResultsTable(page, normalizedAddress);
+      const pagePermits = await parseResultsTable(
+        page,
+        normalizedAddress,
+        jurisdiction.columnMap
+      );
       allPermits.push(...pagePermits);
 
-      // Try to go to next page
       const nextLink = await page.$(SELECTORS.nextPage);
       if (!nextLink) break;
 
@@ -233,14 +235,18 @@ export async function scrapeAccelaPermits(
         await page.waitForSelector(SELECTORS.resultsTable, {
           timeout: SELECTOR_TIMEOUT,
         });
-        await page.waitForLoadState("networkidle", { timeout: SELECTOR_TIMEOUT });
+        await page.waitForLoadState("networkidle", {
+          timeout: SELECTOR_TIMEOUT,
+        });
       } catch {
         break;
       }
       pageNum++;
     }
 
-    console.log(`[accela-scraper] Found ${allPermits.length} total permit records`);
+    console.log(
+      `[accela-scraper] Found ${allPermits.length} total permit records`
+    );
     return allPermits;
   } catch (error) {
     console.error("[accela-scraper] Scraping failed:", error);
@@ -250,36 +256,24 @@ export async function scrapeAccelaPermits(
   }
 }
 
-/**
- * Parse the confirmed results table.
- *
- * Column order (verified via DevTools 2026-03-20):
- *   0: (row selector / checkbox)
- *   1: Date (filed date)
- *   2: Record Number
- *   3: Record Type
- *   4: Address (not used — we already have addr from search)
- *   5: Description
- *   6: Permit Name
- *   7: Status
- */
 async function parseResultsTable(
   page: Page,
-  address: string
+  address: string,
+  columnMap: JurisdictionConfig["columnMap"]
 ): Promise<PermitRecord[]> {
   return page.evaluate(
-    ({ tableSelector, addr }) => {
-      const table = document.querySelector(tableSelector) as HTMLTableElement | null;
+    ({ tableSelector, addr, cols }: { tableSelector: string; addr: string; cols: Record<string, number> }) => {
+      const table = document.querySelector(
+        tableSelector
+      ) as HTMLTableElement | null;
       if (!table) return [];
 
       const permits: PermitRecord[] = [];
       const rows = table.querySelectorAll("tr");
 
-      // Skip row 0 (pagination/count header) and row 1 (column headers)
-      // Data rows start at index 2
       for (let i = 2; i < rows.length; i++) {
         const cells = rows[i].querySelectorAll("td");
-        if (cells.length < 7) continue;
+        if (cells.length < 3) continue;
 
         const getText = (cell: Element | undefined): string => {
           if (!cell) return "";
@@ -300,39 +294,56 @@ async function parseResultsTable(
 
         const mapStatus = (
           raw: string
-        ): "Issued" | "Finaled" | "Expired" | "Void" | "In Review" | "Unknown" => {
+        ):
+          | "Issued"
+          | "Finaled"
+          | "Expired"
+          | "Void"
+          | "In Review"
+          | "Unknown" => {
           const s = raw.toUpperCase().trim();
           if (s.includes("ISSUED") || s.includes("APPROVED")) return "Issued";
-          if (s.includes("FINAL") || s.includes("CLOSED") || s.includes("COMPLETE")) return "Finaled";
+          if (
+            s.includes("FINAL") ||
+            s.includes("CLOSED") ||
+            s.includes("COMPLETE")
+          )
+            return "Finaled";
           if (s.includes("EXPIRED")) return "Expired";
           if (s.includes("VOID") || s.includes("CANCEL")) return "Void";
-          if (s.includes("REVIEW") || s.includes("PENDING") || s.includes("SUBMITTED")) return "In Review";
+          if (
+            s.includes("REVIEW") ||
+            s.includes("PENDING") ||
+            s.includes("SUBMITTED")
+          )
+            return "In Review";
           return "Unknown";
         };
 
-        // Extract data columns (no spacer columns — confirmed via DevTools)
-        const filedDateRaw = getText(cells[1]);
-        const recordNumber  = getText(cells[2]);
-        const recordType    = getText(cells[3]);
-        const description   = getText(cells[5]);
-        const permitName    = getText(cells[6]);
-        const statusRaw     = getText(cells[7]);
-
+        const recordNumber = getText(cells[cols.recordNumber]);
         if (!recordNumber || recordNumber.includes(" ")) continue;
+
+        const resolvedAddress =
+          cols.address >= 0
+            ? getText(cells[cols.address]) || addr
+            : addr;
 
         permits.push({
           recordNumber,
-          type: recordType || "Unknown",
-          status: mapStatus(statusRaw),
-          filedDate: parseDate(filedDateRaw),
+          type: getText(cells[cols.recordType]) || "Unknown",
+          status: mapStatus(getText(cells[cols.status])),
+          filedDate: parseDate(getText(cells[cols.filedDate])),
           issuedDate: null,
-          description: description || permitName,
-          address: addr,
+          description:
+            getText(cells[cols.description]) ||
+            getText(cells[cols.permitName]) ||
+            "",
+          address: resolvedAddress,
         });
       }
 
       return permits;
     },
-    { tableSelector: SELECTORS.resultsTable, addr: address }
+    { tableSelector: SELECTORS.resultsTable, addr: address, cols: columnMap }
   );
 }
