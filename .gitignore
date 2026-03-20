@@ -44,3 +44,9 @@ next-env.d.ts
 
 # scraper debug artifacts
 scripts/scraper-debug.*
+
+# jurisdiction bot outputs
+scripts/screenshots/
+scripts/discovered-jurisdictions.json
+scripts/verified-configs.json
+scripts/generated-jurisdiction-configs.ts
