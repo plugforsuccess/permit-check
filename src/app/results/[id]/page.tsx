@@ -182,47 +182,6 @@ export default function ResultsPage() {
 
   const isPaid = result.payment_status === "paid";
   const permitCount = result.permit_count ?? 0;
-  const isZeroResults = permitCount === 0;
-
-  // Zero-result state — no payment gate
-  if (isZeroResults) {
-    return (
-      <div className="min-h-screen py-12 px-4">
-        <div className="max-w-3xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              Permit History
-            </h1>
-            <p className="text-lg text-gray-600">{result.address}</p>
-          </div>
-
-          <div className="text-center py-16 bg-gray-50 rounded-xl">
-            <div className="text-5xl mb-4">
-              <svg className="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-700 mb-3">
-              No Permit Records Found
-            </h3>
-            <p className="text-gray-500 max-w-lg mx-auto leading-relaxed">
-              No permit records found in the City of Atlanta database for this
-              address. This may indicate no permitted work has been recorded, or
-              the address format may need adjustment.
-            </p>
-            <a
-              href="/"
-              className="inline-block mt-8 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Search Another Address
-            </a>
-          </div>
-
-          <Disclaimer />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen py-12 px-4">
@@ -259,9 +218,11 @@ export default function ResultsPage() {
           </h1>
           <p className="text-lg text-gray-600">{result.address}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-              {permitCount} permit record{permitCount !== 1 ? "s" : ""} found
-            </span>
+            {isPaid && (
+              <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                {permitCount} permit record{permitCount !== 1 ? "s" : ""} found
+              </span>
+            )}
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
                 isPaid
@@ -356,7 +317,7 @@ export default function ResultsPage() {
           <div>
             <PermitTable
               permits={Array.from(
-                { length: Math.min(permitCount, 5) },
+                { length: Math.max(Math.min(permitCount, 5), 3) },
                 (_, i) => ({
                   id: `placeholder-${i}`,
                   lookup_id: lookupId,
