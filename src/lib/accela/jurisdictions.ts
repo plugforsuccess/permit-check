@@ -6,6 +6,7 @@ export interface JurisdictionConfig {
   searchUrl: string;
   hasQuadrant: boolean; // NE/NW/SE/SW directional dropdown
   hasDateRange: boolean; // start/end date fields
+  nextPageSelector: string; // CSS selector for the Next page link
   columnMap: {
     filedDate: number;
     recordNumber: number;
@@ -27,6 +28,7 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
       "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Building&customglobalsearch=true",
     hasQuadrant: true,
     hasDateRange: true,
+    nextPageSelector: "a.aca_pagination_PagerNextStyle",
     columnMap: {
       filedDate: 1,
       recordNumber: 2,
@@ -47,6 +49,7 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
       "https://aca-prod.accela.com/GWINNETT/Cap/CapHome.aspx?module=Building",
     hasQuadrant: false,
     hasDateRange: false,
+    nextPageSelector: "a.aca_simple_text", // will match by text content in scraper
     columnMap: {
       filedDate: 1,
       recordNumber: 2,

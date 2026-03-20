@@ -227,17 +227,29 @@ export async function scrapeAccelaPermits(
       );
       allPermits.push(...pagePermits);
 
-      const nextLink = await page.$(SELECTORS.nextPage);
-      if (!nextLink) break;
+      // Try standard pagination link first, then postback text link
+      let hasNextPage = false;
 
-      await nextLink.click();
+      const standardNext = await page.$("a.aca_pagination_PagerNextStyle");
+      if (standardNext) {
+        await standardNext.click();
+        hasNextPage = true;
+      } else {
+        // Try postback-style text link (Gwinnett and others)
+        const textNext = await page.getByText("Next >", { exact: true }).first();
+        const isVisible = await textNext.isVisible().catch(() => false);
+        if (isVisible) {
+          await textNext.click();
+          hasNextPage = true;
+        }
+      }
+
+      if (!hasNextPage) break;
+
       try {
-        await page.waitForSelector(SELECTORS.resultsTable, {
-          timeout: SELECTOR_TIMEOUT,
-        });
-        await page.waitForLoadState("networkidle", {
-          timeout: SELECTOR_TIMEOUT,
-        });
+        await page.waitForLoadState("networkidle", { timeout: SELECTOR_TIMEOUT });
+        await page.waitForSelector(SELECTORS.resultsTable, { timeout: SELECTOR_TIMEOUT });
+        await page.waitForTimeout(500);
       } catch {
         break;
       }
