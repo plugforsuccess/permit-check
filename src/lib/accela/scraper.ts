@@ -8,8 +8,11 @@
  * address form), with separate fields for street number, street name,
  * street type (suffix dropdown), and quadrant (NE/NW/SE/SW dropdown).
  */
-import chromium from "@sparticuz/chromium";
+import chromium from "@sparticuz/chromium-min";
 import { chromium as playwrightChromium } from "playwright-core";
+
+const CHROMIUM_REMOTE_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v137.0.0/chromium-v137.0.0-pack.tar";
 import type { Browser, Page } from "playwright-core";
 
 export interface PermitRecord {
@@ -120,7 +123,7 @@ function parseAddressForPortal(normalizedAddress: string): {
 async function launchBrowser(): Promise<Browser> {
   return playwrightChromium.launch({
     args: chromium.args,
-    executablePath: await chromium.executablePath(),
+    executablePath: await chromium.executablePath(CHROMIUM_REMOTE_URL),
     headless: true,
   });
 }

@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
-    "@sparticuz/chromium": "^137.0.0",
+    "@sparticuz/chromium-min": "^143.0.4",
     "@supabase/supabase-js": "^2.99.3",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
