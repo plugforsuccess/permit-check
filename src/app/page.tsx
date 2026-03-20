@@ -1,45 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import AddressSearch from "@/components/AddressSearch";
 import Disclaimer from "@/components/Disclaimer";
 
 export default function HomePage() {
   const router = useRouter();
+  const [address, setAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async (
-    address: string,
-    reportType: "standard" | "attorney"
-  ) => {
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const trimmed = address.trim();
+    if (!trimmed) {
+      setError("Please enter an address");
+      return;
+    }
+    if (!/^\d+/.test(trimmed)) {
+      setError("Address must start with a street number");
+      return;
+    }
+    if (trimmed.split(/\s+/).length < 2) {
+      setError("Please enter a complete street address");
+      return;
+    }
+
     setIsLoading(true);
-    setSearchError(null);
-
     try {
       const response = await fetch("/api/lookup/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, report_type: reportType }),
+        body: JSON.stringify({ address: trimmed }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setSearchError(data.error || "Something went wrong. Please try again.");
+        setError(data.error || "Something went wrong. Please try again.");
         return;
       }
 
-      // Redirect to Stripe checkout
-      if (data.payment_url) {
-        window.location.href = data.payment_url;
-      } else {
-        // If no payment URL (e.g., free tier in future), go to results
-        router.push(`/results/${data.lookup_id}`);
-      }
+      router.push(`/results/${data.lookup_id}`);
     } catch {
-      setSearchError(
+      setError(
         "Unable to connect to the server. Please check your connection and try again."
       );
     } finally {
@@ -50,8 +56,8 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="pt-20 pb-16 px-4">
-        <div className="max-w-4xl mx-auto text-center">
+      <section className="pt-24 pb-20 px-4">
+        <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6 leading-tight">
             Verify Atlanta Property Permits
             <br />
@@ -59,17 +65,62 @@ export default function HomePage() {
           </h1>
           <p className="text-lg text-gray-600 mb-10 max-w-2xl mx-auto">
             Instantly check the complete permit history for any Atlanta property.
-            Protect yourself from unpermitted renovations, illegal additions, and
-            seller misrepresentation.
           </p>
 
-          <AddressSearch onSearch={handleSearch} isLoading={isLoading} />
-
-          {searchError && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm max-w-2xl mx-auto">
-              {searchError}
+          <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
+            <div className="relative">
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  setError(null);
+                }}
+                placeholder="Enter a property address — e.g. 130 Trinity Ave SW"
+                className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-gray-900 placeholder-gray-400"
+                disabled={isLoading}
+                aria-label="Property address"
+              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="animate-spin h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    Searching...
+                  </span>
+                ) : (
+                  "Check Permits"
+                )}
+              </button>
             </div>
-          )}
+
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+          </form>
 
           <p className="mt-6 text-sm text-gray-400">
             Searching the City of Atlanta&apos;s Accela public records database
@@ -77,196 +128,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* Below the fold explainer */}
       <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-12">
-            How It Works
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            What is PermitCheck?
           </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "1",
-                title: "Enter the Address",
-                description:
-                  "Type any Atlanta property address. We search the City of Atlanta's official permit database.",
-              },
-              {
-                step: "2",
-                title: "Unlock the Report",
-                description:
-                  "See how many permits are on file, then pay $9.99 to unlock the full detailed report.",
-              },
-              {
-                step: "3",
-                title: "Download Your PDF",
-                description:
-                  "Get a professional PDF report suitable for your agent, attorney, or personal records.",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="text-center p-6 bg-white rounded-xl shadow-sm"
-              >
-                <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">
-                  {item.step}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {item.title}
-                </h3>
-                <p className="text-gray-600 text-sm">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-16">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-gray-600 text-center mb-12 max-w-xl mx-auto">
-            Pay per lookup or save with a subscription plan.
+          <p className="text-gray-600 leading-relaxed mb-4">
+            PermitCheck searches the City of Atlanta&apos;s official Accela
+            database for building permits, renovation permits, and other public
+            records tied to a property address. Buyers use it to verify that
+            renovations were properly permitted before closing on a home.
           </p>
-          <div className="grid md:grid-cols-4 gap-6">
-            {[
-              {
-                name: "Single Lookup",
-                price: "$9.99",
-                period: "per report",
-                features: [
-                  "One property permit report",
-                  "Full permit history",
-                  "PDF download",
-                  "48-hour access",
-                ],
-                cta: "Get Started",
-                highlighted: false,
-              },
-              {
-                name: "Buyer Plan",
-                price: "$29",
-                period: "/month",
-                features: [
-                  "10 lookups per month",
-                  "Full permit history",
-                  "PDF downloads",
-                  "Lookup history dashboard",
-                ],
-                cta: "Subscribe",
-                highlighted: true,
-              },
-              {
-                name: "Agent Plan",
-                price: "$99",
-                period: "/month",
-                features: [
-                  "Unlimited lookups",
-                  "Full permit history",
-                  "PDF downloads",
-                  "Priority support",
-                ],
-                cta: "Subscribe",
-                highlighted: false,
-              },
-              {
-                name: "Attorney Report",
-                price: "$199",
-                period: "per report",
-                features: [
-                  "Litigation-grade PDF",
-                  "Chain of custody documentation",
-                  "Cover page with matter reference",
-                  "Suitable for court filings",
-                ],
-                cta: "Order Report",
-                highlighted: false,
-              },
-            ].map((plan) => (
-              <div
-                key={plan.name}
-                className={`p-6 rounded-xl border-2 ${plan.highlighted ? "border-blue-600 shadow-lg scale-105" : "border-gray-200"} bg-white`}
-              >
-                {plan.highlighted && (
-                  <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="text-lg font-bold text-gray-900">
-                  {plan.name}
-                </h3>
-                <div className="mt-2 mb-4">
-                  <span className="text-3xl font-bold text-gray-900">
-                    {plan.price}
-                  </span>
-                  <span className="text-gray-500 text-sm">{plan.period}</span>
-                </div>
-                <ul className="space-y-2 mb-6">
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="text-sm text-gray-600 flex items-start gap-2"
-                    >
-                      <svg
-                        className="w-4 h-4 text-green-500 mt-0.5 shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  className={`w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors ${plan.highlighted ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-100 text-gray-800 hover:bg-gray-200"}`}
-                >
-                  {plan.cta}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            Why PermitCheck?
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                title: "Public Record Data",
-                description:
-                  "We pull directly from the City of Atlanta's official Accela database — the same system used by city inspectors.",
-              },
-              {
-                title: "Instant Results",
-                description:
-                  "No waiting for manual research. Get your permit history in seconds, not days.",
-              },
-              {
-                title: "Attorney-Ready Reports",
-                description:
-                  "Our PDF reports are formatted for professional use — suitable for demand letters and legal filings.",
-              },
-            ].map((item) => (
-              <div key={item.title}>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {item.title}
-                </h3>
-                <p className="text-gray-600 text-sm">{item.description}</p>
-              </div>
-            ))}
-          </div>
+          <p className="text-gray-600 leading-relaxed mb-4">
+            Unpermitted work is one of the most common — and most expensive —
+            surprises in real estate transactions. A $50,000 kitchen renovation
+            done without permits can cost a new owner tens of thousands to bring
+            up to code, or worse, become a liability in a future sale.
+          </p>
+          <p className="text-gray-600 leading-relaxed">
+            For $9.99, you get the full permit history for any Atlanta property
+            — searchable in seconds, not days.
+          </p>
         </div>
       </section>
 

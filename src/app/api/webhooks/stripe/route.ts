@@ -47,12 +47,13 @@ export async function POST(req: Request) {
 
     const supabase = createServerClient();
 
-    // Update lookup payment status
+    // Update lookup payment status and paid_at timestamp
     const { error: updateError } = await supabase
       .from("lookups")
       .update({
         payment_status: "paid",
         payment_id: session.payment_intent as string,
+        paid_at: new Date().toISOString(),
       })
       .eq("id", lookupId);
 
