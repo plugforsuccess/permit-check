@@ -286,7 +286,7 @@ export default function ResultsPage() {
         {isPaid && result.permits ? (
           <>
             {/* Download button */}
-            {result.report && (
+            {result.report ? (
               <div className="mb-6 flex flex-wrap items-center gap-4">
                 <a
                   href={result.report.download_url}
@@ -309,6 +309,37 @@ export default function ResultsPage() {
                   </svg>
                   Download PDF Report
                 </a>
+              </div>
+            ) : (
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                <svg
+                  className="animate-spin h-5 w-5 text-yellow-600 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <p className="text-yellow-800 text-sm">
+                  Generating your report&hellip; This usually takes a few seconds.
+                </p>
+                <button
+                  onClick={() => fetchResults()}
+                  className="ml-auto text-sm px-4 py-1.5 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors shrink-0"
+                >
+                  Refresh
+                </button>
               </div>
             )}
 

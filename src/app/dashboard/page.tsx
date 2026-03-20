@@ -49,10 +49,8 @@ export default function DashboardPage() {
         return;
       }
 
-      const token = data.session.access_token;
-      sessionStorage.setItem("auth_token", token);
       setIsAuthenticated(true);
-      fetchHistory(token);
+      fetchHistory(data.session.access_token);
     } catch {
       setAuthError("Authentication failed. Please try again.");
     }
@@ -190,7 +188,6 @@ export default function DashboardPage() {
             onClick={async () => {
               const supabase = getSupabaseClient();
               await supabase.auth.signOut();
-              sessionStorage.removeItem("auth_token");
               setIsAuthenticated(false);
               setLookups([]);
             }}
