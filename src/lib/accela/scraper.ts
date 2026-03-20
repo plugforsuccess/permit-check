@@ -162,11 +162,18 @@ export async function scrapeAccelaPermits(
       timeout: BROWSER_TIMEOUT,
     });
 
-    // Step 2: Fill the street number (From field only)
+    // Wait for the search form to be fully interactive
+    await page.waitForSelector(SELECTORS.streetNumberFrom, { timeout: SELECTOR_TIMEOUT });
+    await page.waitForTimeout(1000);
+
+    // Step 2: Click then fill street number — ASP.NET watermark fields need
+    // a click to clear the watermark before fill() will work correctly
     console.log("[accela-scraper] Filling search form...");
+    await page.click(SELECTORS.streetNumberFrom);
     await page.fill(SELECTORS.streetNumberFrom, parsed.streetNumber);
 
-    // Step 3: Fill street name
+    // Step 3: Click then fill street name
+    await page.click(SELECTORS.streetName);
     await page.fill(SELECTORS.streetName, parsed.streetName);
 
     // Step 4: Select street suffix from dropdown if we have one
@@ -180,23 +187,31 @@ export async function scrapeAccelaPermits(
     }
 
     // Step 6: Widen date range to capture full history
-    // Default is last 5 years — clear start date to get all records
+    // Default is last 5 years — click to clear watermark before filling
+    await page.click(SELECTORS.startDate);
     await page.fill(SELECTORS.startDate, "01/01/2000");
+    await page.click(SELECTORS.endDate);
     await page.fill(SELECTORS.endDate, new Date().toLocaleDateString("en-US", {
       month: "2-digit", day: "2-digit", year: "numeric"
     }));
+
+    // Brief pause to let any ASP.NET postback JS settle before submitting
+    await page.waitForTimeout(500);
 
     // Step 7: Submit
     console.log("[accela-scraper] Submitting search...");
     await page.click(SELECTORS.searchButton);
 
-    // Step 8: Wait for results table
+    // Step 8: Wait for results table or no-results state
     try {
       await page.waitForSelector(SELECTORS.resultsTable, {
         timeout: SELECTOR_TIMEOUT,
       });
     } catch {
-      console.log("[accela-scraper] No results table found — zero results or search error");
+      // Log the page title and URL to help diagnose what happened
+      const title = await page.title();
+      const url = page.url();
+      console.log(`[accela-scraper] No results table found. Page: "${title}" URL: ${url}`);
       return [];
     }
 
