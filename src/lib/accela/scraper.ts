@@ -227,17 +227,28 @@ export async function scrapeAccelaPermits(
       );
       allPermits.push(...pagePermits);
 
-      const nextLink = await page.$(SELECTORS.nextPage);
+      // Find Next link by text content — works for both standard and postback pagination
+      const nextLink = await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll("a"));
+        const next = links.find(
+          (a) =>
+            a.innerText.trim() === "Next >" ||
+            a.innerText.trim() === "Next" ||
+            a.className.includes("PagerNextStyle")
+        );
+        return next ? true : false;
+      });
+
       if (!nextLink) break;
 
-      await nextLink.click();
+      // Click by text — Playwright handles the postback correctly
+      await page.getByText("Next >", { exact: true }).first().click();
+
       try {
-        await page.waitForSelector(SELECTORS.resultsTable, {
-          timeout: SELECTOR_TIMEOUT,
-        });
-        await page.waitForLoadState("networkidle", {
-          timeout: SELECTOR_TIMEOUT,
-        });
+        // Wait for the results table to reload after postback
+        await page.waitForLoadState("networkidle", { timeout: SELECTOR_TIMEOUT });
+        await page.waitForSelector(SELECTORS.resultsTable, { timeout: SELECTOR_TIMEOUT });
+        await page.waitForTimeout(500); // extra buffer for postback DOM update
       } catch {
         break;
       }
