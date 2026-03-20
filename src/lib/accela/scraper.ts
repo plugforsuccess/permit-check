@@ -80,11 +80,14 @@ export async function scrapeAccelaPermits(
     );
 
     // Try to find and fill the street number field
+    // Standard ACA ID: ctl00_PlaceHolderMain_generalSearchForm_txtGSAddress_txtHouseNumberFrom
     const streetNumberInput = await findInputField(page, [
+      'input[id*="txtGSAddress_txtHouseNumberFrom"]',
       'input[id*="txtHouseNumberFrom"]',
       'input[id*="HouseNumberFrom"]',
       'input[name*="HouseNumberFrom"]',
       'input[id*="txtStreetNo"]',
+      'input[id*="StreetNumber"]',
     ]);
 
     if (streetNumberInput) {
@@ -96,7 +99,9 @@ export async function scrapeAccelaPermits(
     }
 
     // Try to find and fill the street name field
+    // Standard ACA ID: ctl00_PlaceHolderMain_generalSearchForm_txtGSAddress_txtStreetName
     const streetNameInput = await findInputField(page, [
+      'input[id*="txtGSAddress_txtStreetName"]',
       'input[id*="txtStreetName"]',
       'input[id*="StreetName"]',
       'input[name*="StreetName"]',
@@ -109,8 +114,10 @@ export async function scrapeAccelaPermits(
     }
 
     // Step 4: Submit the search
+    // Standard ACA ID: ctl00_PlaceHolderMain_btnNewSearch
     const searchButton = await findInputField(page, [
       'a[id*="btnNewSearch"]',
+      'input[id*="btnNewSearch"]',
       'input[id*="btnSearch"]',
       'button[id*="btnSearch"]',
       'a[id*="btnSearch"]',
@@ -129,10 +136,11 @@ export async function scrapeAccelaPermits(
     }
 
     // Step 5: Wait for results to load
+    // Standard ACA table ID: ctl00_PlaceHolderMain_dgvPermitList_gdvPermitList
     console.log("[accela-scraper] Waiting for results...");
     try {
       await page.waitForSelector(
-        'table[id*="GridView"], div[id*="resultList"], .ACA_Grid_Caption, table[id*="gdvPermitList"]',
+        'table[id*="dgvPermitList"], table[id*="gdvPermitList"], table[id*="GridView"], div[id*="resultList"], .ACA_Grid_Caption',
         { timeout: BROWSER_TIMEOUT }
       );
     } catch {
@@ -206,8 +214,9 @@ async function parseResults(
       const address = `${streetNum} ${streetNm}`;
 
       // Find result rows — Accela uses GridView tables or div-based layouts
+      // Standard ACA table: ctl00_PlaceHolderMain_dgvPermitList_gdvPermitList
       const tables = document.querySelectorAll(
-        'table[id*="GridView"], table[id*="gdvPermitList"], table.ACA_Grid_Caption'
+        'table[id*="dgvPermitList"], table[id*="gdvPermitList"], table[id*="GridView"], table.ACA_Grid_Caption'
       );
 
       for (const table of tables) {
@@ -430,12 +439,14 @@ async function retryWithAlternateNames(
     );
 
     const streetNumberInput = await findInputField(page, [
+      'input[id*="txtGSAddress_txtHouseNumberFrom"]',
       'input[id*="txtHouseNumberFrom"]',
       'input[id*="HouseNumberFrom"]',
       'input[name*="HouseNumberFrom"]',
     ]);
 
     const streetNameInput = await findInputField(page, [
+      'input[id*="txtGSAddress_txtStreetName"]',
       'input[id*="txtStreetName"]',
       'input[id*="StreetName"]',
       'input[name*="StreetName"]',
@@ -446,6 +457,7 @@ async function retryWithAlternateNames(
 
     const searchButton = await findInputField(page, [
       'a[id*="btnNewSearch"]',
+      'input[id*="btnNewSearch"]',
       'input[id*="btnSearch"]',
       'button[id*="btnSearch"]',
       'a[id*="btnSearch"]',
@@ -460,7 +472,7 @@ async function retryWithAlternateNames(
 
     try {
       await page.waitForSelector(
-        'table[id*="GridView"], div[id*="resultList"], .ACA_Grid_Caption, table[id*="gdvPermitList"]',
+        'table[id*="dgvPermitList"], table[id*="gdvPermitList"], table[id*="GridView"], div[id*="resultList"], .ACA_Grid_Caption',
         { timeout: BROWSER_TIMEOUT }
       );
     } catch {
