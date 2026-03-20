@@ -72,11 +72,11 @@ export default function HomePage() {
 
           {/* Left: CTA */}
           <div>
-            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
+            <div className="inline-flex flex-wrap items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
               <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
               Now covering Atlanta + Gwinnett County
             </div>
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
               Verify permits before
               <br />
               <span className="text-blue-600">you close.</span>
@@ -93,7 +93,7 @@ export default function HomePage() {
               </div>
             )}
             {/* Trust signals */}
-            <div className="mt-8 flex items-center gap-6 text-sm text-gray-400">
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400">
               <span>&#10003; Official government data</span>
               <span>&#10003; Results in ~20 seconds</span>
               <span>&#10003; $9.99 one-time</span>
@@ -179,7 +179,7 @@ export default function HomePage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-10">Pricing</h2>
           <div className="grid sm:grid-cols-2 gap-6">
             {/* Standard */}
-            <div className="border-2 border-gray-200 rounded-2xl p-8 text-left">
+            <div className="border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
               <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
               <div className="text-sm text-gray-500 mb-6">one-time · instant access</div>
               <ul className="space-y-3 text-sm text-gray-700">
@@ -192,7 +192,7 @@ export default function HomePage() {
             </div>
 
             {/* Attorney */}
-            <div className="border-2 border-blue-600 rounded-2xl p-8 text-left relative">
+            <div className="border-2 border-blue-600 rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-full">
                 For legal use
               </div>

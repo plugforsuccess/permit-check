@@ -144,12 +144,12 @@ export default function AddressAutocomplete({
           type="text"
           disabled
           placeholder="Loading address search..."
-          className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl outline-none text-gray-400"
+          className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none text-gray-400"
         />
       )}
       <div ref={containerRef} className="w-full" />
 
-      <div className="mt-4 flex items-center gap-6 justify-center">
+      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 justify-center">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="radio"

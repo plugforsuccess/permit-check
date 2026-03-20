@@ -111,7 +111,7 @@ export default function SearchingPage() {
   }, [lookupId, router]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-16">
 
       {/* Brand */}
       <div className="text-xl font-bold text-blue-600 mb-1">PermitCheck</div>
@@ -119,12 +119,12 @@ export default function SearchingPage() {
 
       {/* Address pill */}
       {address && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3 mb-10 flex items-center gap-2 max-w-sm w-full">
-          <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-8 sm:mb-10 flex items-start gap-2 max-w-sm w-full">
+          <svg className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span className="text-sm font-medium text-blue-800 truncate">{address}</span>
+          <span className="text-sm font-medium text-blue-800 break-words">{address}</span>
         </div>
       )}
 
@@ -189,7 +189,7 @@ export default function SearchingPage() {
       </div>
 
       {/* Footer note */}
-      <p className="text-xs text-gray-400 text-center max-w-xs leading-relaxed">
+      <p className="text-xs text-gray-400 text-center max-w-xs sm:max-w-sm leading-relaxed">
         This usually takes 15–20 seconds. We&apos;re searching the official
         government permit database on your behalf.
       </p>

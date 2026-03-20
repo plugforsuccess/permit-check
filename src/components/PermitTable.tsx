@@ -18,6 +18,16 @@ const statusStyles: Record<string, string> = {
   Unknown: "border-l-2 border-gray-200 bg-gray-50 text-gray-400",
 };
 
+const mobileStatusStyles: Record<string, string> = {
+  Issued: "bg-green-100 text-green-800",
+  Expired: "bg-red-100 text-red-700",
+  "In Review": "bg-yellow-100 text-yellow-800",
+  Finaled: "bg-blue-100 text-blue-800",
+  Void: "bg-gray-100 text-gray-500",
+  Pending: "bg-yellow-100 text-yellow-800",
+  Unknown: "bg-gray-100 text-gray-400",
+};
+
 export default function PermitTable({
   permits,
   isBlurred = false,
@@ -69,7 +79,7 @@ export default function PermitTable({
       )}
 
       {/* Mobile cards — shown on small screens */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-2">
         {permits.map((permit, index) => (
           <div
             key={permit.id || index}
@@ -81,14 +91,14 @@ export default function PermitTable({
                 {permit.record_number}
               </span>
               <span
-                className={`text-xs px-2 py-0.5 rounded-full ${statusStyles[permit.status] || statusStyles.Unknown}`}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${mobileStatusStyles[permit.status] || mobileStatusStyles.Unknown}`}
               >
                 {permit.status}
               </span>
             </div>
             <div className="text-sm text-gray-700 mb-1">{permit.type}</div>
             {permit.description && (
-              <div className="text-xs text-gray-500 mb-2 leading-relaxed">
+              <div className="text-xs text-gray-500 mb-2 leading-relaxed line-clamp-2">
                 {permit.description}
               </div>
             )}
