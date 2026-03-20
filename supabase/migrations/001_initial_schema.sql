@@ -1,3 +1,4 @@
+
 -- PermitCheck MVP Database Schema
 -- City of Atlanta Permit Verification Platform
 
