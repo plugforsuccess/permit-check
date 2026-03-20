@@ -49,7 +49,12 @@ export default function HomePage() {
         return;
       }
 
-      router.push(`/results/${data.lookup_id}`);
+      const jurisdictionLabel =
+        data.jurisdiction_id === "GWINNETT_GA" ? "Gwinnett County" : "City of Atlanta";
+      router.push(
+        `/searching/${data.lookup_id}?address=${encodeURIComponent(address.raw)}&jurisdiction=${encodeURIComponent(jurisdictionLabel)}`
+      );
+      setIsLoading(false);
     } catch {
       setError(
         "Unable to connect to the server. Please check your connection and try again."

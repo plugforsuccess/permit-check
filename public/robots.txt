@@ -3,5 +3,6 @@ Allow: /
 Disallow: /dashboard
 Disallow: /results/
 Disallow: /api/
+Disallow: /searching/
 
 Sitemap: https://permitcheck.com/sitemap.xml
