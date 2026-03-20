@@ -141,7 +141,7 @@ export default function DashboardPage() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full py-3 bg-[#0f1f3d] text-white rounded-lg font-semibold hover:bg-[#1a3560] transition-colors"
             >
               {authMode === "login" ? "Sign In" : "Create Account"}
             </button>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
             </p>
             <a
               href="/"
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="inline-block px-6 py-3 bg-[#0f1f3d] text-white rounded-lg font-semibold hover:bg-[#1a3560] transition-colors"
             >
               Search an Address
             </a>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
                         href={report.pdf_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="text-sm px-4 py-2 bg-[#0f1f3d] text-white rounded-lg hover:bg-[#1a3560] transition-colors"
                       >
                         Download PDF
                       </a>

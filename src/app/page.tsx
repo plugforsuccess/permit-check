@@ -79,7 +79,7 @@ export default function HomePage() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
               Verify permits before
               <br />
-              <span className="text-blue-600">you close.</span>
+              <span style={{ color: "#c9a84c" }}>you close.</span>
             </h1>
             <p className="text-lg text-gray-500 mb-8 leading-relaxed">
               Unpermitted work costs buyers tens of thousands. Search the
@@ -192,8 +192,8 @@ export default function HomePage() {
             </div>
 
             {/* Attorney */}
-            <div className="border-2 border-blue-600 rounded-2xl p-5 sm:p-8 text-left relative">
-              <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-full">
+            <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
+              <div className="absolute -top-3 left-6 px-3 py-1 bg-[#0f1f3d] text-white text-xs font-semibold rounded-full">
                 For legal use
               </div>
               <div className="text-2xl font-bold text-gray-900 mb-1">$199</div>

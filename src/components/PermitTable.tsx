@@ -112,7 +112,7 @@ export default function PermitTable({
       {/* Desktop table — hidden on small screens */}
       <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-blue-600 sticky top-0 z-10">
+          <thead className="bg-[#0f1f3d] sticky top-0 z-10">
             <tr>
               {[
                 "Record #",
