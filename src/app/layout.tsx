@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import GoogleMapsProvider from "@/components/GoogleMapsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -54,7 +55,9 @@ export default function RootLayout({
             </div>
           </div>
         </nav>
-        <main className="flex-1">{children}</main>
+        <GoogleMapsProvider>
+          <main className="flex-1">{children}</main>
+        </GoogleMapsProvider>
         <footer className="border-t border-gray-100 py-8">
           <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500">
             <p>
