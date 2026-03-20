@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { createCheckoutSession } from "@/lib/stripe";
-import { fetchPermits } from "@/lib/accela";
+import {
+  scrapeAccelaPermits,
+  normalizeAddress as normalizeAccelaAddress,
+} from "@/lib/accela/index";
+import type { PermitRecord } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress } from "@/lib/address";
-import { config } from "@/lib/config";
 import { lookupInitiateSchema } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
+
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { address, report_type } = parsed.data;
+    const { address } = parsed.data;
 
     // Validate address format
     const validation = validateAddress(address);
@@ -42,21 +46,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 2. Normalize address
     const addressNormalized = normalizeAddress(address);
+    const { streetNumber, streetName } = normalizeAccelaAddress(address);
 
-    // Fetch permits to get count (this is cached, so subsequent calls are fast)
-    const permitResult = await fetchPermits(address);
-
-    // Create lookup record in database
+    // 3. Check Supabase cache — if address looked up in last 24h, return cached result
     const supabase = createServerClient();
+    const cutoff = new Date(Date.now() - CACHE_TTL_MS).toISOString();
+
+    const { data: cachedLookup } = await supabase
+      .from("lookups")
+      .select("id, address_normalized, permit_count, created_at")
+      .eq("address_normalized", addressNormalized)
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (cachedLookup) {
+      // Fetch cached permits
+      const { data: cachedPermits } = await supabase
+        .from("permits")
+        .select("*")
+        .eq("lookup_id", cachedLookup.id);
+
+      return NextResponse.json({
+        lookup_id: cachedLookup.id,
+        address_normalized: cachedLookup.address_normalized,
+        permits: (cachedPermits || []).map(dbPermitToResponse),
+        total_count: cachedLookup.permit_count || 0,
+        source: "cache",
+        cached: true,
+      });
+    }
+
+    // 4. No cache hit — scrape Accela portal
+    console.log(
+      `[lookup/initiate] Scraping Accela for: ${streetNumber} ${streetName}`
+    );
+
+    let permits: PermitRecord[] = [];
+    let warning: string | undefined;
+
+    try {
+      permits = await scrapeAccelaPermits(streetNumber, streetName);
+    } catch (error) {
+      console.error("Accela scraping failed:", error);
+      warning =
+        "Permit data temporarily unavailable. Please try again shortly.";
+    }
+
+    // 5. Store result in Supabase (lookups + permits tables)
     const { data: lookup, error: lookupError } = await supabase
       .from("lookups")
       .insert({
         address_raw: address,
         address_normalized: addressNormalized,
-        permit_count: permitResult.total_count,
-        payment_status: "pending",
-        report_type,
+        permit_count: permits.length,
       })
       .select()
       .single();
@@ -69,11 +115,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store permits (they'll be revealed after payment)
-    if (permitResult.permits.length > 0) {
-      const permitsToInsert = permitResult.permits.map((p) => ({
-        ...p,
+    // Store permits
+    if (permits.length > 0) {
+      const permitsToInsert = permits.map((p) => ({
         lookup_id: lookup.id,
+        record_number: p.recordNumber,
+        type: p.type,
+        status: p.status,
+        filed_date: p.filedDate,
+        issued_date: p.issuedDate,
+        description: p.description,
+        address: p.address,
       }));
 
       const { error: permitError } = await supabase
@@ -85,27 +137,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create Stripe checkout session
-    const amount =
-      report_type === "attorney"
-        ? config.pricing.attorneyReport
-        : config.pricing.singleLookup;
-
-    const session = await createCheckoutSession(
-      lookup.id,
-      amount,
-      report_type,
-      `${config.app.baseUrl}/results/${lookup.id}?payment=success`,
-      `${config.app.baseUrl}?payment=cancelled`
-    );
-
+    // 6. Return permit data
     return NextResponse.json({
       lookup_id: lookup.id,
       address_normalized: addressNormalized,
-      permit_count: permitResult.total_count,
-      payment_url: session.url,
-      client_secret: session.id,
-      ...(permitResult.warning ? { warning: permitResult.warning } : {}),
+      permits: permits.map(scraperPermitToResponse),
+      total_count: permits.length,
+      source: "accela_scraper",
+      cached: false,
+      ...(warning ? { warning } : {}),
     });
   } catch (error) {
     console.error("Lookup initiation error:", error);
@@ -114,4 +154,28 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function scraperPermitToResponse(p: PermitRecord) {
+  return {
+    record_number: p.recordNumber,
+    type: p.type,
+    status: p.status,
+    filed_date: p.filedDate,
+    issued_date: p.issuedDate,
+    description: p.description,
+    address: p.address,
+  };
+}
+
+function dbPermitToResponse(p: Record<string, unknown>) {
+  return {
+    record_number: p.record_number,
+    type: p.type,
+    status: p.status,
+    filed_date: p.filed_date,
+    issued_date: p.issued_date,
+    description: p.description,
+    address: p.address,
+  };
 }
