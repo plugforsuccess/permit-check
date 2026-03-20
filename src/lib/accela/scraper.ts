@@ -322,10 +322,17 @@ async function parseResultsTable(
           return "Unknown";
         };
 
+        // Temporarily log all cells on first row to confirm indices
+        if (permits.length === 0) {
+          const allCells = Array.from(cells).map((c, i) => `[${i}]: ${getText(c)}`);
+          console.log("[accela-scraper] First row cells:", allCells.join(" | "));
+        }
+
         // Extract data columns (skipping spacer columns)
         const filedDateRaw = getText(cells[0]);
         const recordNumber  = getText(cells[2]);
         const recordType    = getText(cells[4]);
+        const address       = getText(cells[6]);
         const description   = getText(cells[8]);
         const statusRaw     = getText(cells[12]);
 
@@ -338,7 +345,7 @@ async function parseResultsTable(
           filedDate: parseDate(filedDateRaw),
           issuedDate: null, // not exposed in list view — available on detail page
           description,
-          address: addr,
+          address: address || addr,
         });
       }
 
