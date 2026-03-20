@@ -31,10 +31,14 @@ const PORTAL_URL = "https://aca-prod.accela.com/ATLANTA_GA";
 const BROWSER_TIMEOUT = 15_000;
 
 async function launchBrowser(): Promise<Browser> {
+  const executablePath = process.env.AWS_EXECUTION_ENV
+    ? await chromium.executablePath()
+    : "/usr/bin/chromium-browser"; // local fallback
+
   const browser = await playwrightChromium.launch({
     args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
+    executablePath,
+    headless: chromium.headless,
   });
   return browser;
 }
