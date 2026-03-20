@@ -9,7 +9,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 
 // Test address to use for each jurisdiction — a government building that
 // should exist in any US city's permit database
