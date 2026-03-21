@@ -222,7 +222,7 @@ export default function AddressAutocomplete({
     <div className="w-full max-w-2xl mx-auto">
 
       {/* Search input row */}
-      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-blue-600 transition-colors h-[60px]">
+      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-blue-600 transition-colors h-[60px] bg-white">
 
         {/* Visible styled input */}
         <div className="relative flex-1">
