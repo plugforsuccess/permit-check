@@ -3,11 +3,13 @@ import { createServerClient } from "@/lib/supabase";
 import {
   scrapeAccelaPermits,
   detectJurisdiction,
+  isZipSupported,
 } from "@/lib/accela/index";
 import type { PermitRecord } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { lookupInitiateSchema } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
+import { log } from "@/lib/logger";
 
 export const maxDuration = 60; // seconds — requires Vercel Pro
 
@@ -76,7 +78,18 @@ export async function POST(request: NextRequest) {
 
     // Detect jurisdiction from the full address (before normalization strips zip)
     const jurisdictionId = detectJurisdiction(address);
-    console.log(`[lookup/initiate] Jurisdiction detected: ${jurisdictionId}`);
+    log.info("Jurisdiction detected", { jurisdictionId, address: addressNormalized });
+
+    // Warn if zip code isn't in a supported jurisdiction
+    if (!isZipSupported(address)) {
+      return NextResponse.json(
+        {
+          error:
+            "This zip code is not yet in a supported jurisdiction. We currently cover Atlanta and Gwinnett County.",
+        },
+        { status: 422 }
+      );
+    }
 
     // 3. Check Supabase cache — if address looked up in last 24h, return cached result
     const supabase = createServerClient();
@@ -109,24 +122,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. No cache hit — scrape Accela portal
-    console.log(
-      `[lookup/initiate] Scraping Accela for: ${streetNumber} ${streetName}`
-    );
+    // 4. No cache hit — scrape Accela portal (with retry)
+    log.info("Scraping Accela", { streetNumber, streetName, jurisdictionId });
 
     let permits: PermitRecord[] = [];
+    const MAX_SCRAPE_RETRIES = 2;
 
-    try {
-      permits = await scrapeAccelaPermits(streetNumber, streetName, jurisdictionId);
-    } catch (error) {
-      console.error("Accela scraping failed:", error);
-      return NextResponse.json(
-        {
-          error:
-            "Permit data temporarily unavailable. Please try again in a few minutes.",
-        },
-        { status: 503 }
-      );
+    for (let attempt = 0; attempt <= MAX_SCRAPE_RETRIES; attempt++) {
+      try {
+        permits = await scrapeAccelaPermits(streetNumber, streetName, jurisdictionId);
+        break; // success
+      } catch (error) {
+        log.error("Accela scraping failed", { attempt: attempt + 1, maxAttempts: MAX_SCRAPE_RETRIES + 1, error: String(error) });
+        if (attempt === MAX_SCRAPE_RETRIES) {
+          return NextResponse.json(
+            {
+              error:
+                "Permit data temporarily unavailable. Please try again in a few minutes.",
+            },
+            { status: 503 }
+          );
+        }
+        // Wait before retry: 2s, 4s
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      }
     }
 
     // 5. Store result in Supabase (lookups + permits tables)
@@ -144,7 +163,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (lookupError) {
-      console.error("Failed to create lookup:", lookupError);
+      log.error("Failed to create lookup", { error: lookupError.message });
       return NextResponse.json(
         { error: "Failed to initiate lookup" },
         { status: 500 }
@@ -169,7 +188,7 @@ export async function POST(request: NextRequest) {
         .insert(permitsToInsert);
 
       if (permitError) {
-        console.error("Failed to store permits:", permitError);
+        log.error("Failed to store permits", { error: permitError.message, lookupId: lookup.id });
       }
     }
 
@@ -184,7 +203,7 @@ export async function POST(request: NextRequest) {
       jurisdiction_id: jurisdictionId,
     });
   } catch (error) {
-    console.error("Lookup initiation error:", error);
+    log.error("Lookup initiation error", { error: String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
