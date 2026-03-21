@@ -7,6 +7,7 @@ export interface JurisdictionConfig {
   hasQuadrant: boolean; // NE/NW/SE/SW directional dropdown
   hasDateRange: boolean; // start/end date fields
   nextPageSelector: string; // CSS selector for the Next page link
+  resultsTableSelector: string; // CSS selector for the results table
   columnMap: {
     filedDate: number;
     recordNumber: number;
@@ -15,6 +16,7 @@ export interface JurisdictionConfig {
     permitName: number;
     status: number;
     address: number;
+    issuedDate: number; // -1 if not available in results table
   };
 }
 
@@ -29,6 +31,7 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
     hasQuadrant: true,
     hasDateRange: true,
     nextPageSelector: "a.aca_pagination_PagerNextStyle",
+    resultsTableSelector: "#ctl00_PlaceHolderMain_dgvPermitList_gdvPermitList",
     columnMap: {
       filedDate: 1,
       recordNumber: 2,
@@ -37,6 +40,7 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
       permitName: 6,
       status: 7,
       address: -1, // not in results table — use normalized input address
+      issuedDate: -1, // not in results table
     },
   },
 
@@ -50,6 +54,7 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
     hasQuadrant: false,
     hasDateRange: false,
     nextPageSelector: "a.aca_simple_text", // will match by text content in scraper
+    resultsTableSelector: "#ctl00_PlaceHolderMain_dgvPermitList_gdvPermitList",
     columnMap: {
       filedDate: 1,
       recordNumber: 2,
@@ -58,6 +63,7 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
       permitName: 3, // no separate permit name — use record type
       status: 5,
       address: 8,
+      issuedDate: -1, // not in results table
     },
   },
 };
