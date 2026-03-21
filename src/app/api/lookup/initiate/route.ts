@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     const { data: cachedLookup } = await supabase
       .from("lookups")
-      .select("id, address_normalized, permit_count, created_at")
+      .select("id, address_normalized, permit_count, created_at, jurisdiction_id")
       .eq("address_normalized", addressNormalized)
       .gte("created_at", cutoff)
       .order("created_at", { ascending: false })
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         total_count: cachedLookup.permit_count || 0,
         source: "cache",
         cached: true,
-        jurisdiction_id: jurisdictionId,
+        jurisdiction_id: cachedLookup.jurisdiction_id ?? jurisdictionId,
       });
     }
 

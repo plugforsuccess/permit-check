@@ -7,6 +7,7 @@ import AddressAutocomplete, {
 } from "@/components/AddressAutocomplete";
 import Disclaimer from "@/components/Disclaimer";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { JURISDICTIONS } from "@/lib/accela/jurisdictions";
 
 export default function HomePage() {
   return (
@@ -60,7 +61,7 @@ function HomePageContent() {
       }
 
       const jurisdictionLabel =
-        data.jurisdiction_id === "GWINNETT_GA" ? "Gwinnett County" : "City of Atlanta";
+        JURISDICTIONS[data.jurisdiction_id]?.name ?? "Atlanta Metro";
       router.push(
         `/searching/${data.lookup_id}?address=${encodeURIComponent(address.raw)}&jurisdiction=${encodeURIComponent(jurisdictionLabel)}`
       );

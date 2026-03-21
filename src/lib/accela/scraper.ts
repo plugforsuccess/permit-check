@@ -223,7 +223,8 @@ export async function scrapeAccelaPermits(
       const pagePermits = await parseResultsTable(
         page,
         normalizedAddress,
-        jurisdiction.columnMap
+        jurisdiction.columnMap,
+        jurisdiction.resultsTableSelector
       );
       allPermits.push(...pagePermits);
 
@@ -271,7 +272,8 @@ export async function scrapeAccelaPermits(
 async function parseResultsTable(
   page: Page,
   address: string,
-  columnMap: JurisdictionConfig["columnMap"]
+  columnMap: JurisdictionConfig["columnMap"],
+  resultsTableSelector: string
 ): Promise<PermitRecord[]> {
   return page.evaluate(
     ({ tableSelector, addr, cols }: { tableSelector: string; addr: string; cols: Record<string, number> }) => {
@@ -345,7 +347,10 @@ async function parseResultsTable(
           type: getText(cells[cols.recordType]) || "Unknown",
           status: mapStatus(getText(cells[cols.status])),
           filedDate: parseDate(getText(cells[cols.filedDate])),
-          issuedDate: null,
+          issuedDate:
+            cols.issuedDate >= 0
+              ? parseDate(getText(cells[cols.issuedDate]))
+              : null, // Not available in search results — only on detail page
           description:
             getText(cells[cols.description]) ||
             getText(cells[cols.permitName]) ||
@@ -356,6 +361,6 @@ async function parseResultsTable(
 
       return permits;
     },
-    { tableSelector: SELECTORS.resultsTable, addr: address, cols: columnMap }
+    { tableSelector: resultsTableSelector, addr: address, cols: columnMap }
   );
 }

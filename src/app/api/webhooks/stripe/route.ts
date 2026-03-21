@@ -2,7 +2,6 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
-import { generateReportHtml } from "@/lib/pdf";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 
@@ -48,6 +47,18 @@ export async function POST(req: Request) {
 
     const supabase = createServerClient();
 
+    // Idempotency: skip if already paid (Stripe retries on 5xx)
+    const { data: existingLookup } = await supabase
+      .from("lookups")
+      .select("payment_status")
+      .eq("id", lookupId)
+      .single();
+
+    if (existingLookup?.payment_status === "paid") {
+      console.log("[webhook] lookup already paid, skipping update:", lookupId);
+      return NextResponse.json({ received: true });
+    }
+
     // Update lookup payment status and paid_at timestamp
     const { error: updateError } = await supabase
       .from("lookups")
@@ -85,15 +96,6 @@ export async function POST(req: Request) {
     console.log("[webhook] permits fetch:", permits?.length, "error:", permitsFetchError);
 
     if (lookup && permits) {
-      // Generate report HTML (used in production PDF pipeline)
-      generateReportHtml({
-        address: lookup.address_normalized,
-        lookupDate: new Date().toISOString().split("T")[0],
-        lookupId: lookup.id,
-        permits,
-        reportType,
-      });
-
       // Store report record
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + config.app.reportExpiryHours);
@@ -104,13 +106,16 @@ export async function POST(req: Request) {
 
       const { data: reportData, error: reportError } = await supabase
         .from("reports")
-        .insert({
-          lookup_id: lookupId,
-          pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
-          expires_at: expiresAt.toISOString(),
-          download_token: downloadToken,
-          matter_reference: session.metadata?.matter_reference || null,
-        })
+        .upsert(
+          {
+            lookup_id: lookupId,
+            pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
+            expires_at: expiresAt.toISOString(),
+            download_token: downloadToken,
+            matter_reference: session.metadata?.matter_reference || null,
+          },
+          { onConflict: "lookup_id", ignoreDuplicates: true }
+        )
         .select()
         .single();
 
