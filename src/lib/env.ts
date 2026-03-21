@@ -16,6 +16,7 @@ const required = [
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
+  "ANTHROPIC_API_KEY",
 ];
 
 let validated = false;

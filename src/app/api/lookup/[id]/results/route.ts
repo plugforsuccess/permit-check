@@ -62,6 +62,16 @@ export async function GET(
     .eq("lookup_id", lookupId)
     .single();
 
+  // Parse the summary JSON
+  let parsedSummary = null;
+  if (report?.ai_summary) {
+    try {
+      parsedSummary = JSON.parse(report.ai_summary);
+    } catch {
+      parsedSummary = null;
+    }
+  }
+
   return NextResponse.json({
     lookup_id: lookup.id,
     address: lookup.address_normalized,
@@ -74,6 +84,8 @@ export async function GET(
           id: report.id,
           download_url: report.pdf_url,
           expires_at: report.expires_at,
+          summary: parsedSummary,
+          risk_level: report.risk_level,
         }
       : null,
   });

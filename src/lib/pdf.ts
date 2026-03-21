@@ -17,6 +17,12 @@ export interface ReportData {
   permits: Permit[];
   reportType: "standard" | "attorney";
   matterReference?: string;
+  summary?: {
+    riskLevel: "low" | "medium" | "high";
+    summary: string;
+    flags: string[];
+    positives: string[];
+  } | null;
 }
 
 /**
@@ -237,6 +243,52 @@ export function generateReportHtml(data: ReportData): string {
     <strong>Total Permit Records Found:</strong> ${permits.length}<br/>
     <strong>Data Source:</strong> Official Government Accela Public Records Database
   </div>
+
+  ${data.summary ? `
+  <h2>Summary</h2>
+  <div style="margin: 24px 0; padding: 20px; border-radius: 8px; border: 2px solid ${
+    data.summary.riskLevel === "high" ? "#fca5a5" :
+    data.summary.riskLevel === "medium" ? "#fde68a" : "#86efac"
+  }; background: ${
+    data.summary.riskLevel === "high" ? "#fef2f2" :
+    data.summary.riskLevel === "medium" ? "#fffbeb" : "#f0fdf4"
+  };">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+      <span style="display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; background: ${
+        data.summary.riskLevel === "high" ? "#fee2e2" :
+        data.summary.riskLevel === "medium" ? "#fef3c7" : "#dcfce7"
+      }; color: ${
+        data.summary.riskLevel === "high" ? "#991b1b" :
+        data.summary.riskLevel === "medium" ? "#92400e" : "#166534"
+      };">
+        ${data.summary.riskLevel === "high" ? "High Risk" :
+          data.summary.riskLevel === "medium" ? "Medium Risk" : "Low Risk"}
+      </span>
+      <span style="font-size: 10px; color: #6b7280; font-weight: 500;">AI-Generated Summary</span>
+    </div>
+    <p style="font-size: 12px; line-height: 1.7; margin: 0 0 12px; font-weight: 500; color: ${
+      data.summary.riskLevel === "high" ? "#7f1d1d" :
+      data.summary.riskLevel === "medium" ? "#78350f" : "#14532d"
+    };">
+      ${data.summary.summary}
+    </p>
+    ${data.summary.flags.length > 0 ? `
+      <div style="margin-bottom: 10px;">
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #374151; margin-bottom: 6px;">Red Flags</div>
+        ${data.summary.flags.map(f => `<div style="font-size: 11px; color: #991b1b; margin-bottom: 3px;">&#x2715; ${f}</div>`).join("")}
+      </div>
+    ` : ""}
+    ${data.summary.positives.length > 0 ? `
+      <div>
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #374151; margin-bottom: 6px;">Positive Signals</div>
+        ${data.summary.positives.map(p => `<div style="font-size: 11px; color: #166534; margin-bottom: 3px;">&#x2713; ${p}</div>`).join("")}
+      </div>
+    ` : ""}
+    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #9ca3af;">
+      AI analysis based on official permit records. Not a substitute for professional inspection or legal advice.
+    </div>
+  </div>
+  ` : ""}
 
   <h2>Permit History</h2>
 
