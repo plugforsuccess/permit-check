@@ -49,14 +49,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Don't charge for zero-result lookups
-    if (lookup.permit_count === 0) {
-      return NextResponse.json(
-        { error: "No permit records found — nothing to unlock" },
-        { status: 400 }
-      );
-    }
-
     const reportType = lookup.report_type || "standard";
     const amount =
       reportType === "attorney"

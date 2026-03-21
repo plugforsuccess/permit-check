@@ -115,14 +115,18 @@ export async function POST(request: NextRequest) {
     );
 
     let permits: PermitRecord[] = [];
-    let warning: string | undefined;
 
     try {
       permits = await scrapeAccelaPermits(streetNumber, streetName, jurisdictionId);
     } catch (error) {
       console.error("Accela scraping failed:", error);
-      warning =
-        "Permit data temporarily unavailable. Please try again shortly.";
+      return NextResponse.json(
+        {
+          error:
+            "Permit data temporarily unavailable. Please try again in a few minutes.",
+        },
+        { status: 503 }
+      );
     }
 
     // 5. Store result in Supabase (lookups + permits tables)
@@ -178,7 +182,6 @@ export async function POST(request: NextRequest) {
       source: "accela_scraper",
       cached: false,
       jurisdiction_id: jurisdictionId,
-      ...(warning ? { warning } : {}),
     });
   } catch (error) {
     console.error("Lookup initiation error:", error);
