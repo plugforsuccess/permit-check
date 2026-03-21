@@ -259,6 +259,7 @@ export default function AddressAutocomplete({
                 : "Loading..."
             }
             disabled={busy}
+            autoFocus
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
@@ -325,8 +326,8 @@ export default function AddressAutocomplete({
       )}
 
       {/* Report type selector */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 justify-center">
-        <label className="flex items-center gap-2 cursor-pointer">
+      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-3 justify-center">
+        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "standard" ? "border-blue-300 bg-blue-50" : "border-transparent hover:bg-gray-50"}`}>
           <input
             type="radio"
             name="reportType"
@@ -335,12 +336,12 @@ export default function AddressAutocomplete({
             onChange={() => setReportType("standard")}
             className="text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-700">
             Standard Report{" "}
             <span className="font-semibold text-gray-900">$9.99</span>
           </span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "attorney" ? "border-blue-300 bg-blue-50" : "border-transparent hover:bg-gray-50"}`}>
           <input
             type="radio"
             name="reportType"
@@ -349,9 +350,10 @@ export default function AddressAutocomplete({
             onChange={() => setReportType("attorney")}
             className="text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-700">
             Attorney Report{" "}
             <span className="font-semibold text-gray-900">$199</span>
+            <span className="text-xs text-gray-400 ml-1">(litigation-grade)</span>
           </span>
         </label>
       </div>

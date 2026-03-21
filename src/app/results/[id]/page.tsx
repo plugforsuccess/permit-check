@@ -174,18 +174,30 @@ export default function ResultsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <h2 className="text-xl font-bold text-gray-900 mb-2">
             Something went wrong
           </h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <a
-            href="/"
-            className="inline-block px-6 py-3 bg-[#0f1f3d] text-white rounded-lg font-semibold hover:bg-[#1a3560] transition-colors"
-          >
-            Try Another Address
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                fetchResults();
+              }}
+              className="px-6 py-3 bg-[#0f1f3d] text-white rounded-lg font-semibold hover:bg-[#1a3560] transition-colors"
+            >
+              Retry
+            </button>
+            <a
+              href="/"
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Try Another Address
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -199,6 +211,17 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen py-8 sm:py-12 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Breadcrumb */}
+        <nav className="mb-6 text-sm text-gray-500" aria-label="Breadcrumb">
+          <ol className="flex items-center gap-1.5">
+            <li><a href="/" className="hover:text-gray-900 transition-colors">Home</a></li>
+            <li aria-hidden="true" className="text-gray-300">/</li>
+            <li className="text-gray-900 font-medium truncate max-w-[200px] sm:max-w-none">
+              {result.address_normalized || result.address}
+            </li>
+          </ol>
+        </nav>
+
         {/* Payment Success Banner */}
         {paymentSuccess && isPaid && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
@@ -446,7 +469,7 @@ export default function ResultsPage() {
                   </div>
                 </div>
               </div>
-              <span className="text-xs font-semibold text-gray-400 bg-gray-200 px-2.5 py-1 rounded-full">
+              <span className="text-xs font-semibold text-gray-400 bg-gray-200 px-2.5 py-1 rounded-full" title="Unlock to see permit details and AI risk summary">
                 Locked
               </span>
             </div>
@@ -489,27 +512,16 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* Payment CTA */}
-            <div className="mt-8 text-center">
-              <div className="inline-flex flex-col items-center">
-                <svg
-                  className="w-10 h-10 text-yellow-500 mb-3"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+            {/* Payment CTA — sticky on mobile for visibility */}
+            <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:backdrop-blur-none mt-8">
+              <div className="text-center">
                 <button
                   onClick={handleCheckout}
                   disabled={checkoutLoading}
                   className="w-full sm:w-auto px-8 py-4 bg-[#0f1f3d] text-white rounded-xl font-bold text-base sm:text-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
                 >
                   {checkoutLoading ? (
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center justify-center gap-2">
                       <svg
                         className="animate-spin h-5 w-5"
                         viewBox="0 0 24 24"
@@ -532,11 +544,11 @@ export default function ResultsPage() {
                       Redirecting to payment...
                     </span>
                   ) : (
-                    "Unlock full report for $9.99"
+                    `Unlock full report for ${result.report_type === "attorney" ? "$199" : "$9.99"}`
                   )}
                 </button>
-                <p className="mt-3 text-sm text-gray-500">
-                  Secure payment via Stripe. Results available instantly.
+                <p className="mt-2 text-xs text-gray-500">
+                  Secure payment via Stripe · Instant access · 30-day money-back guarantee
                 </p>
               </div>
             </div>

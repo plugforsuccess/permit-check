@@ -109,7 +109,7 @@ function HomePageContent() {
               </div>
             )}
             {/* Trust signals */}
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400">
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
               <span>&#10003; Official government data</span>
               <span>&#10003; Results in ~20 seconds</span>
               <span>&#10003; $9.99 one-time</span>

@@ -131,6 +131,11 @@ export default function DashboardPage() {
                 required
                 minLength={8}
               />
+              {password.length > 0 && password.length < 8 && (
+                <p className="mt-1.5 text-xs text-amber-600">
+                  Password must be at least 8 characters
+                </p>
+              )}
             </div>
 
             {authError && (
