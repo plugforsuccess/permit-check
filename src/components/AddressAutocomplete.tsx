@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useMapsReady } from "@/components/GoogleMapsProvider";
 
 export interface StructuredAddress {
   raw: string;
@@ -18,42 +19,63 @@ interface AddressAutocompleteProps {
   isLoading: boolean;
 }
 
+function parseFormattedAddress(
+  formatted: string
+): Omit<StructuredAddress, "raw" | "lat" | "lng"> {
+  const cleaned = formatted
+    .replace(/, USA$/, "")
+    .replace(/, United States$/, "");
+  const parts = cleaned.split(", ");
+  const streetPart = parts[0] ?? "";
+  const city = parts[1] ?? "";
+  const stateZip = parts[2] ?? "";
+  const match = streetPart.match(/^(\d+)\s+(.+)$/);
+  return {
+    streetNumber: match?.[1] ?? "",
+    streetName: match?.[2] ?? "",
+    city,
+    state: stateZip.split(" ")[0] ?? "",
+    zip: stateZip.split(" ")[1] ?? "",
+  };
+}
+
 export default function AddressAutocomplete({
   onSelect,
   isLoading,
 }: AddressAutocompleteProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const elementRef = useRef<HTMLElement | null>(null);
+  const mapsReady = useMapsReady();
+  const gmpContainerRef = useRef<HTMLDivElement>(null);
+  const gmpElementRef = useRef<HTMLElement | null>(null);
+
+  // Store reportType and onSelect in refs — never include in useEffect deps
+  // This prevents the Google element from remounting when reportType changes
+  const reportTypeRef = useRef<"standard" | "attorney">("standard");
+  const onSelectRef = useRef(onSelect);
+
   const [reportType, setReportType] = useState<"standard" | "attorney">("standard");
-  const [mapsReady, setMapsReady] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Poll for the google global to be available
+  // Keep refs in sync without triggering remounts
+  useEffect(() => { reportTypeRef.current = reportType; }, [reportType]);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+
+  // Mount Google element ONCE when Maps API is ready
+  // reportType is intentionally NOT in deps — we use the ref
   useEffect(() => {
-    const check = () => {
-      if (typeof google !== "undefined" && google.maps) {
-        setMapsReady(true);
-      } else {
-        setTimeout(check, 100);
-      }
-    };
-    check();
-  }, []);
+    if (!mapsReady || !gmpContainerRef.current) return;
 
-  useEffect(() => {
-    if (!mapsReady || !containerRef.current || isLoading) return;
+    let cancelled = false;
 
-    // Clean up any existing element
-    if (elementRef.current && containerRef.current.contains(elementRef.current)) {
-      containerRef.current.removeChild(elementRef.current);
-      elementRef.current = null;
-    }
-
-    const initAutocomplete = async () => {
+    const init = async () => {
       try {
         // @ts-expect-error — PlaceAutocompleteElement not yet in TS types
         const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
-        const placeAutocomplete = new PlaceAutocompleteElement({
+        if (cancelled) return;
+
+        const el = new PlaceAutocompleteElement({
           componentRestrictions: { country: "us" },
           types: ["address"],
           locationBias: {
@@ -62,93 +84,223 @@ export default function AddressAutocomplete({
           },
         });
 
-        console.log("[autocomplete] element created", placeAutocomplete);
+        // Position absolute and invisible — our styled input is the visible one
+        // The GMP element still handles autocomplete suggestion rendering
+        el.style.cssText = `
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          z-index: 1;
+          width: 100%;
+          height: 100%;
+        `;
 
-        // Match the existing input styling
-        placeAutocomplete.style.width = "100%";
-        placeAutocomplete.setAttribute(
-          "placeholder",
-          "Enter a property address — e.g. 130 Trinity Ave SW"
-        );
+        gmpContainerRef.current?.appendChild(el);
+        gmpElementRef.current = el;
 
-        containerRef.current?.appendChild(placeAutocomplete);
-        elementRef.current = placeAutocomplete;
+        // Handle dropdown selection — fires on tap/click of a suggestion
+        el.addEventListener("gmp-select", async (event: Event) => {
+          try {
+            // @ts-expect-error
+            const { placePrediction } = event;
+            if (!placePrediction) return;
 
-        console.log("[autocomplete] element appended, adding listeners...");
+            const place = placePrediction.toPlace();
+            await place.fetchFields({
+              fields: ["addressComponents", "formattedAddress", "location"],
+            });
 
-        placeAutocomplete.addEventListener("gmp-select", async (event: Event) => {
-          console.log("[autocomplete] gmp-select fired", event);
-          // @ts-expect-error
-          const { placePrediction } = event;
-          const place = placePrediction.toPlace();
+            const formattedAddress = place.formattedAddress ?? "";
+            if (!formattedAddress) return;
 
-          await place.fetchFields({
-            fields: ["addressComponents", "formattedAddress", "location"],
-          });
+            const parsed = parseFormattedAddress(formattedAddress);
+            setInputValue(formattedAddress);
+            setError(null);
 
-          // Use the Place object's built-in accessor instead of manual component parsing
-          const formattedAddress = place.formattedAddress ?? "";
-
-          // Parse from the formatted address string as fallback
-          // Google returns: "1278 Greenwich St SW, Atlanta, GA 30310, USA"
-          const parts = formattedAddress.replace(", USA", "").split(", ");
-          // parts[0] = "1278 Greenwich St SW"
-          // parts[1] = "Atlanta"
-          // parts[2] = "GA 30310"
-
-          const streetPart = parts[0] ?? "";
-          const streetMatch = streetPart.match(/^(\d+)\s+(.+)$/);
-          const streetNumber = streetMatch?.[1] ?? "";
-          const streetName = streetMatch?.[2] ?? "";
-          const city = parts[1] ?? "";
-          const stateZip = parts[2] ?? "";
-          const state = stateZip.split(" ")[0] ?? "";
-          const zip = stateZip.split(" ")[1] ?? "";
-
-          console.log("[autocomplete] parsed:", { streetNumber, streetName, city, state, zip });
-
-          onSelect(
-            {
-              raw: formattedAddress,
-              streetNumber,
-              streetName,
-              city,
-              state,
-              zip,
-              lat: place.location?.lat() ?? 0,
-              lng: place.location?.lng() ?? 0,
-            },
-            reportType
-          );
+            onSelectRef.current(
+              {
+                raw: formattedAddress,
+                ...parsed,
+                lat: place.location?.lat() ?? 0,
+                lng: place.location?.lng() ?? 0,
+              },
+              reportTypeRef.current
+            );
+          } catch (err) {
+            console.error("[autocomplete] gmp-select handler failed:", err);
+          }
         });
       } catch (err) {
-        console.error("[AddressAutocomplete] Failed to initialize:", err);
+        console.error("[AddressAutocomplete] init failed:", err);
       }
     };
 
-    initAutocomplete();
+    init();
 
     return () => {
-      if (elementRef.current && containerRef.current?.contains(elementRef.current)) {
-        containerRef.current.removeChild(elementRef.current);
-        elementRef.current = null;
+      cancelled = true;
+      if (
+        gmpElementRef.current &&
+        gmpContainerRef.current?.contains(gmpElementRef.current)
+      ) {
+        gmpContainerRef.current.removeChild(gmpElementRef.current);
+        gmpElementRef.current = null;
       }
     };
-  }, [mapsReady, reportType, onSelect, isLoading]);
+  }, [mapsReady]); // only mapsReady — intentional
+
+  // Geocode whatever is in the input — handles paste + Search button tap
+  const geocodeAndSubmit = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed || isGeocoding || isLoading) return;
+
+    setError(null);
+    setIsGeocoding(true);
+
+    try {
+      // @ts-expect-error
+      const { Geocoder } = await google.maps.importLibrary("geocoding");
+      const geocoder = new Geocoder();
+
+      const result = await geocoder.geocode({
+        address: trimmed,
+        componentRestrictions: { country: "us" },
+      });
+
+      if (!result.results?.[0]) {
+        setError("Address not found. Please try a more specific address.");
+        setIsGeocoding(false);
+        return;
+      }
+
+      const r = result.results[0];
+
+      const get = (type: string) =>
+        r.address_components.find(
+          (c: { types: string[]; long_name: string }) => c.types.includes(type)
+        )?.long_name ?? "";
+
+      const getShort = (type: string) =>
+        r.address_components.find(
+          (c: { types: string[]; short_name: string }) => c.types.includes(type)
+        )?.short_name ?? "";
+
+      const formattedAddress = r.formatted_address;
+      setInputValue(formattedAddress);
+
+      onSelectRef.current(
+        {
+          raw: formattedAddress,
+          streetNumber: get("street_number"),
+          streetName: get("route"),
+          city: get("locality") || get("sublocality"),
+          state: getShort("administrative_area_level_1"),
+          zip: get("postal_code"),
+          lat: r.geometry.location.lat(),
+          lng: r.geometry.location.lng(),
+        },
+        reportTypeRef.current
+      );
+    } catch (err) {
+      console.error("[autocomplete] geocode failed:", err);
+      setError("Could not find that address. Please try again.");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      geocodeAndSubmit(inputValue);
+    }
+  };
+
+  const busy = isLoading || isGeocoding;
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      {/* Fallback shown while Maps API loads */}
-      {!mapsReady && (
-        <input
-          type="text"
-          disabled
-          placeholder="Loading address search..."
-          className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none text-gray-400"
-        />
-      )}
-      <div ref={containerRef} className="w-full" />
 
+      {/* Search input row */}
+      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-[#0f1f3d] transition-colors">
+
+        {/* Visible styled input */}
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              mapsReady
+                ? "Enter a property address — e.g. 130 Trinity Ave SW"
+                : "Loading..."
+            }
+            disabled={busy}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            className="w-full px-5 py-4 text-base sm:text-lg bg-transparent outline-none text-gray-900 placeholder-gray-400 disabled:text-gray-400"
+          />
+
+          {/* GMP element mounts here — invisible but handles suggestions */}
+          <div
+            ref={gmpContainerRef}
+            className="absolute inset-0 pointer-events-none"
+            style={{ zIndex: mapsReady ? 1 : -1 }}
+          />
+        </div>
+
+        {/* Search button — geocodes current input value */}
+        <button
+          type="button"
+          onClick={() => geocodeAndSubmit(inputValue)}
+          disabled={busy || !inputValue.trim()}
+          className="px-5 sm:px-6 py-4 bg-[#0f1f3d] text-white font-semibold hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center"
+          aria-label="Search"
+        >
+          {isGeocoding ? (
+            <svg
+              className="w-5 h-5 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle
+                className="opacity-25"
+                cx="12" cy="12" r="10"
+                stroke="currentColor" strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          ) : (
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Error message */}
+      {error && (
+        <p className="mt-2 text-sm text-red-600">{error}</p>
+      )}
+
+      {/* Report type selector */}
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 justify-center">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
