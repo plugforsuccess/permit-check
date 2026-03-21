@@ -10,6 +10,7 @@ import type { Permit } from "@/types";
 interface LookupResult {
   lookup_id: string;
   address: string;
+  address_normalized: string;
   permit_count: number;
   payment_status: "pending" | "paid" | "failed";
   report_type: "standard" | "attorney";
@@ -221,7 +222,7 @@ export default function ResultsPage() {
         {/* Street View */}
         <div className="mb-6 street-view-wrapper">
           <div className="h-32 sm:h-48">
-            <PropertyStreetView address={result.address} />
+            <PropertyStreetView address={result.address_normalized || result.address} />
           </div>
         </div>
 
@@ -428,6 +429,28 @@ export default function ResultsPage() {
         ) : (
           /* STATE 1: Unpaid — blurred teaser + payment CTA */
           <div>
+            {/* Locked risk badge — shown in unpaid state to drive conversion */}
+            <div className="mb-5 rounded-xl border-2 border-gray-200 bg-gray-50 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-gray-700">
+                    AI Risk Summary
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    Risk level · Red flags · Due diligence analysis
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-semibold text-gray-400 bg-gray-200 px-2.5 py-1 rounded-full">
+                Locked
+              </span>
+            </div>
+
             <PermitTable
               permits={Array.from(
                 { length: Math.max(Math.min(permitCount, 5), 3) },

@@ -32,7 +32,8 @@ export async function GET(
     // Return teaser data (address and count only, no permit details)
     return NextResponse.json({
       lookup_id: lookup.id,
-      address: lookup.address_normalized,
+      address: lookup.address_raw || lookup.address_normalized,
+      address_normalized: lookup.address_normalized,
       permit_count: lookup.permit_count,
       payment_status: lookup.payment_status,
       report_type: lookup.report_type || "standard",
@@ -74,7 +75,8 @@ export async function GET(
 
   return NextResponse.json({
     lookup_id: lookup.id,
-    address: lookup.address_normalized,
+    address: lookup.address_raw || lookup.address_normalized,
+    address_normalized: lookup.address_normalized,
     permit_count: lookup.permit_count,
     payment_status: lookup.payment_status,
     report_type: lookup.report_type || "standard",
