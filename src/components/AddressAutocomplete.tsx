@@ -84,7 +84,6 @@ export default function AddressAutocomplete({
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
   // Mount Google element ONCE when Maps API is ready
-  // reportType is intentionally NOT in deps — we use the ref
   useEffect(() => {
     if (!mapsReady || !gmpContainerRef.current) return;
 
@@ -106,19 +105,24 @@ export default function AddressAutocomplete({
           },
         });
 
-        // Position absolute and invisible — our styled input is the visible one
-        // The GMP element still handles autocomplete suggestion rendering
-        el.style.cssText = `
-          position: absolute;
-          inset: 0;
-          opacity: 0;
-          z-index: 1;
-          width: 100%;
-          height: 100%;
-        `;
+        // The GMP element is the actual visible input — style it to fill the container
+        el.style.width = "100%";
+        el.setAttribute(
+          "placeholder",
+          "Enter a property address — e.g. 130 Trinity Ave SW"
+        );
 
         gmpContainerRef.current?.appendChild(el);
         gmpElementRef.current = el;
+
+        // Track what the user types so the Search button can geocode it.
+        // Native input events from shadow DOM inputs are composed and bubble up.
+        el.addEventListener("input", (e: Event) => {
+          const target = e.target as HTMLInputElement;
+          if (target?.value !== undefined) {
+            setInputValue(target.value);
+          }
+        });
 
         // Handle dropdown selection — fires on tap/click of a suggestion
         el.addEventListener("gmp-select", async (event: Event) => {
@@ -231,48 +235,24 @@ export default function AddressAutocomplete({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      geocodeAndSubmit(inputValue);
-    }
-  };
-
   const busy = isLoading || isGeocoding;
 
   return (
     <div className="w-full max-w-2xl mx-auto">
 
       {/* Search input row */}
-      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-blue-600 transition-colors h-[60px] bg-white">
+      <div className="flex items-stretch gap-3">
 
-        {/* Visible styled input */}
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              mapsReady
-                ? "Enter a property address — e.g. 130 Trinity Ave SW"
-                : "Loading..."
-            }
-            disabled={busy}
-            autoFocus
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            className="w-full px-6 py-4 text-base sm:text-lg bg-transparent outline-none text-gray-900 placeholder-gray-400 disabled:text-gray-400"
-          />
-
-          {/* GMP element mounts here — invisible but handles suggestions */}
-          <div
-            ref={gmpContainerRef}
-            className="absolute inset-0 pointer-events-none"
-            style={{ zIndex: mapsReady ? 1 : -1 }}
-          />
+        {/* GMP autocomplete element mounts here — it IS the visible input */}
+        <div ref={gmpContainerRef} className="flex-1 min-w-0">
+          {!mapsReady && (
+            <input
+              type="text"
+              disabled
+              placeholder="Loading..."
+              className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none text-gray-400 placeholder-gray-400"
+            />
+          )}
         </div>
 
         {/* Search button — geocodes current input value */}
@@ -280,7 +260,7 @@ export default function AddressAutocomplete({
           type="button"
           onClick={() => geocodeAndSubmit(inputValue)}
           disabled={busy || !inputValue.trim()}
-          className="px-5 sm:px-6 py-4 bg-[#0f1f3d] text-white font-semibold hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center"
+          className="px-5 sm:px-6 py-3 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center"
           aria-label="Search"
         >
           {isGeocoding ? (
