@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AddressAutocomplete, {
   type StructuredAddress,
 } from "@/components/AddressAutocomplete";
@@ -9,7 +9,17 @@ import Disclaimer from "@/components/Disclaimer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
+  return (
+    <Suspense>
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const scraperError = searchParams.get("error") === "scraper_unavailable";
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +96,11 @@ export default function HomePage() {
               official government permit database for any supported metro area
               property in seconds.
             </p>
+            {scraperError && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+                The permit database is temporarily unavailable. Please try again in a few minutes.
+              </div>
+            )}
             <AddressAutocomplete onSelect={handleSubmit} isLoading={isLoading} />
             {error && (
               <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

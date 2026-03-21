@@ -76,6 +76,13 @@ export default function SearchingPage() {
     const poll = async () => {
       try {
         const res = await fetch(`/api/lookup/${lookupId}/status`);
+
+        if (res.status === 503) {
+          if (pollInterval.current) clearInterval(pollInterval.current);
+          router.push(`/?error=scraper_unavailable`);
+          return;
+        }
+
         if (!res.ok) return;
 
         const data = await res.json();
