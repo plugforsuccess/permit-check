@@ -19,9 +19,31 @@ interface AddressAutocompleteProps {
   isLoading: boolean;
 }
 
-function parseFormattedAddress(
+/** Extract address components from Google Place object or fall back to string parsing. */
+function extractAddressComponents(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  place: any,
   formatted: string
 ): Omit<StructuredAddress, "raw" | "lat" | "lng"> {
+  // Use Google's structured addressComponents when available
+  const components = place?.addressComponents;
+  if (components && Array.isArray(components)) {
+    const get = (type: string) =>
+      components.find((c: { types: string[] }) => c.types?.includes(type));
+    return {
+      streetNumber: get("street_number")?.longText ?? get("street_number")?.long_name ?? "",
+      streetName: get("route")?.longText ?? get("route")?.long_name ?? "",
+      city:
+        get("locality")?.longText ?? get("locality")?.long_name ??
+        get("sublocality")?.longText ?? get("sublocality")?.long_name ?? "",
+      state:
+        get("administrative_area_level_1")?.shortText ??
+        get("administrative_area_level_1")?.short_name ?? "",
+      zip: get("postal_code")?.longText ?? get("postal_code")?.long_name ?? "",
+    };
+  }
+
+  // Fallback: parse formatted address string
   const cleaned = formatted
     .replace(/, USA$/, "")
     .replace(/, United States$/, "");
@@ -113,7 +135,7 @@ export default function AddressAutocomplete({
             const formattedAddress = place.formattedAddress ?? "";
             if (!formattedAddress) return;
 
-            const parsed = parseFormattedAddress(formattedAddress);
+            const parsed = extractAddressComponents(place, formattedAddress);
             setInputValue(formattedAddress);
             setError(null);
 
@@ -222,7 +244,7 @@ export default function AddressAutocomplete({
     <div className="w-full max-w-2xl mx-auto">
 
       {/* Search input row */}
-      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-blue-600 transition-colors h-[60px]">
+      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-blue-600 transition-colors h-[60px] bg-white">
 
         {/* Visible styled input */}
         <div className="relative flex-1">
@@ -265,6 +287,8 @@ export default function AddressAutocomplete({
               className="w-5 h-5 animate-spin"
               viewBox="0 0 24 24"
               fill="none"
+              role="status"
+              aria-label="Searching address"
             >
               <circle
                 className="opacity-25"

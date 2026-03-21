@@ -59,13 +59,15 @@ export async function POST(request: NextRequest) {
     const successUrl = `${baseUrl}/results/${lookup_id}?payment=success`;
     const cancelUrl = `${baseUrl}/results/${lookup_id}`;
 
+    const idempotencyKey = `checkout_${lookup_id}_${reportType}`;
     const session = await createCheckoutSession(
       lookup_id,
       amount,
       reportType as "standard" | "attorney",
       successUrl,
       cancelUrl,
-      matter_reference
+      matter_reference,
+      idempotencyKey
     );
 
     return NextResponse.json({ checkout_url: session.url });

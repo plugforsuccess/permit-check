@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
 import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
+import { log } from "@/lib/logger";
 import type Stripe from "stripe";
 
 /**
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
       (session.metadata?.report_type as "standard" | "attorney") || "standard";
 
     if (!lookupId) {
-      console.error("No lookup_id in session metadata");
+      log.error("No lookup_id in session metadata");
       return NextResponse.json({ received: true });
     }
 
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
       .single();
 
     if (existingLookup?.payment_status === "paid") {
-      console.log("[webhook] lookup already paid, skipping update:", lookupId);
+      log.info("Webhook: lookup already paid, skipping", { lookupId });
       return NextResponse.json({ received: true });
     }
 
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       .eq("id", lookupId);
 
     if (updateError) {
-      console.error("Failed to update lookup:", updateError);
+      log.error("Failed to update lookup", { lookupId, error: updateError.message });
       return NextResponse.json(
         { error: "Failed to update lookup" },
         { status: 500 }
@@ -87,14 +88,14 @@ export async function POST(req: Request) {
       .eq("id", lookupId)
       .single();
 
-    console.log("[webhook] lookup fetch:", lookup?.id, "error:", lookupFetchError);
+    log.info("Webhook: lookup fetch", { lookupId: lookup?.id, error: lookupFetchError?.message });
 
     const { data: permits, error: permitsFetchError } = await supabase
       .from("permits")
       .select("*")
       .eq("lookup_id", lookupId);
 
-    console.log("[webhook] permits fetch:", permits?.length, "error:", permitsFetchError);
+    log.info("Webhook: permits fetch", { count: permits?.length, error: permitsFetchError?.message });
 
     if (lookup && permits) {
       // Generate AI summary
@@ -105,9 +106,9 @@ export async function POST(req: Request) {
         const summary = await generatePermitSummary(permits, lookup.address_normalized);
         aiSummary = JSON.stringify(summary);
         riskLevel = summary.riskLevel;
-        console.log("[webhook] summary generated, risk:", riskLevel);
+        log.info("Webhook: summary generated", { lookupId, riskLevel });
       } catch (err) {
-        console.error("[webhook] summary generation failed:", err);
+        log.error("Webhook: summary generation failed", { lookupId, error: String(err) });
         // Don't block report creation if summary fails
       }
 
@@ -117,7 +118,7 @@ export async function POST(req: Request) {
 
       const downloadToken = randomBytes(32).toString("hex");
 
-      console.log("[webhook] inserting report for lookup:", lookupId, "token:", downloadToken.slice(0, 8) + "...");
+      log.info("Webhook: inserting report", { lookupId });
 
       const { data: reportData, error: reportError } = await supabase
         .from("reports")
@@ -136,13 +137,13 @@ export async function POST(req: Request) {
         .select()
         .single();
 
-      console.log("[webhook] report insert result:", reportData?.id, "error:", reportError);
+      log.info("Webhook: report insert result", { reportId: reportData?.id, error: reportError?.message });
 
       if (reportError) {
-        console.error("[webhook] report insert failed:", reportError);
+        log.error("Webhook: report insert failed", { lookupId, error: reportError.message });
       }
     } else {
-      console.log("[webhook] skipped report insert — lookup:", !!lookup, "permits:", !!permits);
+      log.warn("Webhook: skipped report insert", { lookupId, hasLookup: !!lookup, hasPermits: !!permits });
     }
   }
 

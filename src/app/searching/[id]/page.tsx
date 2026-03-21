@@ -55,7 +55,6 @@ export default function SearchingPage() {
     preparing: "pending",
   });
 
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
   const redirecting = useRef(false);
 
   // Animate the timed steps
@@ -69,21 +68,26 @@ export default function SearchingPage() {
     }, 3000);
   }, []);
 
-  // Poll the status endpoint
+  // Poll the status endpoint with exponential backoff
   useEffect(() => {
     if (!lookupId) return;
+
+    let timeoutId: NodeJS.Timeout | null = null;
+    let attempt = 0;
 
     const poll = async () => {
       try {
         const res = await fetch(`/api/lookup/${lookupId}/status`);
 
         if (res.status === 503) {
-          if (pollInterval.current) clearInterval(pollInterval.current);
           router.push(`/?error=scraper_unavailable`);
           return;
         }
 
-        if (!res.ok) return;
+        if (!res.ok) {
+          scheduleNext();
+          return;
+        }
 
         const data = await res.json();
 
@@ -102,19 +106,25 @@ export default function SearchingPage() {
               router.push(`/results/${lookupId}`);
             }, 400);
           }, 800);
-
-          if (pollInterval.current) clearInterval(pollInterval.current);
+          return;
         }
       } catch {
         // ignore poll errors
       }
+      scheduleNext();
     };
 
-    pollInterval.current = setInterval(poll, 2000);
+    const scheduleNext = () => {
+      attempt++;
+      // Backoff: 2s, 3s, 4s, 5s, then cap at 5s
+      const delay = Math.min(2000 + attempt * 1000, 5000);
+      timeoutId = setTimeout(poll, delay);
+    };
+
     poll();
 
     return () => {
-      if (pollInterval.current) clearInterval(pollInterval.current);
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [lookupId, router]);
 
@@ -137,7 +147,7 @@ export default function SearchingPage() {
       )}
 
       {/* Steps */}
-      <div className="flex flex-col gap-4 w-full max-w-sm mb-12">
+      <div className="flex flex-col gap-4 w-full max-w-sm mb-12" aria-live="polite" role="status">
         {STEPS.map((step, i) => {
           const status = stepStatuses[step.id];
           const sublabel =

@@ -198,8 +198,17 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Loading your history...</p>
+          <div className="space-y-4" role="status" aria-label="Loading history">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-6 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                <div className="h-5 w-64 bg-gray-200 rounded mb-3" />
+                <div className="flex gap-4">
+                  <div className="h-4 w-24 bg-gray-100 rounded" />
+                  <div className="h-4 w-20 bg-gray-100 rounded" />
+                  <div className="h-5 w-16 bg-gray-100 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : lookups.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-xl">

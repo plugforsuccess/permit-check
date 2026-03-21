@@ -263,7 +263,7 @@ export async function scrapeAccelaPermits(
     return allPermits;
   } catch (error) {
     console.error("[accela-scraper] Scraping failed:", error);
-    return [];
+    throw error; // Let caller handle retries
   } finally {
     if (browser) await browser.close();
   }
