@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useMapsReady } from "@/components/GoogleMapsProvider";
+import { useMapsLibrary } from "@vis.gl/react-google-maps";
 
 export interface StructuredAddress {
   raw: string;
@@ -23,18 +23,20 @@ interface Prediction {
   placeId: string;
   mainText: string;
   secondaryText: string;
-  description: string;
+  fullText: string;
+  // Keep the original PlacePrediction so we can call toPlace() on selection
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _raw: any;
 }
 
 export default function AddressAutocomplete({
   onSelect,
   isLoading,
 }: AddressAutocompleteProps) {
-  const mapsReady = useMapsReady();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const serviceRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sessionTokenRef = useRef<any>(null);
+  const placesLib = useMapsLibrary("places");
+  const geocodingLib = useMapsLibrary("geocoding");
+
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -53,22 +55,11 @@ export default function AddressAutocomplete({
   useEffect(() => { reportTypeRef.current = reportType; }, [reportType]);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
-  // Initialize AutocompleteService when Maps API is ready
+  // Create session token when Places library loads
   useEffect(() => {
-    if (!mapsReady) return;
-
-    const init = async () => {
-      try {
-        const placesLib = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-        serviceRef.current = new placesLib.AutocompleteService();
-        sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
-      } catch (err) {
-        console.error("[AddressAutocomplete] init failed:", err);
-      }
-    };
-
-    init();
-  }, [mapsReady]);
+    if (!placesLib) return;
+    sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
+  }, [placesLib]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -86,35 +77,41 @@ export default function AddressAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch predictions from AutocompleteService
+  // Fetch predictions using new Places API (AutocompleteSuggestion)
   const fetchPredictions = useCallback(async (value: string) => {
-    if (!serviceRef.current || value.trim().length < 2) {
+    if (!placesLib || value.trim().length < 2) {
       setPredictions([]);
       setShowDropdown(false);
       return;
     }
 
     try {
-      const response = await serviceRef.current.getPlacePredictions({
+      const { suggestions } = await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: value,
-        componentRestrictions: { country: "us" },
-        types: ["address"],
-        sessionToken: sessionTokenRef.current,
-        location: new google.maps.LatLng(33.749, -84.388),
-        radius: 50000,
+        includedRegionCodes: ["us"],
+        includedPrimaryTypes: ["street_address", "subpremise", "premise"],
+        locationBias: {
+          lat: 33.749,
+          lng: -84.388,
+        },
+        sessionToken: sessionTokenRef.current ?? undefined,
       });
 
-      const results = response?.predictions ?? response ?? [];
+      const mapped: Prediction[] = [];
+      for (const s of suggestions) {
+        const pp = s.placePrediction;
+        if (!pp) continue;
+        mapped.push({
+          placeId: pp.placeId,
+          mainText: pp.mainText?.text ?? pp.text.text,
+          secondaryText: pp.secondaryText?.text ?? "",
+          fullText: pp.text.text,
+          _raw: pp,
+        });
+      }
 
-      if (Array.isArray(results) && results.length > 0) {
-        setPredictions(
-          results.map((r: google.maps.places.AutocompletePrediction) => ({
-            placeId: r.place_id,
-            mainText: r.structured_formatting?.main_text ?? r.description,
-            secondaryText: r.structured_formatting?.secondary_text ?? "",
-            description: r.description,
-          }))
-        );
+      if (mapped.length > 0) {
+        setPredictions(mapped);
         setShowDropdown(true);
         setActiveIndex(-1);
       } else {
@@ -122,11 +119,11 @@ export default function AddressAutocomplete({
         setShowDropdown(false);
       }
     } catch (err) {
-      console.error("[AddressAutocomplete] getPlacePredictions failed:", err);
+      console.error("[AddressAutocomplete] fetchAutocompleteSuggestions failed:", err);
       setPredictions([]);
       setShowDropdown(false);
     }
-  }, []);
+  }, [placesLib]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -137,59 +134,53 @@ export default function AddressAutocomplete({
     debounceRef.current = setTimeout(() => fetchPredictions(value), 250);
   };
 
-  // Select a prediction — resolve place details via Geocoder
+  // Select a prediction — resolve place details via Place.fetchFields (new API)
   const selectPrediction = async (prediction: Prediction) => {
-    setInputValue(prediction.description);
+    if (!placesLib) return;
+
+    setInputValue(prediction.fullText);
     setShowDropdown(false);
     setPredictions([]);
     setError(null);
     setIsGeocoding(true);
 
     try {
-      // @ts-expect-error
-      const { Geocoder } = await google.maps.importLibrary("geocoding");
-      const geocoder = new Geocoder();
+      const place = prediction._raw.toPlace();
+      await place.fetchFields({
+        fields: ["addressComponents", "formattedAddress", "location"],
+      });
 
-      const result = await geocoder.geocode({ placeId: prediction.placeId });
-
-      if (!result.results?.[0]) {
+      const formattedAddress = place.formattedAddress ?? "";
+      if (!formattedAddress) {
         setError("Address not found. Please try a more specific address.");
         setIsGeocoding(false);
         return;
       }
 
-      const r = result.results[0];
+      const components = place.addressComponents;
       const get = (type: string) =>
-        r.address_components.find(
-          (c: { types: string[]; long_name: string }) => c.types.includes(type)
-        )?.long_name ?? "";
-      const getShort = (type: string) =>
-        r.address_components.find(
-          (c: { types: string[]; short_name: string }) => c.types.includes(type)
-        )?.short_name ?? "";
+        components?.find((c: { types: string[] }) => c.types?.includes(type));
 
-      const formattedAddress = r.formatted_address;
       setInputValue(formattedAddress);
 
       // Refresh session token after a selection
-      const lib = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-      sessionTokenRef.current = new lib.AutocompleteSessionToken();
+      sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
 
       onSelectRef.current(
         {
           raw: formattedAddress,
-          streetNumber: get("street_number"),
-          streetName: get("route"),
-          city: get("locality") || get("sublocality"),
-          state: getShort("administrative_area_level_1"),
-          zip: get("postal_code"),
-          lat: r.geometry.location.lat(),
-          lng: r.geometry.location.lng(),
+          streetNumber: get("street_number")?.longText ?? "",
+          streetName: get("route")?.longText ?? "",
+          city: get("locality")?.longText ?? get("sublocality")?.longText ?? "",
+          state: get("administrative_area_level_1")?.shortText ?? "",
+          zip: get("postal_code")?.longText ?? "",
+          lat: place.location?.lat() ?? 0,
+          lng: place.location?.lng() ?? 0,
         },
         reportTypeRef.current
       );
     } catch (err) {
-      console.error("[autocomplete] geocode failed:", err);
+      console.error("[autocomplete] place.fetchFields failed:", err);
       setError("Could not find that address. Please try again.");
     } finally {
       setIsGeocoding(false);
@@ -199,7 +190,7 @@ export default function AddressAutocomplete({
   // Geocode a raw text value (for Search button / Enter key)
   const geocodeAndSubmit = async (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed || isGeocoding || isLoading) return;
+    if (!trimmed || isGeocoding || isLoading || !geocodingLib) return;
 
     setShowDropdown(false);
     setPredictions([]);
@@ -207,10 +198,7 @@ export default function AddressAutocomplete({
     setIsGeocoding(true);
 
     try {
-      // @ts-expect-error
-      const { Geocoder } = await google.maps.importLibrary("geocoding");
-      const geocoder = new Geocoder();
-
+      const geocoder = new geocodingLib.Geocoder();
       const result = await geocoder.geocode({
         address: trimmed,
         componentRestrictions: { country: "us" },
@@ -312,9 +300,9 @@ export default function AddressAutocomplete({
             onFocus={() => {
               if (predictions.length > 0) setShowDropdown(true);
             }}
-            disabled={!mapsReady}
+            disabled={!placesLib}
             placeholder={
-              mapsReady
+              placesLib
                 ? "Enter a property address \u2014 e.g. 130 Trinity Ave SW"
                 : "Loading\u2026"
             }
@@ -351,7 +339,6 @@ export default function AddressAutocomplete({
                   } ${i < predictions.length - 1 ? "border-b border-gray-100" : ""}`}
                   onMouseEnter={() => setActiveIndex(i)}
                   onMouseDown={(e) => {
-                    // Prevent input blur before click fires
                     e.preventDefault();
                   }}
                   onClick={() => selectPrediction(p)}
