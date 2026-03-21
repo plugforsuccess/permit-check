@@ -115,14 +115,39 @@ export default function AddressAutocomplete({
         gmpContainerRef.current?.appendChild(el);
         gmpElementRef.current = el;
 
-        // Track what the user types so the Search button can geocode it.
-        // Native input events from shadow DOM inputs are composed and bubble up.
-        el.addEventListener("input", (e: Event) => {
-          const target = e.target as HTMLInputElement;
-          if (target?.value !== undefined) {
-            setInputValue(target.value);
-          }
+        // Track typing so the Search button knows there's text to geocode.
+        // PlaceAutocompleteElement uses a closed shadow root — we can't access
+        // the inner <input> or read its value from events. However:
+        //   1. The native `input` event IS composed and bubbles out.
+        //   2. The element exposes a `.value` getter on the host (recent GMP).
+        // Strategy: listen for bubbling input events on the container to know
+        // the user is typing, then read the value from el.value or fall back
+        // to reading it at click time.
+        const readValue = (): string => {
+          // Try the element's own .value property first (GMP exposes this)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const v = (el as any).value;
+          if (typeof v === "string") return v;
+          // Fallback: try inputValue property
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const iv = (el as any).inputValue;
+          if (typeof iv === "string") return iv;
+          // Last resort: try light DOM input
+          const input = el.querySelector("input");
+          if (input) return input.value;
+          return "";
+        };
+
+        // The input event bubbles from the closed shadow root (composed: true).
+        // We can't get the value from e.target, but we can read el.value.
+        gmpContainerRef.current?.addEventListener("input", () => {
+          const val = readValue();
+          setInputValue(val);
         });
+
+        // Store readValue so the Search button can use it at click time
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (gmpElementRef.current as any).__readValue = readValue;
 
         // Handle dropdown selection — fires on tap/click of a suggestion
         el.addEventListener("gmp-select", async (event: Event) => {
@@ -258,8 +283,18 @@ export default function AddressAutocomplete({
         {/* Search button — geocodes current input value */}
         <button
           type="button"
-          onClick={() => geocodeAndSubmit(inputValue)}
-          disabled={busy || !inputValue.trim()}
+          onClick={() => {
+            // Read fresh value at click time — inputValue state may be stale
+            // if the closed shadow root prevented us from tracking keystrokes.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const readValue = (gmpElementRef.current as any)?.__readValue;
+            const freshValue = typeof readValue === "function" ? readValue() : inputValue;
+            const valueToSubmit = freshValue || inputValue;
+            if (valueToSubmit.trim()) {
+              geocodeAndSubmit(valueToSubmit);
+            }
+          }}
+          disabled={busy}
           className="px-5 sm:px-6 py-3 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center"
           aria-label="Search"
         >
