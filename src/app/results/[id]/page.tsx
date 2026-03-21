@@ -318,6 +318,21 @@ export default function ResultsPage() {
             )}
 
             <PermitTable permits={result.permits} />
+
+            <div className="mt-8 pt-8 border-t border-gray-100 text-center">
+              <p className="text-sm text-gray-500 mb-3">
+                Need to check another property?
+              </p>
+              <a
+                href="/"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Search Another Address
+              </a>
+            </div>
           </>
         ) : (
           /* STATE 1: Unpaid — blurred teaser + payment CTA */
