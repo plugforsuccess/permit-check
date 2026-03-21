@@ -116,13 +116,49 @@ export default function AddressAutocomplete({
         gmpElementRef.current = el;
 
         // Track what the user types so the Search button can geocode it.
-        // Native input events from shadow DOM inputs are composed and bubble up.
-        el.addEventListener("input", (e: Event) => {
-          const target = e.target as HTMLInputElement;
-          if (target?.value !== undefined) {
-            setInputValue(target.value);
+        // PlaceAutocompleteElement uses a closed shadow root, so e.target is
+        // retargeted to the host element (no .value). Instead, find the actual
+        // <input> rendered inside the element and listen on it directly.
+        const findAndObserveInput = () => {
+          // Google may render the input as a light-DOM child or inside shadow DOM.
+          // Try light DOM first, then open shadow root if available.
+          const input =
+            el.querySelector("input") ??
+            el.shadowRoot?.querySelector("input") ??
+            null;
+
+          if (input) {
+            input.addEventListener("input", () => {
+              setInputValue(input.value);
+            });
+            input.addEventListener("keydown", (e: KeyboardEvent) => {
+              // Allow Enter to geocode when no suggestion is actively selected.
+              // The GMP element consumes Enter when a suggestion is highlighted,
+              // so this only fires for "raw" Enter presses (paste + Enter).
+              if (e.key === "Enter") {
+                // Small delay: if gmp-select fires it will handle the submit,
+                // otherwise we geocode the raw text.
+                setTimeout(() => {
+                  if (input.value.trim()) {
+                    setInputValue(input.value);
+                  }
+                }, 0);
+              }
+            });
+            return true;
           }
-        });
+          return false;
+        };
+
+        // The internal <input> may not exist immediately — observe for it
+        if (!findAndObserveInput()) {
+          const observer = new MutationObserver(() => {
+            if (findAndObserveInput()) observer.disconnect();
+          });
+          observer.observe(el, { childList: true, subtree: true });
+          // Safety: stop observing after 5s to avoid leaks
+          setTimeout(() => observer.disconnect(), 5000);
+        }
 
         // Handle dropdown selection — fires on tap/click of a suggestion
         el.addEventListener("gmp-select", async (event: Event) => {
