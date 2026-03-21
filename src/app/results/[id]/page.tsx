@@ -67,13 +67,14 @@ export default function ResultsPage() {
     }
   }, [lookupId]);
 
-  // Poll the status endpoint after payment redirect
+  // Poll the status endpoint after payment redirect (with backoff)
   useEffect(() => {
     if (!paymentSuccess) return;
 
     setPollingForPayment(true);
     let attempts = 0;
-    const maxAttempts = 5;
+    const maxAttempts = 6;
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const poll = async () => {
       try {
@@ -93,15 +94,18 @@ export default function ResultsPage() {
       if (attempts >= maxAttempts) {
         setPollingForPayment(false);
         fetchResults(); // Final fetch regardless
+        return;
       }
+      // Backoff: 1s, 2s, 3s, 4s, 5s, 5s
+      const delay = Math.min(1000 * attempts, 5000);
+      timeoutId = setTimeout(poll, delay);
     };
 
-    // Poll every 2 seconds for up to 10 seconds
-    const interval = setInterval(poll, 2000);
-    // Also do an immediate check
     poll();
 
-    return () => clearInterval(interval);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [paymentSuccess, lookupId, fetchResults]);
 
   // Initial fetch (only if not waiting for payment)
@@ -141,31 +145,27 @@ export default function ResultsPage() {
 
   if (loading || pollingForPayment) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <svg
-            className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          <p className="text-gray-600">
-            {pollingForPayment
-              ? "Confirming your payment..."
-              : "Loading permit results..."}
+      <div className="min-h-screen py-8 sm:py-12 px-4">
+        <div className="max-w-4xl mx-auto" role="status" aria-label={pollingForPayment ? "Confirming payment" : "Loading results"}>
+          {/* Skeleton street view */}
+          <div className="mb-6 h-32 sm:h-48 bg-gray-100 rounded-xl animate-pulse" />
+          {/* Skeleton header */}
+          <div className="mb-8">
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-3" />
+            <div className="h-5 w-72 bg-gray-100 rounded animate-pulse mb-3" />
+            <div className="flex gap-3">
+              <div className="h-7 w-36 bg-gray-100 rounded-full animate-pulse" />
+              <div className="h-7 w-24 bg-gray-100 rounded-full animate-pulse" />
+            </div>
+          </div>
+          {/* Skeleton table rows */}
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-14 bg-gray-50 rounded-lg animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+            ))}
+          </div>
+          <p className="text-center text-sm text-gray-500 mt-8">
+            {pollingForPayment ? "Confirming your payment..." : "Loading permit results..."}
           </p>
         </div>
       </div>

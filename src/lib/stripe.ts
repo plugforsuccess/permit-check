@@ -35,37 +35,41 @@ export async function createCheckoutSession(
   reportType: "standard" | "attorney",
   successUrl: string,
   cancelUrl: string,
-  matterReference?: string
+  matterReference?: string,
+  idempotencyKey?: string
 ): Promise<Stripe.Checkout.Session> {
   const stripe = getStripe();
-  return stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name:
-              reportType === "attorney"
-                ? "PermitCheck Attorney Report"
-                : "PermitCheck Property Report",
-            description:
-              reportType === "attorney"
-                ? "Litigation-grade permit report with chain of custody"
-                : "Complete permit history report for property",
+  return stripe.checkout.sessions.create(
+    {
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name:
+                reportType === "attorney"
+                  ? "PermitCheck Attorney Report"
+                  : "PermitCheck Property Report",
+              description:
+                reportType === "attorney"
+                  ? "Litigation-grade permit report with chain of custody"
+                  : "Complete permit history report for property",
+            },
+            unit_amount: amount,
           },
-          unit_amount: amount,
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      mode: "payment",
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        lookup_id: lookupId,
+        report_type: reportType,
+        matter_reference: matterReference ?? "",
       },
-    ],
-    mode: "payment",
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: {
-      lookup_id: lookupId,
-      report_type: reportType,
-      matter_reference: matterReference ?? "",
     },
-  });
+    idempotencyKey ? { idempotencyKey } : undefined
+  );
 }
