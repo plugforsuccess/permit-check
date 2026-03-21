@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useMapsReady } from "@/components/GoogleMapsProvider";
+import { useMapsLibrary } from "@vis.gl/react-google-maps";
 
 export interface StructuredAddress {
   raw: string;
@@ -30,7 +30,9 @@ export default function AddressAutocomplete({
   onSelect,
   isLoading,
 }: AddressAutocompleteProps) {
-  const mapsReady = useMapsReady();
+  const placesLib = useMapsLibrary("places");
+  const geocodingLib = useMapsLibrary("geocoding");
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const serviceRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,22 +55,13 @@ export default function AddressAutocomplete({
   useEffect(() => { reportTypeRef.current = reportType; }, [reportType]);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
-  // Initialize AutocompleteService when Maps API is ready
+  // Initialize AutocompleteService when Places library is ready
   useEffect(() => {
-    if (!mapsReady) return;
+    if (!placesLib) return;
 
-    const init = async () => {
-      try {
-        const placesLib = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-        serviceRef.current = new placesLib.AutocompleteService();
-        sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
-      } catch (err) {
-        console.error("[AddressAutocomplete] init failed:", err);
-      }
-    };
-
-    init();
-  }, [mapsReady]);
+    serviceRef.current = new placesLib.AutocompleteService();
+    sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
+  }, [placesLib]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -139,6 +132,8 @@ export default function AddressAutocomplete({
 
   // Select a prediction — resolve place details via Geocoder
   const selectPrediction = async (prediction: Prediction) => {
+    if (!geocodingLib || !placesLib) return;
+
     setInputValue(prediction.description);
     setShowDropdown(false);
     setPredictions([]);
@@ -146,10 +141,7 @@ export default function AddressAutocomplete({
     setIsGeocoding(true);
 
     try {
-      // @ts-expect-error
-      const { Geocoder } = await google.maps.importLibrary("geocoding");
-      const geocoder = new Geocoder();
-
+      const geocoder = new geocodingLib.Geocoder();
       const result = await geocoder.geocode({ placeId: prediction.placeId });
 
       if (!result.results?.[0]) {
@@ -172,8 +164,7 @@ export default function AddressAutocomplete({
       setInputValue(formattedAddress);
 
       // Refresh session token after a selection
-      const lib = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-      sessionTokenRef.current = new lib.AutocompleteSessionToken();
+      sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
 
       onSelectRef.current(
         {
@@ -199,7 +190,7 @@ export default function AddressAutocomplete({
   // Geocode a raw text value (for Search button / Enter key)
   const geocodeAndSubmit = async (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed || isGeocoding || isLoading) return;
+    if (!trimmed || isGeocoding || isLoading || !geocodingLib) return;
 
     setShowDropdown(false);
     setPredictions([]);
@@ -207,10 +198,7 @@ export default function AddressAutocomplete({
     setIsGeocoding(true);
 
     try {
-      // @ts-expect-error
-      const { Geocoder } = await google.maps.importLibrary("geocoding");
-      const geocoder = new Geocoder();
-
+      const geocoder = new geocodingLib.Geocoder();
       const result = await geocoder.geocode({
         address: trimmed,
         componentRestrictions: { country: "us" },
@@ -312,9 +300,9 @@ export default function AddressAutocomplete({
             onFocus={() => {
               if (predictions.length > 0) setShowDropdown(true);
             }}
-            disabled={!mapsReady}
+            disabled={!placesLib}
             placeholder={
-              mapsReady
+              placesLib
                 ? "Enter a property address \u2014 e.g. 130 Trinity Ave SW"
                 : "Loading\u2026"
             }
