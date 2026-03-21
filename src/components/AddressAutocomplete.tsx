@@ -87,43 +87,45 @@ export default function AddressAutocomplete({
   }, []);
 
   // Fetch predictions from AutocompleteService
-  const fetchPredictions = useCallback((value: string) => {
+  const fetchPredictions = useCallback(async (value: string) => {
     if (!serviceRef.current || value.trim().length < 2) {
       setPredictions([]);
       setShowDropdown(false);
       return;
     }
 
-    serviceRef.current.getPlacePredictions(
-      {
+    try {
+      const response = await serviceRef.current.getPlacePredictions({
         input: value,
         componentRestrictions: { country: "us" },
         types: ["address"],
         sessionToken: sessionTokenRef.current,
-        locationBias: {
-          center: { lat: 33.749, lng: -84.388 },
-          radius: 50000,
-        },
-      },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (results: any[] | null, status: string) => {
-        if (status === "OK" && results) {
-          setPredictions(
-            results.map((r) => ({
-              placeId: r.place_id,
-              mainText: r.structured_formatting?.main_text ?? r.description,
-              secondaryText: r.structured_formatting?.secondary_text ?? "",
-              description: r.description,
-            }))
-          );
-          setShowDropdown(true);
-          setActiveIndex(-1);
-        } else {
-          setPredictions([]);
-          setShowDropdown(false);
-        }
+        location: new google.maps.LatLng(33.749, -84.388),
+        radius: 50000,
+      });
+
+      const results = response?.predictions ?? response ?? [];
+
+      if (Array.isArray(results) && results.length > 0) {
+        setPredictions(
+          results.map((r: google.maps.places.AutocompletePrediction) => ({
+            placeId: r.place_id,
+            mainText: r.structured_formatting?.main_text ?? r.description,
+            secondaryText: r.structured_formatting?.secondary_text ?? "",
+            description: r.description,
+          }))
+        );
+        setShowDropdown(true);
+        setActiveIndex(-1);
+      } else {
+        setPredictions([]);
+        setShowDropdown(false);
       }
-    );
+    } catch (err) {
+      console.error("[AddressAutocomplete] getPlacePredictions failed:", err);
+      setPredictions([]);
+      setShowDropdown(false);
+    }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
