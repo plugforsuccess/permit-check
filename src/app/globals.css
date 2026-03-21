@@ -27,20 +27,6 @@ h1, h2, h3 {
   letter-spacing: -0.02em;
 }
 
-/* Phase 1 — Style Google Places autocomplete to match site design */
-gmp-place-autocomplete {
-  width: 100%;
-  --gmp-input-background-color: #ffffff;
-  --gmp-input-border-color: #e5e7eb;
-  --gmp-input-border-radius: 0.75rem;
-  --gmp-input-font-family: inherit;
-  --gmp-input-font-size: 1.125rem;
-  --gmp-input-padding: 1rem 1.5rem;
-  --gmp-input-focus-border-color: #2563eb;
-  --gmp-input-placeholder-color: #9ca3af;
-  --gmp-input-height: 60px;
-}
-
 /* Mobile tap optimizations */
 * {
   -webkit-tap-highlight-color: transparent;
