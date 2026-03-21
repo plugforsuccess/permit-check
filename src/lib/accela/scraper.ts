@@ -335,7 +335,8 @@ async function parseResultsTable(
         };
 
         const recordNumber = getText(cells[cols.recordNumber]);
-        if (!recordNumber || recordNumber.includes(" ")) continue;
+        // Valid Accela record numbers contain a hyphen and are not purely numeric
+        if (!recordNumber || recordNumber.includes(" ") || !/[A-Z].*-.*\d/.test(recordNumber)) continue;
 
         const resolvedAddress =
           cols.address >= 0
