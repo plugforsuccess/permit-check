@@ -46,7 +46,7 @@ export default function SearchingPage() {
   const searchParams = useSearchParams();
   const lookupId = params.id as string;
   const address = searchParams.get("address") ?? "";
-  const jurisdiction = searchParams.get("jurisdiction") ?? "City of Atlanta";
+  const jurisdiction = searchParams.get("jurisdiction") ?? "the permit database";
 
   const [stepStatuses, setStepStatuses] = useState<Record<string, StepStatus>>({
     verified: "pending",
@@ -142,9 +142,9 @@ export default function SearchingPage() {
           const status = stepStatuses[step.id];
           const sublabel =
             step.id === "verified"
-              ? `${jurisdiction} · ${address.match(/\d{5}/)?.[0] ?? ""}`
+              ? `${jurisdiction}${address.match(/\d{5}/) ? ` · ${address.match(/\d{5}/)?.[0]}` : ""}`
               : step.id === "connected"
-              ? `${jurisdiction} Accela system`
+              ? `${jurisdiction} permit system`
               : step.sublabel;
 
           return (
