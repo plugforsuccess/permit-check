@@ -89,11 +89,7 @@ export default function AddressAutocomplete({
       const { suggestions } = await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: value,
         includedRegionCodes: ["us"],
-        includedPrimaryTypes: ["street_address", "subpremise", "premise"],
-        locationBias: {
-          lat: 33.749,
-          lng: -84.388,
-        },
+        locationBias: { lat: 33.749, lng: -84.388 },
         sessionToken: sessionTokenRef.current ?? undefined,
       });
 
