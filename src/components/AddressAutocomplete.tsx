@@ -222,7 +222,7 @@ export default function AddressAutocomplete({
     <div className="w-full max-w-2xl mx-auto">
 
       {/* Search input row */}
-      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-[#0f1f3d] transition-colors">
+      <div className="flex items-stretch rounded-xl overflow-hidden border-2 border-gray-200 focus-within:border-blue-600 transition-colors h-[60px]">
 
         {/* Visible styled input */}
         <div className="relative flex-1">
@@ -241,7 +241,7 @@ export default function AddressAutocomplete({
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="w-full px-5 py-4 text-base sm:text-lg bg-transparent outline-none text-gray-900 placeholder-gray-400 disabled:text-gray-400"
+            className="w-full px-6 py-4 text-base sm:text-lg bg-transparent outline-none text-gray-900 placeholder-gray-400 disabled:text-gray-400"
           />
 
           {/* GMP element mounts here — invisible but handles suggestions */}
