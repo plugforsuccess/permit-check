@@ -7,6 +7,18 @@ vi.stubGlobal("fetch", mockFetch);
 // Mock process.env
 vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
 
+// Mock the schemas module to avoid needing zod in test runner
+vi.mock("@/lib/schemas", () => ({
+  permitSummarySchema: {
+    safeParse: (data: Record<string, unknown>) => {
+      if (data.riskLevel && data.summary && Array.isArray(data.flags) && Array.isArray(data.positives)) {
+        return { success: true, data };
+      }
+      return { success: false };
+    },
+  },
+}));
+
 import { generatePermitSummary } from "../lib/summary";
 
 describe("generatePermitSummary", () => {

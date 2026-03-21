@@ -10,6 +10,16 @@
 import { DISCLAIMER } from "./config";
 import type { Permit } from "@/types";
 
+/** Escape HTML special characters to prevent injection in PDF templates. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export interface ReportData {
   address: string;
   lookupDate: string;
@@ -30,7 +40,10 @@ export interface ReportData {
  * This HTML can be converted to PDF via Puppeteer or served directly.
  */
 export function generateReportHtml(data: ReportData): string {
-  const { address, lookupDate, lookupId, permits, reportType } = data;
+  const address = escapeHtml(data.address);
+  const lookupDate = escapeHtml(data.lookupDate);
+  const lookupId = escapeHtml(data.lookupId);
+  const { permits, reportType } = data;
 
   const statusColor: Record<string, string> = {
     Issued: "#22c55e",
@@ -51,12 +64,12 @@ export function generateReportHtml(data: ReportData): string {
     .map(
       (p) => `
     <tr>
-      <td>${p.record_number}</td>
-      <td>${p.type}</td>
-      <td><span style="color: ${statusColor[p.status] || "#9ca3af"}; font-weight: 600;">${p.status}</span></td>
-      <td>${p.filed_date || "N/A"}</td>
-      <td>${p.issued_date || "N/A"}</td>
-      <td>${p.description || "—"}</td>
+      <td>${escapeHtml(p.record_number)}</td>
+      <td>${escapeHtml(p.type)}</td>
+      <td><span style="color: ${statusColor[p.status] || "#9ca3af"}; font-weight: 600;">${escapeHtml(p.status)}</span></td>
+      <td>${escapeHtml(p.filed_date || "N/A")}</td>
+      <td>${escapeHtml(p.issued_date || "N/A")}</td>
+      <td>${escapeHtml(p.description || "—")}</td>
       <td>${p.contractor || "—"}</td>
     </tr>
   `
@@ -107,7 +120,7 @@ export function generateReportHtml(data: ReportData): string {
           ${data.matterReference ? `
           <tr style="border-bottom: 1px solid #e5e7eb;">
             <td style="padding: 12px 0; color: #6b7280; font-weight: 500;">Matter Reference</td>
-            <td style="padding: 12px 0; color: #111827;">${data.matterReference}</td>
+            <td style="padding: 12px 0; color: #111827;">${escapeHtml(data.matterReference ?? "")}</td>
           </tr>` : ""}
         </table>
       </div>

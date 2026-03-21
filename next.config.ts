@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@sparticuz/chromium-min", "playwright-core", "puppeteer-core"],
+  serverExternalPackages: ["@sparticuz/chromium-min", "playwright-core", "puppeteer-core", "cheerio"],
   async headers() {
     return [
       {

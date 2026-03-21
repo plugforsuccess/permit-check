@@ -7,7 +7,7 @@ import {
 } from "@/lib/accela/index";
 import type { PermitRecord } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress } from "@/lib/address";
-import { lookupInitiateSchema } from "@/lib/schemas";
+import { lookupInitiateSchema, scrapedPermitSchema } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
 
@@ -170,9 +170,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store permits
-    if (permits.length > 0) {
-      const permitsToInsert = permits.map((p) => ({
+    // Validate and store permits
+    const validPermits = permits.filter((p) => scrapedPermitSchema.safeParse(p).success);
+    if (validPermits.length < permits.length) {
+      log.warn("Some scraped permits failed validation", {
+        total: permits.length,
+        valid: validPermits.length,
+        lookupId: lookup.id,
+      });
+    }
+
+    if (validPermits.length > 0) {
+      const permitsToInsert = validPermits.map((p) => ({
         lookup_id: lookup.id,
         record_number: p.recordNumber,
         type: p.type,
@@ -223,7 +232,17 @@ function scraperPermitToResponse(p: PermitRecord) {
   };
 }
 
-function dbPermitToResponse(p: Record<string, unknown>) {
+interface DbPermitRow {
+  record_number: string;
+  type: string;
+  status: string;
+  filed_date: string | null;
+  issued_date: string | null;
+  description: string;
+  address: string;
+}
+
+function dbPermitToResponse(p: DbPermitRow) {
   return {
     record_number: p.record_number,
     type: p.type,

@@ -19,5 +19,16 @@ function getRatelimit(): Ratelimit {
 
 export async function rateLimit(identifier: string): Promise<boolean> {
   const { success } = await getRatelimit().limit(identifier);
+  if (!success) {
+    // Structured logging for rate limit events — helps detect abuse patterns
+    console.warn(
+      JSON.stringify({
+        level: "WARN",
+        msg: "Rate limit exceeded",
+        identifier: identifier.replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/, "[REDACTED_IP]"),
+        timestamp: new Date().toISOString(),
+      })
+    );
+  }
   return success;
 }
