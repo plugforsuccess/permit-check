@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useMapsReady } from "@/components/GoogleMapsProvider";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useMapsLibrary } from "@vis.gl/react-google-maps";
 
 export interface StructuredAddress {
   raw: string;
@@ -19,208 +19,186 @@ interface AddressAutocompleteProps {
   isLoading: boolean;
 }
 
-/** Extract address components from Google Place object or fall back to string parsing. */
-function extractAddressComponents(
+interface Prediction {
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+  fullText: string;
+  // Keep the original PlacePrediction so we can call toPlace() on selection
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  place: any,
-  formatted: string
-): Omit<StructuredAddress, "raw" | "lat" | "lng"> {
-  // Use Google's structured addressComponents when available
-  const components = place?.addressComponents;
-  if (components && Array.isArray(components)) {
-    const get = (type: string) =>
-      components.find((c: { types: string[] }) => c.types?.includes(type));
-    return {
-      streetNumber: get("street_number")?.longText ?? get("street_number")?.long_name ?? "",
-      streetName: get("route")?.longText ?? get("route")?.long_name ?? "",
-      city:
-        get("locality")?.longText ?? get("locality")?.long_name ??
-        get("sublocality")?.longText ?? get("sublocality")?.long_name ?? "",
-      state:
-        get("administrative_area_level_1")?.shortText ??
-        get("administrative_area_level_1")?.short_name ?? "",
-      zip: get("postal_code")?.longText ?? get("postal_code")?.long_name ?? "",
-    };
-  }
-
-  // Fallback: parse formatted address string
-  const cleaned = formatted
-    .replace(/, USA$/, "")
-    .replace(/, United States$/, "");
-  const parts = cleaned.split(", ");
-  const streetPart = parts[0] ?? "";
-  const city = parts[1] ?? "";
-  const stateZip = parts[2] ?? "";
-  const match = streetPart.match(/^(\d+)\s+(.+)$/);
-  return {
-    streetNumber: match?.[1] ?? "",
-    streetName: match?.[2] ?? "",
-    city,
-    state: stateZip.split(" ")[0] ?? "",
-    zip: stateZip.split(" ")[1] ?? "",
-  };
+  _raw: any;
 }
 
 export default function AddressAutocomplete({
   onSelect,
   isLoading,
 }: AddressAutocompleteProps) {
-  const mapsReady = useMapsReady();
-  const gmpContainerRef = useRef<HTMLDivElement>(null);
-  const gmpElementRef = useRef<HTMLElement | null>(null);
+  const placesLib = useMapsLibrary("places");
+  const geocodingLib = useMapsLibrary("geocoding");
 
-  // Store reportType and onSelect in refs — never include in useEffect deps
-  // This prevents the Google element from remounting when reportType changes
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   const reportTypeRef = useRef<"standard" | "attorney">("standard");
   const onSelectRef = useRef(onSelect);
 
   const [reportType, setReportType] = useState<"standard" | "attorney">("standard");
   const [inputValue, setInputValue] = useState("");
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Keep refs in sync without triggering remounts
   useEffect(() => { reportTypeRef.current = reportType; }, [reportType]);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
-  // Prevent mobile scroll when autocomplete dropdown opens
+  // Create session token when Places library loads
   useEffect(() => {
-    // The GMP PlaceAutocompleteElement renders its dropdown in a shadow DOM.
-    // On mobile, focusing the input can trigger the browser to scroll the page.
-    // We prevent this by saving and restoring scroll position on focus.
-    const container = gmpContainerRef.current;
-    if (!container) return;
+    if (!placesLib) return;
+    sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
+  }, [placesLib]);
 
-    const preventScroll = () => {
-      const scrollY = window.scrollY;
-      requestAnimationFrame(() => {
-        if (Math.abs(window.scrollY - scrollY) > 50) {
-          window.scrollTo({ top: scrollY, behavior: "instant" });
-        }
-      });
-    };
-
-    container.addEventListener("focusin", preventScroll);
-    return () => container.removeEventListener("focusin", preventScroll);
-  }, [mapsReady]);
-
-  // Mount Google element ONCE when Maps API is ready
+  // Close dropdown when clicking outside
   useEffect(() => {
-    if (!mapsReady || !gmpContainerRef.current) return;
-
-    let cancelled = false;
-
-    const init = async () => {
-      try {
-        // @ts-expect-error — PlaceAutocompleteElement not yet in TS types
-        const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
-
-        if (cancelled) return;
-
-        const el = new PlaceAutocompleteElement({
-          componentRestrictions: { country: "us" },
-          types: ["address"],
-          locationBias: {
-            center: { lat: 33.749, lng: -84.388 },
-            radius: 50000,
-          },
-        });
-
-        // The GMP element is the actual visible input — style it to fill the container
-        el.style.width = "100%";
-        el.setAttribute(
-          "placeholder",
-          "Enter a property address \u2014 e.g. 130 Trinity Ave SW"
-        );
-
-        gmpContainerRef.current?.appendChild(el);
-        gmpElementRef.current = el;
-
-        // Track typing so the Search button knows there's text to geocode.
-        const readValue = (): string => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const v = (el as any).value;
-          if (typeof v === "string") return v;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const iv = (el as any).inputValue;
-          if (typeof iv === "string") return iv;
-          const input = el.querySelector("input");
-          if (input) return input.value;
-          return "";
-        };
-
-        gmpContainerRef.current?.addEventListener("input", () => {
-          const val = readValue();
-          setInputValue(val);
-        });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (gmpElementRef.current as any).__readValue = readValue;
-
-        // Handle dropdown selection — fires on tap/click of a suggestion
-        el.addEventListener("gmp-select", async (event: Event) => {
-          try {
-            // @ts-expect-error
-            const { placePrediction } = event;
-            if (!placePrediction) return;
-
-            const place = placePrediction.toPlace();
-            await place.fetchFields({
-              fields: ["addressComponents", "formattedAddress", "location"],
-            });
-
-            const formattedAddress = place.formattedAddress ?? "";
-            if (!formattedAddress) return;
-
-            const parsed = extractAddressComponents(place, formattedAddress);
-            setInputValue(formattedAddress);
-            setError(null);
-
-            onSelectRef.current(
-              {
-                raw: formattedAddress,
-                ...parsed,
-                lat: place.location?.lat() ?? 0,
-                lng: place.location?.lng() ?? 0,
-              },
-              reportTypeRef.current
-            );
-          } catch (err) {
-            console.error("[autocomplete] gmp-select handler failed:", err);
-          }
-        });
-      } catch (err) {
-        console.error("[AddressAutocomplete] init failed:", err);
-      }
-    };
-
-    init();
-
-    return () => {
-      cancelled = true;
+    const handleClickOutside = (e: MouseEvent) => {
       if (
-        gmpElementRef.current &&
-        gmpContainerRef.current?.contains(gmpElementRef.current)
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
       ) {
-        gmpContainerRef.current.removeChild(gmpElementRef.current);
-        gmpElementRef.current = null;
+        setShowDropdown(false);
       }
     };
-  }, [mapsReady]); // only mapsReady — intentional
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  // Geocode whatever is in the input — handles paste + Search button tap
-  const geocodeAndSubmit = async (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed || isGeocoding || isLoading) return;
+  // Fetch predictions using new Places API (AutocompleteSuggestion)
+  const fetchPredictions = useCallback(async (value: string) => {
+    if (!placesLib || value.trim().length < 2) {
+      setPredictions([]);
+      setShowDropdown(false);
+      return;
+    }
 
+    try {
+      const { suggestions } = await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: value,
+        includedRegionCodes: ["us"],
+        includedPrimaryTypes: ["street_address", "subpremise", "premise"],
+        locationBias: {
+          lat: 33.749,
+          lng: -84.388,
+        },
+        sessionToken: sessionTokenRef.current ?? undefined,
+      });
+
+      const mapped: Prediction[] = [];
+      for (const s of suggestions) {
+        const pp = s.placePrediction;
+        if (!pp) continue;
+        mapped.push({
+          placeId: pp.placeId,
+          mainText: pp.mainText?.text ?? pp.text.text,
+          secondaryText: pp.secondaryText?.text ?? "",
+          fullText: pp.text.text,
+          _raw: pp,
+        });
+      }
+
+      if (mapped.length > 0) {
+        setPredictions(mapped);
+        setShowDropdown(true);
+        setActiveIndex(-1);
+      } else {
+        setPredictions([]);
+        setShowDropdown(false);
+      }
+    } catch (err) {
+      console.error("[AddressAutocomplete] fetchAutocompleteSuggestions failed:", err);
+      setPredictions([]);
+      setShowDropdown(false);
+    }
+  }, [placesLib]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    setError(null);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchPredictions(value), 250);
+  };
+
+  // Select a prediction — resolve place details via Place.fetchFields (new API)
+  const selectPrediction = async (prediction: Prediction) => {
+    if (!placesLib) return;
+
+    setInputValue(prediction.fullText);
+    setShowDropdown(false);
+    setPredictions([]);
     setError(null);
     setIsGeocoding(true);
 
     try {
-      // @ts-expect-error
-      const { Geocoder } = await google.maps.importLibrary("geocoding");
-      const geocoder = new Geocoder();
+      const place = prediction._raw.toPlace();
+      await place.fetchFields({
+        fields: ["addressComponents", "formattedAddress", "location"],
+      });
 
+      const formattedAddress = place.formattedAddress ?? "";
+      if (!formattedAddress) {
+        setError("Address not found. Please try a more specific address.");
+        setIsGeocoding(false);
+        return;
+      }
+
+      const components = place.addressComponents;
+      const get = (type: string) =>
+        components?.find((c: { types: string[] }) => c.types?.includes(type));
+
+      setInputValue(formattedAddress);
+
+      // Refresh session token after a selection
+      sessionTokenRef.current = new placesLib.AutocompleteSessionToken();
+
+      onSelectRef.current(
+        {
+          raw: formattedAddress,
+          streetNumber: get("street_number")?.longText ?? "",
+          streetName: get("route")?.longText ?? "",
+          city: get("locality")?.longText ?? get("sublocality")?.longText ?? "",
+          state: get("administrative_area_level_1")?.shortText ?? "",
+          zip: get("postal_code")?.longText ?? "",
+          lat: place.location?.lat() ?? 0,
+          lng: place.location?.lng() ?? 0,
+        },
+        reportTypeRef.current
+      );
+    } catch (err) {
+      console.error("[autocomplete] place.fetchFields failed:", err);
+      setError("Could not find that address. Please try again.");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  // Geocode a raw text value (for Search button / Enter key)
+  const geocodeAndSubmit = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed || isGeocoding || isLoading || !geocodingLib) return;
+
+    setShowDropdown(false);
+    setPredictions([]);
+    setError(null);
+    setIsGeocoding(true);
+
+    try {
+      const geocoder = new geocodingLib.Geocoder();
       const result = await geocoder.geocode({
         address: trimmed,
         componentRestrictions: { country: "us" },
@@ -233,12 +211,10 @@ export default function AddressAutocomplete({
       }
 
       const r = result.results[0];
-
       const get = (type: string) =>
         r.address_components.find(
           (c: { types: string[]; long_name: string }) => c.types.includes(type)
         )?.long_name ?? "";
-
       const getShort = (type: string) =>
         r.address_components.find(
           (c: { types: string[]; short_name: string }) => c.types.includes(type)
@@ -268,6 +244,43 @@ export default function AddressAutocomplete({
     }
   };
 
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown || predictions.length === 0) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        geocodeAndSubmit(inputValue);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setActiveIndex((prev) =>
+          prev < predictions.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActiveIndex((prev) =>
+          prev > 0 ? prev - 1 : predictions.length - 1
+        );
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < predictions.length) {
+          selectPrediction(predictions[activeIndex]);
+        } else {
+          geocodeAndSubmit(inputValue);
+        }
+        break;
+      case "Escape":
+        setShowDropdown(false);
+        break;
+    }
+  };
+
   const busy = isLoading || isGeocoding;
 
   return (
@@ -276,31 +289,86 @@ export default function AddressAutocomplete({
       {/* Search input row */}
       <div className="flex items-stretch gap-3">
 
-        {/* GMP autocomplete element mounts here — it IS the visible input */}
-        <div ref={gmpContainerRef} className="flex-1 min-w-0">
-          {!mapsReady && (
-            <input
-              type="text"
-              disabled
-              placeholder="Loading..."
-              className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none text-gray-400 placeholder-gray-400"
-            />
+        {/* Input + dropdown container */}
+        <div className="flex-1 min-w-0 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              if (predictions.length > 0) setShowDropdown(true);
+            }}
+            disabled={!placesLib}
+            placeholder={
+              placesLib
+                ? "Enter a property address \u2014 e.g. 130 Trinity Ave SW"
+                : "Loading\u2026"
+            }
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={showDropdown}
+            aria-autocomplete="list"
+            aria-controls="address-listbox"
+            aria-activedescendant={
+              activeIndex >= 0 ? `address-option-${activeIndex}` : undefined
+            }
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none focus:border-blue-400 transition-colors disabled:text-gray-400 disabled:placeholder-gray-400"
+          />
+
+          {/* Custom dropdown */}
+          {showDropdown && predictions.length > 0 && (
+            <div
+              ref={dropdownRef}
+              id="address-listbox"
+              role="listbox"
+              className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-y-auto max-h-72"
+            >
+              {predictions.map((p, i) => (
+                <button
+                  key={p.placeId}
+                  id={`address-option-${i}`}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  type="button"
+                  className={`w-full text-left px-4 py-3 flex flex-col gap-0.5 transition-colors ${
+                    i === activeIndex
+                      ? "bg-blue-50"
+                      : "hover:bg-gray-50"
+                  } ${i < predictions.length - 1 ? "border-b border-gray-100" : ""}`}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={() => selectPrediction(p)}
+                >
+                  <span className="text-sm font-medium text-gray-900">
+                    {p.mainText}
+                  </span>
+                  {p.secondaryText && (
+                    <span className="text-xs text-gray-500">
+                      {p.secondaryText}
+                    </span>
+                  )}
+                </button>
+              ))}
+              <div className="px-4 py-2 flex justify-end border-t border-gray-100">
+                <img
+                  src="https://maps.gstatic.com/mapfiles/api-3/images/powered-by-google-on-white3_hdpi.png"
+                  alt="Powered by Google"
+                  className="h-4"
+                />
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Search button — geocodes current input value */}
+        {/* Search button */}
         <button
           type="button"
-          onClick={() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const readValue = (gmpElementRef.current as any)?.__readValue;
-            const freshValue = typeof readValue === "function" ? readValue() : inputValue;
-            const valueToSubmit = freshValue || inputValue;
-            if (valueToSubmit.trim()) {
-              geocodeAndSubmit(valueToSubmit);
-            }
-          }}
-          disabled={busy}
+          onClick={() => geocodeAndSubmit(inputValue)}
+          disabled={busy || !inputValue.trim()}
           className="px-5 sm:px-6 py-3 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center"
           aria-label="Search"
         >
