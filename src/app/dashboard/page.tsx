@@ -232,7 +232,7 @@ export default function DashboardPage() {
                 >
                   <div>
                     <h3 className="font-semibold text-gray-900">
-                      {lookup.address_normalized}
+                      {lookup.address_raw || lookup.address_normalized}
                     </h3>
                     <div className="flex items-center gap-4 mt-1">
                       <span className="text-sm text-gray-500">
