@@ -137,12 +137,12 @@ export default function SearchingPage() {
 
       {/* Address pill */}
       {address && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-8 sm:mb-10 flex items-start gap-2 max-w-sm w-full">
-          <svg className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#c9a84c" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-[#0f1f3d]/5 border border-[#0f1f3d]/20 rounded-xl px-4 py-3 mb-8 sm:mb-10 flex items-start gap-2 max-w-sm w-full">
+          <svg className="w-4 h-4 text-[#0f1f3d] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span className="text-sm font-medium text-blue-800 break-words">{address}</span>
+          <span className="text-sm font-medium text-[#0f1f3d] break-words">{address}</span>
         </div>
       )}
 
@@ -173,8 +173,8 @@ export default function SearchingPage() {
                     </svg>
                   </div>
                 ) : status === "active" ? (
-                  <div className="w-7 h-7 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5 text-blue-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round">
+                  <div className="w-7 h-7 rounded-full bg-[#0f1f3d]/10 border-2 border-[#0f1f3d]/30 flex items-center justify-center">
+                    <svg className="w-3.5 h-3.5 text-[#0f1f3d] animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round">
                       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                     </svg>
                   </div>

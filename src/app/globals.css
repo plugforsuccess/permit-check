@@ -28,40 +28,6 @@ h1, h2, h3 {
   letter-spacing: -0.02em;
 }
 
-/* Phase 1 — Style Google Places autocomplete to match site design */
-gmp-place-autocomplete {
-  width: 100%;
-  --gmp-input-background-color: #ffffff;
-  --gmp-input-border-color: #e5e7eb;
-  --gmp-input-border-radius: 0.75rem;
-  --gmp-input-font-family: inherit;
-  --gmp-input-font-size: 1.125rem;
-  --gmp-input-padding: 1rem 1.5rem;
-  --gmp-input-focus-border-color: #2563eb;
-  --gmp-input-placeholder-color: #9ca3af;
-  --gmp-input-height: 60px;
-}
-
-/* Style the GMP suggestion list dropdown */
-gmp-place-autocomplete::part(panel) {
-  border-radius: 0.75rem;
-  margin-top: 0.5rem;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  font-family: var(--font-display);
-}
-
-gmp-place-autocomplete::part(prediction-item) {
-  padding: 0.75rem 1rem;
-  font-size: 0.9375rem;
-  font-family: var(--font-display);
-}
-
-gmp-place-autocomplete::part(prediction-item):hover,
-gmp-place-autocomplete::part(prediction-item-selected) {
-  background-color: #f0f4ff;
-}
-
 /* Mobile tap optimizations */
 * {
   -webkit-tap-highlight-color: transparent;
