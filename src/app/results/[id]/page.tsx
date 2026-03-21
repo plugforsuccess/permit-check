@@ -18,6 +18,13 @@ interface LookupResult {
     id: string;
     download_url: string;
     expires_at: string;
+    summary?: {
+      riskLevel: "low" | "medium" | "high";
+      summary: string;
+      flags: string[];
+      positives: string[];
+    } | null;
+    risk_level?: string | null;
   } | null;
 }
 
@@ -314,6 +321,90 @@ export default function ResultsPage() {
                 >
                   Refresh
                 </button>
+              </div>
+            )}
+
+            {/* AI Permit Summary */}
+            {result.report?.summary && (
+              <div className={`mb-6 rounded-xl border-2 p-5 ${
+                result.report.summary.riskLevel === "high"
+                  ? "border-red-200 bg-red-50"
+                  : result.report.summary.riskLevel === "medium"
+                  ? "border-yellow-200 bg-yellow-50"
+                  : "border-green-200 bg-green-50"
+              }`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                    result.report.summary.riskLevel === "high"
+                      ? "bg-red-100 text-red-800"
+                      : result.report.summary.riskLevel === "medium"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-green-100 text-green-800"
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      result.report.summary.riskLevel === "high"
+                        ? "bg-red-500"
+                        : result.report.summary.riskLevel === "medium"
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
+                    }`} />
+                    {result.report.summary.riskLevel === "high"
+                      ? "High Risk"
+                      : result.report.summary.riskLevel === "medium"
+                      ? "Medium Risk"
+                      : "Low Risk"}
+                  </span>
+                  <span className="text-xs text-gray-500 font-medium">AI-Generated Summary</span>
+                </div>
+
+                <p className={`text-sm leading-relaxed mb-4 font-medium ${
+                  result.report.summary.riskLevel === "high"
+                    ? "text-red-900"
+                    : result.report.summary.riskLevel === "medium"
+                    ? "text-yellow-900"
+                    : "text-green-900"
+                }`}>
+                  {result.report.summary.summary}
+                </p>
+
+                {result.report.summary.flags.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                      Red Flags
+                    </div>
+                    <ul className="space-y-1">
+                      {result.report.summary.flags.map((flag, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-red-800">
+                          <span className="text-red-500 mt-0.5 shrink-0">&#x2715;</span>
+                          {flag}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {result.report.summary.positives.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                      Positive Signals
+                    </div>
+                    <ul className="space-y-1">
+                      {result.report.summary.positives.map((pos, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-green-800">
+                          <span className="text-green-600 mt-0.5 shrink-0">&#x2713;</span>
+                          {pos}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-400">
+                    AI analysis based on official permit records. Not a substitute for
+                    professional inspection or legal advice.
+                  </p>
+                </div>
               </div>
             )}
 

@@ -84,6 +84,12 @@ export async function GET(
     );
   }
 
+  // Parse AI summary if available
+  let parsedSummary = null;
+  if (report.ai_summary) {
+    try { parsedSummary = JSON.parse(report.ai_summary); } catch { /* ignore */ }
+  }
+
   // Generate HTML report
   const reportHtml = generateReportHtml({
     address: lookup.address_normalized,
@@ -92,6 +98,7 @@ export async function GET(
     permits,
     reportType: lookup.report_type || "standard",
     matterReference: report.matter_reference ?? undefined,
+    summary: parsedSummary,
   });
 
   // Standard: return HTML with auto-print for browser print-to-PDF

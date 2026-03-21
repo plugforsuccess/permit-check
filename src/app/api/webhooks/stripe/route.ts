@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
 import { getStripe } from "@/lib/stripe";
+import { generatePermitSummary } from "@/lib/summary";
 import type Stripe from "stripe";
 
 /**
@@ -96,6 +97,20 @@ export async function POST(req: Request) {
     console.log("[webhook] permits fetch:", permits?.length, "error:", permitsFetchError);
 
     if (lookup && permits) {
+      // Generate AI summary
+      let aiSummary: string | null = null;
+      let riskLevel: string | null = null;
+
+      try {
+        const summary = await generatePermitSummary(permits, lookup.address_normalized);
+        aiSummary = JSON.stringify(summary);
+        riskLevel = summary.riskLevel;
+        console.log("[webhook] summary generated, risk:", riskLevel);
+      } catch (err) {
+        console.error("[webhook] summary generation failed:", err);
+        // Don't block report creation if summary fails
+      }
+
       // Store report record
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + config.app.reportExpiryHours);
@@ -113,8 +128,10 @@ export async function POST(req: Request) {
             expires_at: expiresAt.toISOString(),
             download_token: downloadToken,
             matter_reference: session.metadata?.matter_reference || null,
+            ai_summary: aiSummary,
+            risk_level: riskLevel,
           },
-          { onConflict: "lookup_id", ignoreDuplicates: true }
+          { onConflict: "lookup_id", ignoreDuplicates: false }
         )
         .select()
         .single();
