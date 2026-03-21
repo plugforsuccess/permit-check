@@ -83,16 +83,16 @@ export default function RootLayout({
               <a href="/" className="flex items-center">
                 <Logo size="md" variant="light" />
               </a>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-1">
                 <a
                   href="/#pricing"
-                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-50"
                 >
                   Pricing
                 </a>
                 <a
                   href="/dashboard"
-                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-50"
                 >
                   Dashboard
                 </a>

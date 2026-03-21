@@ -63,7 +63,7 @@ export default function PermitTable({
   }
 
   return (
-    <div className={`relative ${isBlurred ? "select-none" : ""}`}>
+    <div className={`relative ${isBlurred ? "select-none" : ""}`} aria-hidden={isBlurred}>
       {isBlurred && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
           <div className="text-center p-8">
@@ -159,8 +159,9 @@ export default function PermitTable({
                   {permit.issued_date || "\u2014"}
                 </td>
                 <td
-                  className="px-4 py-3 text-sm text-gray-600 max-w-xs cursor-pointer"
+                  className="px-4 py-3 text-sm text-gray-600 max-w-xs cursor-pointer hover:text-gray-900 transition-colors"
                   onClick={() => toggleExpanded(permit.record_number)}
+                  title={permit.description ? "Click to expand" : undefined}
                 >
                   {expanded.has(permit.record_number)
                     ? permit.description || "\u2014"
@@ -175,6 +176,17 @@ export default function PermitTable({
           </tbody>
         </table>
       </div>
+
+      {/* Status legend — shown only for unlocked results */}
+      {!isBlurred && permits.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />Issued = Approved by city</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Finaled = Completed &amp; inspected</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400" />In Review = Pending approval</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" />Expired = No longer valid</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" />Void = Cancelled</span>
+        </div>
+      )}
     </div>
   );
 }

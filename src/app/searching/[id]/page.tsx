@@ -131,6 +131,14 @@ export default function SearchingPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-16">
 
+      {/* Back link */}
+      <a href="/" className="self-start mb-8 text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1.5">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        New search
+      </a>
+
       {/* Brand */}
       <Logo size="md" variant="light" className="mb-1" />
       <div className="text-sm text-gray-400 mb-12">Property Permit Verification</div>
