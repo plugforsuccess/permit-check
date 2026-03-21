@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import GoogleMapsProvider from "@/components/GoogleMapsProvider";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Logo from "@/components/Logo";
 import "./globals.css";
 
@@ -100,7 +101,9 @@ export default function RootLayout({
           </div>
         </nav>
         <GoogleMapsProvider>
-          <main id="main-content" className="flex-1">{children}</main>
+          <main id="main-content" className="flex-1">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
         </GoogleMapsProvider>
         <footer className="border-t border-gray-100 py-8">
           <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500">

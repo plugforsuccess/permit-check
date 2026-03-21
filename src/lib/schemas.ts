@@ -1,5 +1,24 @@
 import { z } from "zod";
 
+/** Validates scraped permit data before DB insertion. */
+export const scrapedPermitSchema = z.object({
+  recordNumber: z.string().min(1).max(50),
+  type: z.string().max(200).default("Unknown"),
+  status: z.enum(["Issued", "Finaled", "Expired", "Void", "In Review", "Unknown"]),
+  filedDate: z.string().nullable(),
+  issuedDate: z.string().nullable(),
+  description: z.string().max(500).default(""),
+  address: z.string().max(300).default(""),
+});
+
+/** Validates AI-generated permit summary after JSON.parse. */
+export const permitSummarySchema = z.object({
+  riskLevel: z.enum(["low", "medium", "high"]),
+  summary: z.string().max(1000),
+  flags: z.array(z.string().max(300)),
+  positives: z.array(z.string().max(300)),
+});
+
 export const addressSchema = z.object({
   streetNumber: z
     .string()

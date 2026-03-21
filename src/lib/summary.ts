@@ -1,4 +1,5 @@
 import type { Permit } from "@/types";
+import { permitSummarySchema } from "@/lib/schemas";
 
 export interface PermitSummary {
   riskLevel: "low" | "medium" | "high";
@@ -85,12 +86,17 @@ If permits.length === 0: riskLevel should be "medium", summary should note that 
   const text = data.content[0]?.text ?? "";
 
   try {
-    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+    const raw = JSON.parse(text.replace(/```json|```/g, "").trim());
+    const validated = permitSummarySchema.safeParse(raw);
+    if (validated.success) {
+      return validated.data;
+    }
+    // Partial data — use what we can
     return {
-      riskLevel: parsed.riskLevel ?? "medium",
-      summary: parsed.summary ?? "Summary unavailable.",
-      flags: parsed.flags ?? [],
-      positives: parsed.positives ?? [],
+      riskLevel: raw.riskLevel ?? "medium",
+      summary: raw.summary ?? "Summary unavailable.",
+      flags: Array.isArray(raw.flags) ? raw.flags : [],
+      positives: Array.isArray(raw.positives) ? raw.positives : [],
     };
   } catch {
     return {

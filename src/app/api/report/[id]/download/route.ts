@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { generateReportHtml } from "@/lib/pdf";
 import { generatePdfFromHtml } from "@/lib/pdf-generator";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const maxDuration = 60; // seconds — attorney PDF generation needs more time
 
@@ -16,6 +17,16 @@ export async function GET(
 ) {
   const { id: lookupId } = await params;
   const token = request.nextUrl.searchParams.get("token");
+
+  // Rate limit: 10 downloads per minute per token to prevent abuse
+  const rateLimitKey = `download:${token ?? lookupId}`;
+  const allowed = await rateLimit(rateLimitKey);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many download requests. Please wait a moment." },
+      { status: 429 }
+    );
+  }
 
   if (!token) {
     return NextResponse.json(
