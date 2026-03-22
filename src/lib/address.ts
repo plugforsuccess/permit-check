@@ -62,8 +62,15 @@ export function normalizeAddress(raw: string): string {
     ""
   );
 
-  // Remove city, state, zip if present
-  address = address.replace(/,?\s*ATLANTA\s*,?\s*(GA|GEORGIA)?\s*\d{0,5}\s*$/i, "");
+  // Remove ", USA" or ", United States" suffix (Google Places appends this)
+  address = address.replace(/,?\s*(USA|UNITED STATES)\s*$/i, "");
+
+  // Remove city, state, zip — any city (not just Atlanta)
+  // Matches: ", Atlanta, GA 30309" or ", Lawrenceville, GA 30046" etc.
+  address = address.replace(/,?\s*[A-Z\s]+,?\s*(GA|GEORGIA)\s*\d{0,5}\s*$/i, "");
+
+  // Remove any trailing comma
+  address = address.replace(/,\s*$/, "").trim();
 
   // Normalize street type abbreviations
   const words = address.split(/\s+/);
