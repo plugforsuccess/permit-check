@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Normalize address
+    // 1. Normalize address
     const addressNormalized = normalizeAddress(address);
 
     // Use structured components from Google Places when available
@@ -91,14 +91,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Check Supabase cache — if address looked up in last 24h, return cached result
+    // 2. Check Supabase cache — if address looked up in last 24h, return cached result
     const supabase = createServerClient();
     const cutoff = new Date(Date.now() - CACHE_TTL_MS).toISOString();
 
     const { data: cachedLookup } = await supabase
       .from("lookups")
-      .select("id, address_normalized, permit_count, created_at, jurisdiction_id")
+      .select("id, address_normalized, permit_count, created_at, jurisdiction_id, status")
       .eq("address_normalized", addressNormalized)
+      .eq("status", "complete")
       .gte("created_at", cutoff)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -122,95 +123,117 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. No cache hit — scrape Accela portal (with retry)
-    log.info("Scraping Accela", { streetNumber, streetName, jurisdictionId });
-
-    let permits: PermitRecord[] = [];
-    const MAX_SCRAPE_RETRIES = 2;
-
-    for (let attempt = 0; attempt <= MAX_SCRAPE_RETRIES; attempt++) {
-      try {
-        permits = await scrapeAccelaPermits(streetNumber, streetName, jurisdictionId);
-        break; // success
-      } catch (error) {
-        log.error("Accela scraping failed", { attempt: attempt + 1, maxAttempts: MAX_SCRAPE_RETRIES + 1, error: String(error) });
-        if (attempt === MAX_SCRAPE_RETRIES) {
-          return NextResponse.json(
-            {
-              error:
-                "Permit data temporarily unavailable. Please try again in a few minutes.",
-            },
-            { status: 503 }
-          );
-        }
-        // Wait before retry: 2s, 4s
-        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-      }
-    }
-
-    // 5. Store result in Supabase (lookups + permits tables)
+    // 3. Cache miss — insert pending lookup row
     const { data: lookup, error: lookupError } = await supabase
       .from("lookups")
       .insert({
         address_raw: address,
         address_normalized: addressNormalized,
-        permit_count: permits.length,
+        status: "pending",
         report_type: parsed.data.report_type,
         user_id: userId,
         jurisdiction_id: jurisdictionId,
       })
-      .select()
+      .select("id")
       .single();
 
-    if (lookupError) {
-      log.error("Failed to create lookup", { error: lookupError.message });
+    if (lookupError || !lookup) {
+      log.error("Failed to create lookup", { error: lookupError?.message });
       return NextResponse.json(
         { error: "Failed to initiate lookup" },
         { status: 500 }
       );
     }
 
-    // Validate and store permits
-    const validPermits = permits.filter((p) => scrapedPermitSchema.safeParse(p).success);
-    if (validPermits.length < permits.length) {
-      log.warn("Some scraped permits failed validation", {
-        total: permits.length,
-        valid: validPermits.length,
-        lookupId: lookup.id,
-      });
-    }
+    const lookupId = lookup.id;
 
-    if (validPermits.length > 0) {
-      const permitsToInsert = validPermits.map((p) => ({
-        lookup_id: lookup.id,
-        record_number: p.recordNumber,
-        type: p.type,
-        status: p.status,
-        filed_date: p.filedDate,
-        issued_date: p.issuedDate,
-        description: p.description,
-        address: p.address,
-      }));
-
-      const { error: permitError } = await supabase
-        .from("permits")
-        .insert(permitsToInsert);
-
-      if (permitError) {
-        log.error("Failed to store permits", { error: permitError.message, lookupId: lookup.id });
-      }
-    }
-
-    // 6. Return permit data
-    return NextResponse.json({
-      lookup_id: lookup.id,
-      address_normalized: addressNormalized,
-      permits: permits.map(scraperPermitToResponse),
-      total_count: permits.length,
-      source: "accela_scraper",
+    // 4. Return immediately — don't await scraper
+    const response = NextResponse.json({
+      lookup_id: lookupId,
       cached: false,
       jurisdiction_id: jurisdictionId,
     });
+
+    // 5. Fire scraper in background using waitUntil
+    const ctx = (request as any)[Symbol.for("next.request.context")];
+    const waitUntil = ctx?.waitUntil?.bind(ctx);
+
+    const scrapeJob = (async () => {
+      try {
+        let permits: PermitRecord[] = [];
+        const MAX_SCRAPE_RETRIES = 2;
+
+        for (let attempt = 0; attempt <= MAX_SCRAPE_RETRIES; attempt++) {
+          try {
+            permits = await scrapeAccelaPermits(streetNumber, streetName, jurisdictionId);
+            break;
+          } catch (error) {
+            log.error("Accela scraping failed", {
+              attempt: attempt + 1,
+              maxAttempts: MAX_SCRAPE_RETRIES + 1,
+              error: String(error),
+            });
+            if (attempt === MAX_SCRAPE_RETRIES) throw error;
+            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+          }
+        }
+
+        // Validate permits
+        const validPermits = permits.filter((p) => scrapedPermitSchema.safeParse(p).success);
+        if (validPermits.length < permits.length) {
+          log.warn("Some scraped permits failed validation", {
+            total: permits.length,
+            valid: validPermits.length,
+            lookupId,
+          });
+        }
+
+        // Update lookup with results
+        await supabase
+          .from("lookups")
+          .update({
+            status: "complete",
+            permit_count: validPermits.length,
+          })
+          .eq("id", lookupId);
+
+        // Insert individual permit rows
+        if (validPermits.length > 0) {
+          const permitsToInsert = validPermits.map((p) => ({
+            lookup_id: lookupId,
+            record_number: p.recordNumber,
+            type: p.type,
+            status: p.status,
+            filed_date: p.filedDate,
+            issued_date: p.issuedDate,
+            description: p.description,
+            address: p.address,
+          }));
+
+          const { error: permitError } = await supabase
+            .from("permits")
+            .insert(permitsToInsert);
+
+          if (permitError) {
+            log.error("Failed to store permits", { error: permitError.message, lookupId });
+          }
+        }
+      } catch (err) {
+        await supabase
+          .from("lookups")
+          .update({ status: "error" })
+          .eq("id", lookupId);
+        log.error("[initiate] scrape failed:", { error: String(err), lookupId });
+      }
+    })();
+
+    if (waitUntil) {
+      waitUntil(scrapeJob);
+    } else {
+      scrapeJob.catch(console.error);
+    }
+
+    return response;
   } catch (error) {
     log.error("Lookup initiation error", { error: String(error) });
     return NextResponse.json(

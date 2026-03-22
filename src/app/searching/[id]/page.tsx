@@ -62,10 +62,10 @@ export default function SearchingPage() {
     setStepStatuses((s) => ({ ...s, verified: "active" }));
     setTimeout(() => {
       setStepStatuses((s) => ({ ...s, verified: "done", connected: "active" }));
-    }, 500);
+    }, 600);
     setTimeout(() => {
       setStepStatuses((s) => ({ ...s, connected: "done", searching: "active" }));
-    }, 3000);
+    }, 1800);
   }, []);
 
   // Poll the status endpoint with exponential backoff
@@ -91,7 +91,7 @@ export default function SearchingPage() {
 
         const data = await res.json();
 
-        if (data.lookup_id && !redirecting.current) {
+        if (data.status === "complete" && !redirecting.current) {
           redirecting.current = true;
 
           setStepStatuses((s) => ({
@@ -106,6 +106,10 @@ export default function SearchingPage() {
               router.push(`/results/${lookupId}`);
             }, 400);
           }, 800);
+          return;
+        } else if (data.status === "error" && !redirecting.current) {
+          redirecting.current = true;
+          router.push(`/results/${lookupId}?error=scrape_failed`);
           return;
         }
       } catch {
