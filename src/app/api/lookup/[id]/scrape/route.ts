@@ -43,7 +43,15 @@ export async function POST(
       lookup.jurisdiction_id ?? "ATLANTA_GA"
     );
 
-    const validPermits = permits.filter(
+    // Deduplicate permits by record_number — keep first occurrence
+    const seen = new Set<string>();
+    const uniquePermits = permits.filter((p) => {
+      if (seen.has(p.recordNumber)) return false;
+      seen.add(p.recordNumber);
+      return true;
+    });
+
+    const validPermits = uniquePermits.filter(
       (p) => scrapedPermitSchema.safeParse(p).success
     );
 
