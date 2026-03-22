@@ -62,10 +62,10 @@ export default function SearchingPage() {
     setStepStatuses((s) => ({ ...s, verified: "active" }));
     setTimeout(() => {
       setStepStatuses((s) => ({ ...s, verified: "done", connected: "active" }));
-    }, 500);
+    }, 600);
     setTimeout(() => {
       setStepStatuses((s) => ({ ...s, connected: "done", searching: "active" }));
-    }, 3000);
+    }, 1800);
   }, []);
 
   // Poll the status endpoint with exponential backoff
