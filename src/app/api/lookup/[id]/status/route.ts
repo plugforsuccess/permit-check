@@ -3,7 +3,8 @@ import { createServerClient } from "@/lib/supabase";
 
 /**
  * GET /api/lookup/:id/status
- * Returns whether a lookup has been paid.
+ * Returns the current status of a lookup (pending, complete, error)
+ * and whether it has been paid.
  */
 export async function GET(
   _request: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
 
   const { data: lookup, error } = await supabase
     .from("lookups")
-    .select("id, address_normalized, permit_count, paid_at, payment_status")
+    .select("id, address_normalized, permit_count, paid_at, payment_status, status")
     .eq("id", lookupId)
     .single();
 
@@ -28,8 +29,9 @@ export async function GET(
 
   return NextResponse.json({
     lookup_id: lookup.id,
+    status: lookup.status ?? "complete", // 'pending' | 'complete' | 'error'
     paid: lookup.paid_at !== null || lookup.payment_status === "paid",
-    permit_count: lookup.permit_count ?? 0,
+    total_count: lookup.permit_count ?? 0,
     address_normalized: lookup.address_normalized,
   });
 }

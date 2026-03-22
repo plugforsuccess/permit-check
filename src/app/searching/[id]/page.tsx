@@ -91,7 +91,7 @@ export default function SearchingPage() {
 
         const data = await res.json();
 
-        if (data.lookup_id && !redirecting.current) {
+        if (data.status === "complete" && !redirecting.current) {
           redirecting.current = true;
 
           setStepStatuses((s) => ({
@@ -106,6 +106,10 @@ export default function SearchingPage() {
               router.push(`/results/${lookupId}`);
             }, 400);
           }, 800);
+          return;
+        } else if (data.status === "error" && !redirecting.current) {
+          redirecting.current = true;
+          router.push(`/results/${lookupId}?error=scrape_failed`);
           return;
         }
       } catch {
