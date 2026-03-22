@@ -216,10 +216,12 @@ export async function scrapeAccelaPermits(
     }
 
     const allPermits: PermitRecord[] = [];
-    let pageNum = 1;
+    const MAX_PAGES = 10; // cap at 10 pages = ~100 records max
+    let pageCount = 0;
 
-    while (true) {
-      console.log(`[accela-scraper] Parsing results page ${pageNum}...`);
+    while (pageCount < MAX_PAGES) {
+      pageCount++;
+      console.log(`[accela-scraper] Parsing results page ${pageCount}...`);
       const pagePermits = await parseResultsTable(
         page,
         normalizedAddress,
@@ -254,7 +256,10 @@ export async function scrapeAccelaPermits(
       } catch {
         break;
       }
-      pageNum++;
+    }
+
+    if (pageCount >= MAX_PAGES) {
+      console.warn(`[accela-scraper] Hit page limit of ${MAX_PAGES} for ${streetName}`);
     }
 
     console.log(
