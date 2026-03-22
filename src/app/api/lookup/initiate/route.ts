@@ -68,8 +68,13 @@ export async function POST(request: NextRequest) {
     let streetName: string;
 
     if (parsed.data.address_components) {
-      streetNumber = parsed.data.address_components.streetNumber;
-      streetName = parsed.data.address_components.streetName;
+      // Google's route field is "Peachtree Road SW" — the full street name including suffix and quadrant
+      // Pass through normalizeAddress() so parseAddressForPortal() gets a clean string like "2288 PEACHTREE RD"
+      const fullStreet = `${parsed.data.address_components.streetNumber} ${parsed.data.address_components.streetName}`;
+      const reparsed = normalizeAddress(fullStreet);
+      const parts = reparsed.split(/\s+/);
+      streetNumber = parts[0];
+      streetName = parts.slice(1).join(" ");
     } else {
       const parts = addressNormalized.split(/\s+/);
       streetNumber = parts[0];
