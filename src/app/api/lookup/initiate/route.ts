@@ -11,7 +11,7 @@ import { lookupInitiateSchema, scrapedPermitSchema } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
 
-export const maxDuration = 60; // seconds — requires Vercel Pro
+export const maxDuration = 300; // 5 minutes — Vercel Pro max
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
