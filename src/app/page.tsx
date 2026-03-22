@@ -54,19 +54,28 @@ function HomePageContent() {
         }),
       });
 
-      const data = await response.json();
+      const initData = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Something went wrong. Please try again.");
+        setError(initData.error || "Something went wrong. Please try again.");
         return;
       }
 
+      const lookupId = initData.lookup_id;
       const jurisdictionLabel =
-        JURISDICTIONS[data.jurisdiction_id]?.name ?? "Atlanta Metro";
+        JURISDICTIONS[initData.jurisdiction_id]?.name ?? "Atlanta Metro";
+
+      // Step 2 — redirect to loading screen immediately
       router.push(
-        `/searching/${data.lookup_id}?address=${encodeURIComponent(address.raw)}&jurisdiction=${encodeURIComponent(jurisdictionLabel)}`
+        `/searching/${lookupId}?address=${encodeURIComponent(address.raw)}&jurisdiction=${encodeURIComponent(jurisdictionLabel)}`
       );
-      setIsLoading(false);
+
+      // Step 3 — fire scrape in background (client-side, stays alive)
+      // Don't await — searching page polls status
+      if (!initData.cached) {
+        fetch(`/api/lookup/${lookupId}/scrape`, { method: "POST" })
+          .catch(console.error);
+      }
     } catch {
       setError(
         "Unable to connect to the server. Please check your connection and try again."
