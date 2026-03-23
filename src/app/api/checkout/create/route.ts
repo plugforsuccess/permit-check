@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase";
 import { createCheckoutSession } from "@/lib/stripe";
+import { rateLimit } from "@/lib/ratelimit";
 import { config } from "@/lib/config";
 import { hasAgentAccess } from "@/lib/subscription";
 
@@ -17,6 +18,18 @@ const checkoutSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit by IP to prevent checkout spam
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown";
+    const allowed = await rateLimit(`checkout:${ip}`);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429 }
+      );
+    }
+
     const raw = await request.json();
     const parsed = checkoutSchema.safeParse(raw);
 
