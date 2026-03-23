@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { rateLimit } from "@/lib/ratelimit";
 import { z } from "zod";
+import { UUID_RE } from "@/lib/schemas";
 
 const schema = z.object({
   rating: z.union([z.literal(1), z.literal(-1)]),
 });
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(
   request: NextRequest,

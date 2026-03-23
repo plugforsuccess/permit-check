@@ -4,6 +4,7 @@ import { generateReportHtml } from "@/lib/pdf";
 import { generatePdfFromHtml } from "@/lib/pdf-generator";
 import { rateLimit } from "@/lib/ratelimit";
 import { hasAgentAccess } from "@/lib/subscription";
+import { UUID_RE } from "@/lib/schemas";
 
 export const maxDuration = 60; // seconds — attorney PDF generation needs more time
 
@@ -17,6 +18,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+
+  if (!UUID_RE.test(lookupId)) {
+    return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
+  }
+
   const token = request.nextUrl.searchParams.get("token");
 
   // Rate limit: 10 downloads per minute per token to prevent abuse

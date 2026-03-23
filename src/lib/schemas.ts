@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** UUID v4 format regex for route parameter validation. */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Validates scraped permit data before DB insertion. */
 export const scrapedPermitSchema = z.object({
   recordNumber: z.string().min(1).max(50),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { rateLimit } from "@/lib/ratelimit";
+import { UUID_RE } from "@/lib/schemas";
 
 /**
  * GET /api/lookup/:id/status
@@ -12,6 +13,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+
+  if (!UUID_RE.test(lookupId)) {
+    return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
+  }
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";

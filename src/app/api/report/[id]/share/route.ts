@@ -3,12 +3,17 @@ import { createServerClient } from "@/lib/supabase";
 import { randomBytes } from "crypto";
 import { config } from "@/lib/config";
 import { rateLimit } from "@/lib/ratelimit";
+import { UUID_RE } from "@/lib/schemas";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+
+  if (!UUID_RE.test(lookupId)) {
+    return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
+  }
 
   // Rate limit: 5 share requests per minute per lookup
   const rateLimitKey = `share:${lookupId}`;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { scrapeAccelaPermits } from "@/lib/accela/index";
-import { scrapedPermitSchema } from "@/lib/schemas";
+import { scrapedPermitSchema, UUID_RE } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
 
@@ -12,6 +12,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+
+  if (!UUID_RE.test(lookupId)) {
+    return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
+  }
 
   // Rate limit by lookup ID — prevents repeated scrape triggers
   const allowed = await rateLimit(`scrape:${lookupId}`);

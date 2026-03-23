@@ -29,7 +29,11 @@ export function originMiddleware(request: NextRequest): NextResponse | null {
     "http://localhost:3001",
   ];
 
-  const isOriginAllowed = origin && allowedOrigins.some((allowed) => origin.startsWith(allowed));
+  // Origin is always scheme+host+port (no path) — use exact match to prevent
+  // subdomain bypass (e.g. https://permitcheck.com.evil.com)
+  const isOriginAllowed = origin && allowedOrigins.includes(origin);
+
+  // Referer includes a path, so startsWith is appropriate here
   const isRefererAllowed = referer && allowedOrigins.some((allowed) => referer.startsWith(allowed));
 
   if (!isOriginAllowed && !isRefererAllowed) {
