@@ -63,6 +63,7 @@ export async function createCheckoutSession(
         },
       ],
       mode: "payment",
+      customer_creation: "always",
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
