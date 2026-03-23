@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { getStripe } from "@/lib/stripe";
 import { config } from "@/lib/config";
+import { hasAgentAccess } from "@/lib/subscription";
 import { z } from "zod";
 
 const schema = z.object({
@@ -42,6 +43,20 @@ export async function POST(request: NextRequest) {
       agent_name: parsed.data.agent_name ?? null,
       brokerage: parsed.data.brokerage ?? null,
     });
+
+    // Prevent duplicate subscriptions
+    const { data: existing } = await supabase
+      .from("users")
+      .select("subscription_status")
+      .eq("id", user.id)
+      .single();
+
+    if (existing && hasAgentAccess(existing.subscription_status)) {
+      return NextResponse.json(
+        { error: "You already have an active Agent Plan subscription." },
+        { status: 409 }
+      );
+    }
 
     const priceId = process.env.STRIPE_AGENT_PLAN_PRICE_ID;
     if (!priceId) {

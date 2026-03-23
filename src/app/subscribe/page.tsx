@@ -27,11 +27,7 @@ export default function SubscribePage() {
       await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError || !data.session) {
-      setError(
-        signInError?.message.includes("Invalid login credentials")
-          ? "Incorrect password. If you already have an account, check your password and try again."
-          : (signInError?.message ?? "Sign in failed")
-      );
+      setError("Could not sign in. Check your email and password and try again.");
       setLoading(false);
       return;
     }

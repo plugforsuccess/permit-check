@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createServerClient } from "@/lib/supabase";
 import { createCheckoutSession } from "@/lib/stripe";
 import { config } from "@/lib/config";
+import { hasAgentAccess } from "@/lib/subscription";
 
 const checkoutSchema = z.object({
   lookup_id: z.string().uuid(),
@@ -48,6 +49,27 @@ export async function POST(request: NextRequest) {
         { error: "This lookup has already been paid for" },
         { status: 400 }
       );
+    }
+
+    // Agent subscribers don't pay per-lookup — reject with guidance
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("subscription_status")
+          .eq("id", user.id)
+          .single();
+
+        if (profile && hasAgentAccess(profile.subscription_status)) {
+          return NextResponse.json(
+            { error: "Your Agent Plan includes unlimited searches — no per-lookup payment needed." },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const reportType = lookup.report_type || "standard";
