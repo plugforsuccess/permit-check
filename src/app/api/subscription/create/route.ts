@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ checkout_url: session.url });
+    return NextResponse.json({ checkout_url: session.url }, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (err) {
     console.error("Subscription checkout error:", err);
     return NextResponse.json(

@@ -143,5 +143,7 @@ export async function GET(
           risk_level: report.risk_level,
         }
       : null,
+  }, {
+    headers: { "Cache-Control": "private, no-store" },
   });
 }

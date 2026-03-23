@@ -76,7 +76,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ lookups: lookups || [] });
+    return NextResponse.json({ lookups: lookups || [] }, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (error) {
     console.error("History fetch error:", error);
     return NextResponse.json(

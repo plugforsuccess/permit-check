@@ -2,6 +2,7 @@ import type { Permit } from "@/types";
 import type { PropertyData } from "./property-data";
 import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
 import { extractListingClaims, formatClaimsForPrompt } from "./listing-parser";
+import { permitSummarySchema } from "./schemas";
 
 /**
  * Zero Permit Edge Cases
@@ -421,16 +422,33 @@ Risk level guide:
 
   try {
     const raw = JSON.parse(text.replace(/```json|```/g, "").trim());
+    const parsed = permitSummarySchema.safeParse(raw);
+    if (parsed.success) {
+      return parsed.data;
+    }
+    // Schema validation failed — use safe fallbacks for each field
     return {
-      riskLevel: raw.riskLevel ?? "medium",
-      verdict: raw.verdict ?? raw.summary ?? "Summary unavailable.",
-      summary: raw.summary ?? "",
-      flags: Array.isArray(raw.flags) ? raw.flags : [],
-      positives: Array.isArray(raw.positives) ? raw.positives : [],
-      sellerQuestions: Array.isArray(raw.sellerQuestions)
-        ? raw.sellerQuestions
+      riskLevel: (["low", "medium", "high"] as const).includes(raw.riskLevel)
+        ? raw.riskLevel
+        : "medium",
+      verdict: typeof raw.verdict === "string"
+        ? raw.verdict.slice(0, 300)
+        : "Summary unavailable.",
+      summary: typeof raw.summary === "string"
+        ? raw.summary.slice(0, 1000)
+        : "",
+      flags: Array.isArray(raw.flags)
+        ? raw.flags.filter((f: unknown): f is string => typeof f === "string").map((f: string) => f.slice(0, 300))
         : [],
-      listingNotes: Array.isArray(raw.listingNotes) ? raw.listingNotes : [],
+      positives: Array.isArray(raw.positives)
+        ? raw.positives.filter((p: unknown): p is string => typeof p === "string").map((p: string) => p.slice(0, 300))
+        : [],
+      sellerQuestions: Array.isArray(raw.sellerQuestions)
+        ? raw.sellerQuestions.filter((q: unknown): q is string => typeof q === "string").map((q: string) => q.slice(0, 300))
+        : [],
+      listingNotes: Array.isArray(raw.listingNotes)
+        ? raw.listingNotes.filter((n: unknown): n is string => typeof n === "string").map((n: string) => n.slice(0, 300))
+        : [],
     };
   } catch {
     return {

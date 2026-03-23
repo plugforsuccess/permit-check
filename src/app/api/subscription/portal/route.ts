@@ -52,5 +52,7 @@ export async function POST(request: NextRequest) {
     return_url: `${config.app.baseUrl}/dashboard`,
   });
 
-  return NextResponse.json({ portal_url: portalSession.url });
+  return NextResponse.json({ portal_url: portalSession.url }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
