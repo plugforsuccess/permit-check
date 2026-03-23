@@ -127,7 +127,6 @@ export default function PermitTable({
                 "Filed Date",
                 "Issued Date",
                 "Description",
-                "Contractor",
               ].map((header) => (
                 <th
                   key={header}
@@ -176,9 +175,6 @@ export default function PermitTable({
                     ? permit.description || "\u2014"
                     : (permit.description?.slice(0, 60) ?? "\u2014") +
                       ((permit.description?.length ?? 0) > 60 ? "..." : "")}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {permit.contractor || "\u2014"}
                 </td>
               </tr>
             ))}

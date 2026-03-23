@@ -147,7 +147,35 @@ export async function GET(
     });
   }
 
-  // Attorney: generate real PDF binary via Puppeteer
+  // Attorney: try serving pre-generated PDF from storage first
+  if (report.pdf_storage_path) {
+    try {
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from("reports")
+        .download(report.pdf_storage_path);
+
+      if (!downloadError && fileData) {
+        const arrayBuffer = await fileData.arrayBuffer();
+
+        await supabase
+          .from("reports")
+          .update({ downloaded_at: new Date().toISOString() })
+          .eq("id", report.id);
+
+        return new NextResponse(new Uint8Array(arrayBuffer), {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="permitcheck-attorney-report-${lookupId}.pdf"`,
+            "Cache-Control": "private, max-age=3600",
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("[download] Storage fetch failed, falling back to generation:", err);
+    }
+  }
+
+  // Fall back to on-demand generation (storage miss or no pre-generated PDF)
   const pdfBuffer = await generatePdfFromHtml(reportHtml);
 
   // Update download timestamp

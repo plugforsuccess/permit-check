@@ -5,6 +5,8 @@ import { config } from "@/lib/config";
 import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
 import { fetchPropertyData } from "@/lib/property-data";
+import { generateReportHtml } from "@/lib/pdf";
+import { generatePdfFromHtml } from "@/lib/pdf-generator";
 import { log } from "@/lib/logger";
 import { sendReportEmail } from "@/lib/email";
 import type { PermitSummary } from "@/lib/summary";
@@ -181,6 +183,58 @@ export async function POST(req: Request) {
         // Don't block report creation if summary fails
       }
 
+      // Pre-generate PDF for attorney reports
+      let pdfStoragePath: string | null = null;
+      let parsedSummary: PermitSummary | null = null;
+
+      if (aiSummary) {
+        try {
+          parsedSummary = JSON.parse(aiSummary) as PermitSummary;
+        } catch {
+          // ignore parse error
+        }
+      }
+
+      if (reportType === "attorney") {
+        try {
+          const reportHtml = generateReportHtml({
+            address: lookup.address_normalized,
+            lookupDate: new Date(lookup.created_at).toISOString().split("T")[0],
+            lookupId,
+            permits,
+            reportType: "attorney",
+            matterReference: session.metadata?.matter_reference || undefined,
+            summary: parsedSummary,
+          });
+
+          const pdfBuffer = await generatePdfFromHtml(reportHtml);
+          const fileName = `${lookupId}/report.pdf`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("reports")
+            .upload(fileName, pdfBuffer, {
+              contentType: "application/pdf",
+              upsert: true,
+            });
+
+          if (uploadError) {
+            log.error("Webhook: PDF upload failed", {
+              lookupId,
+              error: uploadError.message,
+            });
+          } else {
+            pdfStoragePath = fileName;
+            log.info("Webhook: PDF pre-generated and stored", { lookupId, fileName });
+          }
+        } catch (err) {
+          log.error("Webhook: PDF generation failed", {
+            lookupId,
+            error: String(err),
+          });
+          // Don't block report creation — fall back to on-demand generation
+        }
+      }
+
       // Store report record
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + config.app.reportExpiryHours);
@@ -195,6 +249,7 @@ export async function POST(req: Request) {
           {
             lookup_id: lookupId,
             pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
+            pdf_storage_path: pdfStoragePath,
             expires_at: expiresAt.toISOString(),
             download_token: downloadToken,
             matter_reference: session.metadata?.matter_reference || null,
@@ -216,15 +271,6 @@ export async function POST(req: Request) {
       const customerEmail = session.customer_details?.email;
       if (customerEmail && reportData) {
         try {
-          let parsedSummary: PermitSummary | null = null;
-          if (reportData.ai_summary) {
-            try {
-              parsedSummary = JSON.parse(reportData.ai_summary) as PermitSummary;
-            } catch {
-              // ignore parse error
-            }
-          }
-
           await sendReportEmail({
             to: customerEmail,
             address: lookup.address_normalized,
