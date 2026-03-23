@@ -63,6 +63,32 @@ export default function ResultsPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
+  const [watchEmail, setWatchEmail] = useState("");
+  const [watchAdded, setWatchAdded] = useState(false);
+  const [watchLoading, setWatchLoading] = useState(false);
+
+  const handleAddWatch = async () => {
+    if (!watchEmail || watchAdded) return;
+    setWatchLoading(true);
+
+    try {
+      const res = await fetch("/api/watchlist/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: result?.address_normalized,
+          email: watchEmail,
+          lookup_id: lookupId,
+        }),
+      });
+
+      if (res.ok) setWatchAdded(true);
+    } catch {
+      // ignore
+    } finally {
+      setWatchLoading(false);
+    }
+  };
 
   const handleShare = async () => {
     if (!result?.report?.download_url) return;
@@ -652,6 +678,52 @@ export default function ResultsPage() {
             )}
 
             <PermitTable permits={result.permits} />
+
+            {/* Watchlist opt-in */}
+            {!watchAdded ? (
+              <div className="mt-8 p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                <div className="flex items-start gap-3 mb-4">
+                  <svg className="w-5 h-5 text-[#c9a84c] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900 mb-1">
+                      Monitor this address for free
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Get email alerts if new permits are filed at this address over
+                      the next 30 days. Useful if you&apos;re under contract or still
+                      deciding.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={watchEmail}
+                    onChange={(e) => setWatchEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-[#0f1f3d] focus:ring-1 focus:ring-[#0f1f3d] outline-none"
+                  />
+                  <button
+                    onClick={handleAddWatch}
+                    disabled={watchLoading || !watchEmail}
+                    className="px-4 py-2 bg-[#0f1f3d] text-white text-sm font-semibold rounded-lg hover:bg-[#1a3560] disabled:opacity-50 transition-colors"
+                  >
+                    {watchLoading ? "Adding..." : "Monitor"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
+                <svg className="w-5 h-5 text-green-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <p className="text-sm text-green-800 font-medium">
+                  Monitoring active — we&apos;ll email you if new permits are filed.
+                </p>
+              </div>
+            )}
 
             <div className="mt-8 pt-8 border-t border-gray-100 text-center">
               <p className="text-sm text-gray-500 mb-3">
