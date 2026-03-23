@@ -15,6 +15,7 @@ import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
  * Recent SFH sale, claims renovation | RED FLAG       | High
  * Active complaint + 0 permits | RED FLAG             | High
  * Pre-2000 SFH, major reno claims | RED FLAG          | High
+ * Commercial property    | Different permit patterns   | Context-dependent
  */
 
 export interface PermitSummary {
@@ -25,6 +26,113 @@ export interface PermitSummary {
   positives: string[];
   sellerQuestions: string[];
   listingNotes: string[];
+}
+
+/** Detect if property type from REAPI indicates commercial use */
+function isCommercialProperty(propertyType: string | null): boolean {
+  if (!propertyType) return false;
+  return /\b(commercial|industrial|retail|office|warehouse|mixed.?use|multi.?family|apartment)\b/i.test(
+    propertyType
+  );
+}
+
+/** Pre-compute permit pattern signals for the AI prompt */
+function analyzePermitPatterns(permits: Permit[]): string[] {
+  const signals: string[] = [];
+  if (permits.length === 0) return signals;
+
+  const today = new Date();
+
+  // Count by status
+  const statusCounts: Record<string, number> = {};
+  for (const p of permits) {
+    statusCounts[p.status] = (statusCounts[p.status] ?? 0) + 1;
+  }
+
+  // Stalled permits: "In Review" for 2+ years
+  const stalledPermits = permits.filter((p) => {
+    if (p.status !== "In Review" || !p.filed_date) return false;
+    const filed = new Date(p.filed_date);
+    if (isNaN(filed.getTime())) return false;
+    const yearsStalled = (today.getTime() - filed.getTime()) / (1000 * 60 * 60 * 24 * 365);
+    return yearsStalled >= 2;
+  });
+  if (stalledPermits.length > 0) {
+    signals.push(
+      `STALLED PERMITS: ${stalledPermits.length} permit(s) filed 2+ years ago still show "In Review" status — ${stalledPermits.map((p) => `${p.record_number} (filed ${p.filed_date})`).join(", ")}. This indicates abandoned applications or jurisdiction backlog.`
+    );
+  }
+
+  // Filed but never issued: has filed_date but no issued_date and not Finaled/Void
+  const neverIssued = permits.filter(
+    (p) => p.filed_date && !p.issued_date && !["Finaled", "Void"].includes(p.status)
+  );
+  if (neverIssued.length > 3) {
+    signals.push(
+      `UNISSUED PERMITS: ${neverIssued.length} permits were filed but never issued — work may have been started without final approval.`
+    );
+  }
+
+  // Repeated same-type permits in short window (possible failures/rejections)
+  const typesByYear: Record<string, number> = {};
+  for (const p of permits) {
+    if (!p.filed_date) continue;
+    const year = p.filed_date.slice(0, 4);
+    const key = `${p.type}|${year}`;
+    typesByYear[key] = (typesByYear[key] ?? 0) + 1;
+  }
+  const repeats = Object.entries(typesByYear).filter(([, count]) => count >= 3);
+  if (repeats.length > 0) {
+    for (const [key, count] of repeats) {
+      const [type, year] = key.split("|");
+      signals.push(
+        `REPEATED FILINGS: ${count} "${type}" permits filed in ${year} — may indicate repeated failures, rejections, or re-submissions.`
+      );
+    }
+  }
+
+  // Coordinated renovation pattern: 3+ different types in same 90-day window
+  const sortedByDate = permits
+    .filter((p) => p.filed_date)
+    .sort((a, b) => (a.filed_date! > b.filed_date! ? 1 : -1));
+
+  for (let i = 0; i < sortedByDate.length; i++) {
+    const windowStart = new Date(sortedByDate[i].filed_date!);
+    const windowEnd = new Date(windowStart.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const inWindow = sortedByDate.filter((p) => {
+      const d = new Date(p.filed_date!);
+      return d >= windowStart && d <= windowEnd;
+    });
+    const uniqueTypes = new Set(inWindow.map((p) => p.type));
+    if (uniqueTypes.size >= 3) {
+      const startStr = sortedByDate[i].filed_date;
+      signals.push(
+        `COORDINATED RENOVATION: ${uniqueTypes.size} different permit types filed within 90 days starting ${startStr} (${[...uniqueTypes].join(", ")}) — indicates a major renovation project.`
+      );
+      break; // Only report first cluster
+    }
+  }
+
+  // Complaint / code violation detection from record types
+  const complaintPermits = permits.filter((p) =>
+    /\b(complaint|violation|enforcement|code.?enforcement|citation|condemnation)\b/i.test(
+      p.type + " " + p.description
+    )
+  );
+  if (complaintPermits.length > 0) {
+    signals.push(
+      `COMPLAINTS/VIOLATIONS: ${complaintPermits.length} complaint or code violation record(s) found — ${complaintPermits.map((p) => `${p.record_number} "${p.type}" (${p.status})`).join(", ")}. Building complaints and code violations are significant red flags regardless of other permit activity.`
+    );
+  }
+
+  // Summary stats
+  if (statusCounts["Expired"] && statusCounts["Expired"] >= 2) {
+    signals.push(
+      `STATUS SUMMARY: ${statusCounts["Expired"]} expired permits found. Multiple expired permits suggest work was started but never completed or inspected.`
+    );
+  }
+
+  return signals;
 }
 
 /**
@@ -38,12 +146,23 @@ export async function generatePermitSummary(
   listingDescription?: string | null,
   isUnit?: boolean,
   isDevelopmentPermit?: boolean,
+  permitsTruncated?: boolean,
 ): Promise<PermitSummary> {
-  const permitData = permits.map((p) => ({
+  // Sort permits chronologically (oldest first) so AI sees timeline
+  const sortedPermits = [...permits].sort((a, b) => {
+    if (!a.filed_date && !b.filed_date) return 0;
+    if (!a.filed_date) return 1;
+    if (!b.filed_date) return -1;
+    return a.filed_date < b.filed_date ? -1 : 1;
+  });
+
+  // Include issued_date so AI can detect stalled/unissued permits
+  const permitData = sortedPermits.map((p) => ({
     record: p.record_number,
     type: p.type,
     status: p.status,
     filed: p.filed_date,
+    issued: p.issued_date,
     description: p.description,
   }));
 
@@ -58,14 +177,35 @@ export async function generatePermitSummary(
       ? `Property sold ${flipYears === 0 ? "less than 1 year" : flipYears + " year(s)"} ago — potential flip or recent investor acquisition.`
       : null;
 
+  // Flip detection fallback: if no REAPI data, try to infer from listing
+  const listingFlipSignal =
+    !propertyData && listingDescription
+      ? (/\b(flip|flipped|investor.?special|recently (purchased|acquired)|wholesale)\b/i.test(listingDescription)
+        ? "ALERT: Listing language suggests a flip or investor sale, but no property sale history is available to confirm. Treat with elevated scrutiny."
+        : null)
+      : null;
+
   // Investor-owned signal
   const investorSignal =
     propertyData?.isInvestorOwned
       ? `ALERT: Property owned by ${propertyData.ownerName ?? "an LLC or investor"} — non-owner-occupied.`
       : null;
 
+  // Commercial property detection (Gap 3)
+  const isCommercial = isCommercialProperty(propertyData?.propertyType ?? null);
+  const commercialContext = isCommercial
+    ? `
+IMPORTANT — COMMERCIAL/MULTI-FAMILY PROPERTY: This property is classified as "${propertyData!.propertyType}". Commercial and multi-family properties have fundamentally different permit patterns than single-family residential:
+- Higher permit volume is normal (maintenance, tenant improvements, code compliance)
+- Multiple expired permits may reflect normal business operations, not negligence
+- Complaints may relate to tenant disputes or code inspections, not structural defects
+- Adjust your analysis accordingly — do NOT apply single-family residential assumptions.
+- Frame your analysis for a commercial/investment buyer, not a homebuyer.
+`
+    : "";
+
   const listingSection = listingDescription
-    ? `\nListing description provided by user:\n"${listingDescription.slice(0, 1000)}"\n`
+    ? `\nListing description provided by user:\n"${listingDescription.slice(0, 1500)}"\n`
     : "\nNo listing description provided.\n";
 
   // Unit address context for condos/townhomes
@@ -85,6 +225,19 @@ IMPORTANT — NEW CONSTRUCTION CONTEXT: This property was built in ${propertyDat
 `
       : "";
 
+  // Truncation warning (Gap 4)
+  const truncationWarning = permitsTruncated
+    ? `
+WARNING — INCOMPLETE RECORDS: The permit search returned the maximum number of results and was truncated. There may be additional permits not shown here. Note this limitation in your summary and recommend the buyer request a full permit history from the jurisdiction directly.
+`
+    : "";
+
+  // Pre-computed pattern analysis (Gap 6 + 7)
+  const patternSignals = analyzePermitPatterns(permits);
+  const patternSection = patternSignals.length > 0
+    ? `\nPRE-COMPUTED PATTERN ANALYSIS:\n${patternSignals.map((s) => `- ${s}`).join("\n")}\n`
+    : "";
+
   // Zero permits decision tree
   const zeroPermitGuide =
     permits.length === 0
@@ -99,13 +252,17 @@ ZERO PERMITS DECISION TREE — follow in order:
    YES → LOW risk. Builder permits filed under developer name.
          State this explicitly. Do not flag as risk.
 
-3. Is this a pre-2000 single family home with no recent sale?
+3. Is this a commercial/multi-family property?
+   YES → MEDIUM risk at most. Zero permits may indicate records under
+         a different address or business name.
+
+4. Is this a pre-2000 single family home with no recent sale?
    YES → LOW/MEDIUM risk. Normal for older properties.
 
-4. Is this a single family home sold within 3 years AND listing claims renovation?
+5. Is this a single family home sold within 3 years AND listing claims renovation?
    YES → HIGH risk. Zero permits on a claimed renovation is the core red flag.
 
-5. Is this a single family home sold within 3 years, no renovation claims?
+6. Is this a single family home sold within 3 years, no renovation claims?
    YES → MEDIUM risk. Recent sale warrants follow-up but is not alarming.
 
 NEVER flag a condo/townhome/unit address as high risk purely due to zero permits.
@@ -113,19 +270,23 @@ NEVER flag new construction as high risk purely due to zero permits.
 `
       : "";
 
-  const prompt = `You are a senior real estate due diligence analyst. Your job is to give homebuyers a clear, direct verdict on permit records — not a cautious summary, but an actual recommendation.
+  const prompt = `You are a senior real estate due diligence analyst. Your job is to give ${isCommercial ? "commercial/investment property" : "home"} buyers a clear, direct verdict on permit records — not a cautious summary, but an actual recommendation.
 
 Property: ${address}
 Property context: ${propertyContext}
 ${flipSignal ? `ALERT: ${flipSignal}` : ""}
+${listingFlipSignal ? listingFlipSignal : ""}
 ${investorSignal ? investorSignal : ""}
+${commercialContext}
 ${unitContext}
 ${newConstructionContext}
+${truncationWarning}
 Lookup date: ${new Date().toISOString().split("T")[0]}
 Total permits found: ${permits.length}
 ${listingSection}
+${patternSection}
 ${zeroPermitGuide}
-Permit records:
+Permit records (sorted chronologically, oldest first):
 ${JSON.stringify(permitData, null, 2)}
 
 RULES:
@@ -136,11 +297,15 @@ RULES:
 5. "Seller questions" must be specific and actionable — what should the buyer literally say to their agent or the seller?
 6. If permits.length === 0 and property was recently sold or is listed as renovated, that is HIGH risk — zero permits on a claimed renovation is the core red flag PermitCheck exists to catch.
 7. Duplicate permit records (same record number appearing multiple times) should be counted once.
+8. Check for STALLED permits: any permit with status "In Review" and a filed date 2+ years ago is a red flag — the application was either abandoned or stuck in bureaucracy. Flag it explicitly.
+9. Check the "issued" date field: permits that were filed but never issued (issued = null) and are not Finaled or Void indicate work that was never formally approved.
+10. Look for PATTERNS across permits: same type filed multiple times in one year suggests repeated failures. Multiple different types in the same 90-day window suggests a coordinated renovation.
+11. If records were TRUNCATED (noted above), state this limitation clearly and recommend the buyer request full records from the jurisdiction.
 
 Respond with a JSON object only, no markdown, no explanation:
 {
   "riskLevel": "low" | "medium" | "high",
-  "verdict": "Single sentence. Direct. Tells the buyer exactly where they stand. Example: 'HIGH RISK — This property has an open building complaint about unpermitted unit conversion and an expired plumbing permit that was never inspected.'",
+  "verdict": "Single sentence. Direct. Tells the buyer exactly where they stand.",
   "summary": "2-3 sentences expanding on the verdict with specific details from the records. Include property context if relevant (year built, last sale price). No hedging.",
   "flags": ["Specific red flag with record number where applicable", "Another specific flag"],
   "positives": ["Specific positive signal", "Another positive"],
@@ -149,13 +314,13 @@ Respond with a JSON object only, no markdown, no explanation:
     "What work was performed under the [YEAR] building complaint [RECORD NUMBER]?",
     "Can you provide documentation that the [TYPE] work was completed by a licensed contractor?"
   ],
-  "listingNotes": ["Observation about listing vs permit records if listing description was provided", "Another observation"]
+  "listingNotes": ["Observation about listing vs permit records if listing description was provided"]
 }
 
 Risk level guide:
 - low: All permits finaled or issued, no complaints, no expired permits, records consistent with property age and condition
 - medium: 1-2 expired permits with no complaints, or minor issues that need follow-up but are not deal-breakers
-- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits`;
+- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits, stalled permits 2+ years old`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);

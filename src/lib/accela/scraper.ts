@@ -32,6 +32,11 @@ export interface PermitRecord {
   address: string;
 }
 
+export interface ScrapeResult {
+  permits: PermitRecord[];
+  truncated: boolean;
+}
+
 const BROWSER_TIMEOUT = 20_000;
 const SELECTOR_TIMEOUT = 15_000;
 
@@ -135,7 +140,7 @@ export async function scrapeAccelaPermits(
   streetNumber: string,
   streetName: string,
   jurisdictionId: string = "ATLANTA_GA"
-): Promise<PermitRecord[]> {
+): Promise<ScrapeResult> {
   let browser: Browser | null = null;
   const jurisdiction = getJurisdiction(jurisdictionId);
 
@@ -212,7 +217,7 @@ export async function scrapeAccelaPermits(
       console.log(
         `[accela-scraper] No results table found. Page: "${title}" URL: ${url}`
       );
-      return [];
+      return { permits: [], truncated: false };
     }
 
     const allPermits: PermitRecord[] = [];
@@ -258,14 +263,15 @@ export async function scrapeAccelaPermits(
       }
     }
 
-    if (pageCount >= MAX_PAGES) {
-      console.warn(`[accela-scraper] Hit page limit of ${MAX_PAGES} for ${streetName}`);
+    const truncated = pageCount >= MAX_PAGES;
+    if (truncated) {
+      console.warn(`[accela-scraper] Hit page limit of ${MAX_PAGES} for ${streetName} — results truncated`);
     }
 
     console.log(
-      `[accela-scraper] Found ${allPermits.length} total permit records`
+      `[accela-scraper] Found ${allPermits.length} total permit records${truncated ? " (TRUNCATED)" : ""}`
     );
-    return allPermits;
+    return { permits: allPermits, truncated };
   } catch (error) {
     console.error("[accela-scraper] Scraping failed:", error);
     throw error; // Let caller handle retries

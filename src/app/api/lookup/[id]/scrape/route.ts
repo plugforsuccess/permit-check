@@ -37,11 +37,14 @@ export async function POST(
 
     log.info("Starting scrape", { lookupId, streetNumber, streetName });
 
-    const permits = await scrapeAccelaPermits(
+    const result = await scrapeAccelaPermits(
       streetNumber,
       streetName,
       lookup.jurisdiction_id ?? "ATLANTA_GA"
     );
+
+    let { permits } = result;
+    let { truncated } = result;
 
     // Deduplicate permits by record_number — keep first occurrence
     const seen = new Set<string>();
@@ -66,21 +69,22 @@ export async function POST(
         const baseStreetNumber = baseParts[0];
         const baseStreetName = baseParts.slice(1).join(" ");
 
-        const basePermits = await scrapeAccelaPermits(
+        const baseResult = await scrapeAccelaPermits(
           baseStreetNumber,
           baseStreetName,
           lookup.jurisdiction_id ?? "ATLANTA_GA"
         );
 
-        if (basePermits.length > 0) {
+        if (baseResult.permits.length > 0) {
           // Deduplicate base permits
           const baseSeen = new Set<string>();
-          uniquePermits = basePermits.filter((p) => {
+          uniquePermits = baseResult.permits.filter((p) => {
             if (baseSeen.has(p.recordNumber)) return false;
             baseSeen.add(p.recordNumber);
             return true;
           });
           usedDevelopmentPermits = true;
+          truncated = truncated || baseResult.truncated;
           log.info("Found development-level permits at base address", {
             lookupId,
             baseAddress: lookup.base_address,
@@ -101,13 +105,14 @@ export async function POST(
       (p) => scrapedPermitSchema.safeParse(p).success
     );
 
-    // Update lookup to complete with unit metadata
+    // Update lookup to complete with metadata
     await supabase
       .from("lookups")
       .update({
         status: "complete",
         permit_count: validPermits.length,
         development_level_permits: usedDevelopmentPermits,
+        permits_truncated: truncated,
       })
       .eq("id", lookupId);
 
@@ -132,8 +137,13 @@ export async function POST(
       count: validPermits.length,
       isUnit: lookup.is_unit,
       usedDevelopmentPermits,
+      truncated,
     });
-    return NextResponse.json({ status: "complete", count: validPermits.length });
+    return NextResponse.json({
+      status: "complete",
+      count: validPermits.length,
+      truncated,
+    });
   } catch (err) {
     await supabase
       .from("lookups")

@@ -248,4 +248,192 @@ describe("generatePermitSummary", () => {
     expect(promptContent).toContain("NEW CONSTRUCTION CONTEXT");
     expect(promptContent).toContain("2024");
   });
+
+  it("sends issued_date and sorts permits chronologically", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '{"riskLevel":"low","verdict":"ok","summary":"ok","flags":[],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
+      }),
+    });
+
+    await generatePermitSummary(
+      [
+        {
+          id: "2",
+          lookup_id: "l1",
+          record_number: "BP-2024-002",
+          type: "Electrical",
+          status: "Issued",
+          filed_date: "2024-06-01",
+          issued_date: "2024-06-15",
+          description: "Electrical work",
+          contractor: null,
+        },
+        {
+          id: "1",
+          lookup_id: "l1",
+          record_number: "BP-2024-001",
+          type: "Building",
+          status: "Finaled",
+          filed_date: "2024-01-01",
+          issued_date: "2024-01-15",
+          description: "Kitchen renovation",
+          contractor: null,
+        },
+      ],
+      "55 TRINITY AVE SW"
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+
+    // Should include issued date
+    expect(promptContent).toContain('"issued"');
+    expect(promptContent).toContain("2024-01-15");
+
+    // Should be sorted chronologically (oldest first)
+    const firstRecordIdx = promptContent.indexOf("BP-2024-001");
+    const secondRecordIdx = promptContent.indexOf("BP-2024-002");
+    expect(firstRecordIdx).toBeLessThan(secondRecordIdx);
+  });
+
+  it("includes truncation warning when permits_truncated is true", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '{"riskLevel":"medium","verdict":"ok","summary":"ok","flags":[],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
+      }),
+    });
+
+    await generatePermitSummary(
+      [],
+      "55 TRINITY AVE SW",
+      null,
+      null,
+      false,
+      false,
+      true, // permitsTruncated
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("INCOMPLETE RECORDS");
+    expect(promptContent).toContain("truncated");
+  });
+
+  it("includes commercial property context", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '{"riskLevel":"low","verdict":"ok","summary":"ok","flags":[],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
+      }),
+    });
+
+    await generatePermitSummary(
+      [],
+      "100 COMMERCIAL ST",
+      {
+        beds: null,
+        baths: null,
+        sqft: 5000,
+        yearBuilt: 2000,
+        propertyType: "Commercial Office",
+        lastSalePrice: 1000000,
+        lastSaleDate: "2023-01-01",
+        assessedValue: 900000,
+        ownerOccupied: false,
+        ownerName: "Office Corp LLC",
+        isInvestorOwned: true,
+      },
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("COMMERCIAL/MULTI-FAMILY PROPERTY");
+    expect(promptContent).toContain("commercial/investment property");
+  });
+
+  it("detects stalled permits in pattern analysis", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '{"riskLevel":"high","verdict":"stalled","summary":"stalled","flags":["stalled"],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
+      }),
+    });
+
+    await generatePermitSummary(
+      [
+        {
+          id: "1",
+          lookup_id: "l1",
+          record_number: "BP-2022-001",
+          type: "Building",
+          status: "In Review",
+          filed_date: "2022-01-01",
+          issued_date: null,
+          description: "Addition",
+          contractor: null,
+        },
+      ],
+      "55 TRINITY AVE SW"
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("STALLED PERMITS");
+    expect(promptContent).toContain("BP-2022-001");
+  });
+
+  it("detects complaints from record types", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '{"riskLevel":"high","verdict":"complaint","summary":"complaint","flags":["complaint"],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
+      }),
+    });
+
+    await generatePermitSummary(
+      [
+        {
+          id: "1",
+          lookup_id: "l1",
+          record_number: "CE-2024-001",
+          type: "Building Complaint",
+          status: "Issued",
+          filed_date: "2024-06-01",
+          issued_date: null,
+          description: "Unpermitted construction",
+          contractor: null,
+        },
+      ],
+      "55 TRINITY AVE SW"
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("COMPLAINTS/VIOLATIONS");
+    expect(promptContent).toContain("CE-2024-001");
+  });
+
+  it("infers flip from listing text when no REAPI data", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: '{"riskLevel":"high","verdict":"flip","summary":"flip","flags":["flip"],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
+      }),
+    });
+
+    await generatePermitSummary(
+      [],
+      "55 TRINITY AVE SW",
+      null, // no property data
+      "Investor special! Recently purchased and fully renovated flip property.",
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("suggests a flip or investor sale");
+    expect(promptContent).toContain("elevated scrutiny");
+  });
 });

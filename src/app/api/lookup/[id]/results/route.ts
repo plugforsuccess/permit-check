@@ -39,6 +39,7 @@ export async function GET(
       report_type: lookup.report_type || "standard",
       is_unit: lookup.is_unit ?? false,
       development_level_permits: lookup.development_level_permits ?? false,
+      permits_truncated: lookup.permits_truncated ?? false,
       permits: null, // Not revealed until paid
     });
   }
@@ -84,6 +85,7 @@ export async function GET(
     report_type: lookup.report_type || "standard",
     is_unit: lookup.is_unit ?? false,
     development_level_permits: lookup.development_level_permits ?? false,
+    permits_truncated: lookup.permits_truncated ?? false,
     permits,
     report: report
       ? {
