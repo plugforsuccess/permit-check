@@ -21,7 +21,7 @@ const required = [
 
 let validated = false;
 
-const optional = ["ESTATED_API_KEY", "ACCELA_APP_ID", "ACCELA_APP_SECRET"];
+const optional = ["REAPI_API_KEY", "ACCELA_APP_ID", "ACCELA_APP_SECRET"];
 
 export function validateEnv(): void {
   if (validated) return;

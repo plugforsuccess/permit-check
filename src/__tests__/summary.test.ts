@@ -7,10 +7,18 @@ vi.stubGlobal("fetch", mockFetch);
 // Mock process.env
 vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
 
-// Mock the estated module
-vi.mock("../lib/estated", () => ({
+// Mock the property-data module
+vi.mock("../lib/property-data", () => ({
   formatPropertyContext: (p: Record<string, unknown>) =>
-    p.yearBuilt ? `Year built: ${p.yearBuilt}` : "Property data unavailable",
+    p.yearBuilt ? `Built: ${p.yearBuilt}` : "Property data unavailable",
+  yearsSinceLastSale: (p: Record<string, unknown>) => {
+    if (!p.lastSaleDate) return null;
+    const saleDate = new Date(p.lastSaleDate as string);
+    if (isNaN(saleDate.getTime())) return null;
+    return Math.floor(
+      (Date.now() - saleDate.getTime()) / (1000 * 60 * 60 * 24 * 365)
+    );
+  },
 }));
 
 import { generatePermitSummary } from "../lib/summary";
@@ -111,7 +119,7 @@ describe("generatePermitSummary", () => {
     );
   });
 
-  it("accepts optional Estated property data", async () => {
+  it("accepts optional property data with investor detection", async () => {
     const mockResponse = {
       riskLevel: "high",
       verdict: "HIGH RISK — Recent flip with no permits.",
@@ -142,10 +150,18 @@ describe("generatePermitSummary", () => {
         lastSaleDate: "2025-06-15",
         assessedValue: 200000,
         ownerOccupied: false,
+        ownerName: "ATL Properties LLC",
+        isInvestorOwned: true,
       }
     );
 
     expect(result.riskLevel).toBe("high");
     expect(result.sellerQuestions).toHaveLength(1);
+
+    // Verify the prompt includes investor signal
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("ATL Properties LLC");
+    expect(promptContent).toContain("non-owner-occupied");
   });
 });

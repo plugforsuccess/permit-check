@@ -1,6 +1,6 @@
 import type { Permit } from "@/types";
-import type { EstatedProperty } from "./estated";
-import { formatPropertyContext } from "./estated";
+import type { PropertyData } from "./property-data";
+import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
 
 export interface PermitSummary {
   riskLevel: "low" | "medium" | "high";
@@ -19,8 +19,8 @@ export interface PermitSummary {
 export async function generatePermitSummary(
   permits: Permit[],
   address: string,
-  propertyData?: EstatedProperty | null,
-  listingDescription?: string | null
+  propertyData?: PropertyData | null,
+  listingDescription?: string | null,
 ): Promise<PermitSummary> {
   const permitData = permits.map((p) => ({
     record: p.record_number,
@@ -35,16 +35,16 @@ export async function generatePermitSummary(
     : "Property data not available";
 
   // Calculate years since last sale for flip detection
-  const yearsSinceLastSale = propertyData?.lastSaleDate
-    ? Math.floor(
-        (Date.now() - new Date(propertyData.lastSaleDate).getTime()) /
-          (1000 * 60 * 60 * 24 * 365)
-      )
-    : null;
-
+  const flipYears = propertyData ? yearsSinceLastSale(propertyData) : null;
   const flipSignal =
-    yearsSinceLastSale !== null && yearsSinceLastSale <= 2
-      ? `Property sold ${yearsSinceLastSale === 0 ? "less than 1 year" : yearsSinceLastSale + " year(s)"} ago — potential flip or recent investor acquisition.`
+    flipYears !== null && flipYears <= 2
+      ? `Property sold ${flipYears === 0 ? "less than 1 year" : flipYears + " year(s)"} ago — potential flip or recent investor acquisition.`
+      : null;
+
+  // Investor-owned signal
+  const investorSignal =
+    propertyData?.isInvestorOwned
+      ? `ALERT: Property owned by ${propertyData.ownerName ?? "an LLC or investor"} — non-owner-occupied.`
       : null;
 
   const listingSection = listingDescription
@@ -56,6 +56,7 @@ export async function generatePermitSummary(
 Property: ${address}
 Property context: ${propertyContext}
 ${flipSignal ? `ALERT: ${flipSignal}` : ""}
+${investorSignal ? investorSignal : ""}
 Lookup date: ${new Date().toISOString().split("T")[0]}
 Total permits found: ${permits.length}
 ${listingSection}

@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
 import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
-import { fetchPropertyData } from "@/lib/estated";
+import { fetchPropertyData } from "@/lib/property-data";
 import { log } from "@/lib/logger";
 import type Stripe from "stripe";
 
@@ -99,13 +99,13 @@ export async function POST(req: Request) {
     log.info("Webhook: permits fetch", { count: permits?.length, error: permitsFetchError?.message });
 
     if (lookup && permits) {
-      // Fetch property data from Estated (non-blocking)
+      // Fetch property data from REAPI (non-blocking)
       let propertyData = null;
       try {
         propertyData = await fetchPropertyData(lookup.address_normalized);
-        log.info("Webhook: Estated data fetched", { lookupId, hasData: !!propertyData });
+        log.info("Webhook: property data fetched", { lookupId, hasData: !!propertyData });
       } catch (err) {
-        log.warn("Webhook: Estated fetch failed", { lookupId, error: String(err) });
+        log.warn("Webhook: property data fetch failed", { lookupId, error: String(err) });
       }
 
       // Generate AI summary with property context
