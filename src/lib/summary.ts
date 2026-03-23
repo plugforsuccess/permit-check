@@ -1,6 +1,7 @@
 import type { Permit } from "@/types";
 import type { PropertyData } from "./property-data";
 import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
+import { extractListingClaims, formatClaimsForPrompt } from "./listing-parser";
 
 /**
  * Zero Permit Edge Cases
@@ -204,9 +205,40 @@ IMPORTANT — COMMERCIAL/MULTI-FAMILY PROPERTY: This property is classified as "
 `
     : "";
 
-  const listingSection = listingDescription
-    ? `\nListing description provided by user:\n"${listingDescription.slice(0, 1500)}"\n`
-    : "\nNo listing description provided.\n";
+  let listingSection = "\nNo listing description provided.\n";
+
+  if (listingDescription) {
+    const claims = extractListingClaims(listingDescription);
+    const permitData = permits.map((p) => ({ type: p.type, status: p.status }));
+    const claimsCrossRef = formatClaimsForPrompt(claims, permitData);
+
+    listingSection = `
+Listing description (raw): "${listingDescription.slice(0, 1000)}"
+
+${claimsCrossRef}
+`;
+
+    // Log high-severity unmatched claims for monitoring
+    const highSeverityUnmatched = claims.filter(
+      (c) =>
+        c.severity === "high" &&
+        c.permitTypes.length > 0 &&
+        !permits.some((p) =>
+          c.permitTypes.some((pt) =>
+            p.type.toLowerCase().includes(
+              pt.toLowerCase().split(" - ")[1] ?? pt.toLowerCase()
+            )
+          )
+        )
+    );
+
+    if (highSeverityUnmatched.length > 0) {
+      console.log(
+        "[summary] High-severity unmatched claims:",
+        highSeverityUnmatched.map((c) => c.type).join(", ")
+      );
+    }
+  }
 
   // Unit address context for condos/townhomes
   const unitContext = isUnit
@@ -293,6 +325,14 @@ RULES:
 1. NEVER use hedging language: no "may indicate", "could suggest", "it's possible that", "cannot be determined", "might mean". State facts directly.
 2. Lead with the verdict — one sentence that tells the buyer exactly where they stand.
 3. Cross-reference listing claims against permits. If listing says "renovated" but there are no renovation permits, say so explicitly.
+When analyzing listing claims:
+- The LISTING CLAIM CROSS-REFERENCE section above shows each renovation
+  claim with whether a matching permit exists.
+- "NO PERMIT ON FILE — HIGH RISK" claims must be flagged explicitly in
+  your flags array with the specific claim quoted.
+- "PERMIT FOUND" claims should be noted as positive signals.
+- "NO PERMIT EXPECTED" claims (cosmetic) should be ignored.
+- If multiple HIGH RISK unmatched claims exist, the verdict must be HIGH RISK.
 4. Flag flips aggressively — if sold recently with no major permits, that's a red flag.
 5. "Seller questions" must be specific and actionable — what should the buyer literally say to their agent or the seller?
 6. If permits.length === 0 and property was recently sold or is listed as renovated, that is HIGH risk — zero permits on a claimed renovation is the core red flag PermitCheck exists to catch.
