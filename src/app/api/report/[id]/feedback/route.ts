@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
+import { rateLimit } from "@/lib/ratelimit";
 import { z } from "zod";
 
 const schema = z.object({
   rating: z.union([z.literal(1), z.literal(-1)]),
 });
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(
   request: NextRequest,
@@ -12,7 +15,27 @@ export async function POST(
 ) {
   const { id: lookupId } = await params;
 
-  const raw = await request.json();
+  // Validate UUID format before hitting the database
+  if (!UUID_RE.test(lookupId)) {
+    return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
+  }
+
+  // Rate limit: 5 feedback submissions per minute per lookup
+  const allowed = await rateLimit(`feedback:${lookupId}`);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment." },
+      { status: 429 }
+    );
+  }
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const parsed = schema.safeParse(raw);
 
   if (!parsed.success) {

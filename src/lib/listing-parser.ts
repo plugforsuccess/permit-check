@@ -131,8 +131,7 @@ export function formatClaimsForPrompt(
         )
       : [];
 
-    const hasPermit = matchingPermits.length > 0;
-    const permitStatus = hasPermit
+    const permitStatus = matchingPermits.length > 0
       ? `PERMIT FOUND (${matchingPermits.map((p) => `${p.type} — ${p.status}`).join(", ")})`
       : claim.permitTypes.length === 0
       ? "NO PERMIT EXPECTED (cosmetic work)"
