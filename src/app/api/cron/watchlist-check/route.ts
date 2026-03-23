@@ -72,19 +72,16 @@ export async function GET(request: Request) {
       const currentCount = result.permits.length;
       const previousCount = watch.last_permit_count ?? 0;
 
-      // Update last checked timestamp
+      // Always update last_checked_at so we don't re-scrape on the next run.
+      // Only update last_permit_count AFTER a successful email send to avoid
+      // losing alerts if the email fails.
       await supabase
         .from("watchlist")
-        .update({
-          last_checked_at: now.toISOString(),
-          last_permit_count: currentCount,
-        })
+        .update({ last_checked_at: now.toISOString() })
         .eq("id", watch.id);
 
       // Send alert if new permits found
       if (currentCount > previousCount) {
-        // Identify new permits by filedDate (most recent first), falling
-        // back to taking from the end of the array if dates aren't available.
         const diff = currentCount - previousCount;
         const sorted = [...result.permits].sort((a, b) => {
           if (!a.filedDate && !b.filedDate) return 0;
@@ -94,14 +91,16 @@ export async function GET(request: Request) {
         });
         const newPermits = sorted.slice(0, diff);
 
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://permitcheck.org";
+
         await sendWatchlistAlert({
           to: watch.email,
           address: watch.address_normalized,
           newPermitCount: diff,
           newPermits,
           reportUrl: watch.lookup_id
-            ? `${process.env.NEXT_PUBLIC_APP_URL}/results/${watch.lookup_id}`
-            : `${process.env.NEXT_PUBLIC_APP_URL}`,
+            ? `${appUrl}/results/${watch.lookup_id}`
+            : appUrl,
         });
 
         alertsSent++;
@@ -110,6 +109,13 @@ export async function GET(request: Request) {
           newCount: diff,
         });
       }
+
+      // Only persist the new permit count after email succeeded (or no
+      // alert was needed). This ensures a failed email is retried next run.
+      await supabase
+        .from("watchlist")
+        .update({ last_permit_count: currentCount })
+        .eq("id", watch.id);
 
       // Pause between scrapes
       await new Promise((r) => setTimeout(r, 2000));

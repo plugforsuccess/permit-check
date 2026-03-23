@@ -39,13 +39,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { address, email, lookup_id } = parsed.data;
+  const { address, email: rawEmail, lookup_id } = parsed.data;
+  const email = rawEmail.toLowerCase();
   const supabase = createServerClient();
 
   // Verify lookup exists and is paid
   const { data: lookup } = await supabase
     .from("lookups")
-    .select("payment_status, permit_count")
+    .select("payment_status, permit_count, address_normalized")
     .eq("id", lookup_id)
     .single();
 
@@ -56,8 +57,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const addressNormalized = normalizeAddress(address);
-  const jurisdictionId = detectJurisdiction(address);
+  // Use the lookup's stored normalized address — don't trust the client's
+  // address value, which could differ from what was actually paid for.
+  const addressNormalized = lookup.address_normalized || normalizeAddress(address);
+  const jurisdictionId = detectJurisdiction(addressNormalized);
   const now = new Date();
 
   // Check if already watching this address+email
