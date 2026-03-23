@@ -9,7 +9,21 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { chromium } from "playwright-core";
+import { chromium, type Page } from "playwright-core";
+
+interface AccelaModule {
+  name: string;
+  moduleKey: string;
+  searchUrl: string;
+}
+
+const STANDARD_MODULES = [
+  "Building",
+  "Electrical",
+  "Plumbing",
+  "Mechanical",
+  "Fire",
+];
 
 // Test address to use for each jurisdiction — a government building that
 // should exist in any US city's permit database
@@ -57,10 +71,61 @@ interface VerifiedConfig {
   nextPageSelector: string | null;
   nextPageText: string | null;
   columnMap: ColumnMap;
+  modules: AccelaModule[];
   testResultCount: number;
   screenshotPath: string;
   status: "success" | "partial" | "failed";
   notes: string[];
+}
+
+async function detectModules(
+  page: Page,
+  baseUrl: string
+): Promise<AccelaModule[]> {
+  const confirmed: AccelaModule[] = [];
+
+  for (const moduleName of STANDARD_MODULES) {
+    const moduleUrl = `${baseUrl}/Cap/CapHome.aspx?module=${moduleName}&customglobalsearch=true`;
+
+    try {
+      await page.goto(moduleUrl, {
+        waitUntil: "networkidle",
+        timeout: 10000,
+      });
+
+      // Check if the street number field exists — confirms module is active
+      const fieldExists = await page.$(
+        "#ctl00_PlaceHolderMain_generalSearchForm_txtGSNumber_ChildControl0"
+      ).catch(() => null);
+
+      if (fieldExists) {
+        confirmed.push({
+          name: moduleName,
+          moduleKey: moduleName,
+          searchUrl: moduleUrl,
+        });
+        console.log(`    ✓ ${moduleName}`);
+      } else {
+        console.log(`    ✗ ${moduleName} — form not found`);
+      }
+    } catch {
+      console.log(`    ✗ ${moduleName} — failed to load`);
+    }
+
+    // Brief pause between module checks
+    await page.waitForTimeout(500);
+  }
+
+  // Always ensure Building is included — fall back even if detection fails
+  if (!confirmed.find((m) => m.name === "Building")) {
+    confirmed.unshift({
+      name: "Building",
+      moduleKey: "Building",
+      searchUrl: `${baseUrl}/Cap/CapHome.aspx?module=Building&customglobalsearch=true`,
+    });
+  }
+
+  return confirmed;
 }
 
 async function verifyJurisdiction(
@@ -89,6 +154,15 @@ async function verifyJurisdiction(
     const searchUrl = `${baseUrl}/Cap/CapHome.aspx?module=Building&customglobalsearch=true`;
 
     console.log(`  Navigating to ${searchUrl}...`);
+    await page.goto(searchUrl, { waitUntil: "networkidle", timeout: 20000 });
+
+    // Detect which modules are available on this portal
+    console.log(`  Detecting modules...`);
+    const confirmedModules = await detectModules(page, baseUrl);
+    console.log(`  Modules found: ${confirmedModules.map((m) => m.name).join(", ")}`);
+    notes.push(`Modules: ${confirmedModules.map((m) => m.name).join(", ")}`);
+
+    // Navigate back to Building module for the rest of verification
     await page.goto(searchUrl, { waitUntil: "networkidle", timeout: 20000 });
 
     // Dump all form fields
@@ -284,6 +358,7 @@ async function verifyJurisdiction(
       nextPageSelector: nextPageInfo?.selector ?? null,
       nextPageText: nextPageInfo?.text ?? null,
       columnMap,
+      modules: confirmedModules,
       testResultCount: resultCount,
       screenshotPath,
       status: columnMap.recordNumber >= 0 ? "success" : "partial",
@@ -313,6 +388,7 @@ async function verifyJurisdiction(
         filedDate: -1, recordNumber: -1, recordType: -1,
         description: -1, permitName: -1, status: -1, address: -1,
       },
+      confirmedModules: [],
       testResultCount: 0,
       screenshotPath,
       status: "failed",
@@ -324,12 +400,26 @@ async function verifyJurisdiction(
 }
 
 function generateJurisdictionConfig(config: VerifiedConfig): string {
+  const modulesStr = config.modules
+    .map(
+      (m) =>
+        `    {
+      name: "${m.name}",
+      moduleKey: "${m.name}",
+      searchUrl: "${m.searchUrl}",
+    }`
+    )
+    .join(",\n  ");
+
   return `  ${config.agencyCode}: {
     id: "${config.agencyCode}",
     name: "${config.agencyCode.replace(/_/g, " ").replace(/GA$/, "").trim()}",
     state: "GA",
     portalUrl: "${config.portalUrl}",
     searchUrl: "${config.searchUrl}",
+    modules: [
+  ${modulesStr}
+    ],
     hasQuadrant: ${config.hasQuadrant},
     hasDateRange: ${config.hasDateRange},
     columnMap: {
