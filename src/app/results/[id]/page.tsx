@@ -398,7 +398,7 @@ export default function ResultsPage() {
                     ? "text-yellow-900"
                     : "text-green-900"
                 }`}>
-                  {result.report.summary.verdict}
+                  {result.report.summary.verdict ?? result.report.summary.summary}
                 </p>
 
                 {/* Summary */}
@@ -492,7 +492,10 @@ export default function ResultsPage() {
 
             {/* Referral CTAs — shown only after payment, based on risk level */}
             {result.report?.summary?.riskLevel && (
-              <ReferralCTAs riskLevel={result.report.summary.riskLevel} />
+              <ReferralCTAs
+                riskLevel={result.report.summary.riskLevel}
+                address={result.address_normalized || result.address}
+              />
             )}
 
             <PermitTable permits={result.permits} />

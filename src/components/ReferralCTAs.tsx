@@ -2,6 +2,7 @@
 
 interface ReferralCTAsProps {
   riskLevel: "low" | "medium" | "high";
+  address: string;
 }
 
 interface ReferralCard {

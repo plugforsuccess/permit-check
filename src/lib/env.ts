@@ -21,6 +21,8 @@ const required = [
 
 let validated = false;
 
+const optional = ["ESTATED_API_KEY", "ACCELA_APP_ID", "ACCELA_APP_SECRET"];
+
 export function validateEnv(): void {
   if (validated) return;
 
@@ -31,6 +33,12 @@ export function validateEnv(): void {
       `Missing required environment variable(s): ${missing.join(", ")}`
     );
   }
+
+  optional.forEach((key) => {
+    if (!process.env[key]) {
+      console.warn(`[env] Optional var not set: ${key}`);
+    }
+  });
 
   validated = true;
 }
