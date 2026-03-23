@@ -119,7 +119,9 @@ export async function POST(req: Request) {
           permits,
           lookup.address_normalized,
           propertyData,
-          listingDescription
+          listingDescription,
+          lookup.is_unit ?? false,
+          lookup.development_level_permits ?? false,
         );
         aiSummary = JSON.stringify(summary);
         riskLevel = summary.riskLevel;

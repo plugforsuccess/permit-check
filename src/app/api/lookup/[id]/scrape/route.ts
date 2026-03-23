@@ -16,7 +16,7 @@ export async function POST(
   // Fetch the lookup row
   const { data: lookup } = await supabase
     .from("lookups")
-    .select("id, address_normalized, jurisdiction_id, status")
+    .select("id, address_normalized, jurisdiction_id, status, is_unit, base_address")
     .eq("id", lookupId)
     .single();
 
@@ -45,20 +45,70 @@ export async function POST(
 
     // Deduplicate permits by record_number — keep first occurrence
     const seen = new Set<string>();
-    const uniquePermits = permits.filter((p) => {
+    let uniquePermits = permits.filter((p) => {
       if (seen.has(p.recordNumber)) return false;
       seen.add(p.recordNumber);
       return true;
     });
 
+    // Secondary scrape — if zero results and this is a unit address,
+    // try the base address (development-level permits)
+    let usedDevelopmentPermits = false;
+
+    if (uniquePermits.length === 0 && lookup.is_unit && lookup.base_address) {
+      log.info("Zero results on unit address — retrying base address", {
+        lookupId,
+        baseAddress: lookup.base_address,
+      });
+
+      try {
+        const baseParts = lookup.base_address.split(/\s+/);
+        const baseStreetNumber = baseParts[0];
+        const baseStreetName = baseParts.slice(1).join(" ");
+
+        const basePermits = await scrapeAccelaPermits(
+          baseStreetNumber,
+          baseStreetName,
+          lookup.jurisdiction_id ?? "ATLANTA_GA"
+        );
+
+        if (basePermits.length > 0) {
+          // Deduplicate base permits
+          const baseSeen = new Set<string>();
+          uniquePermits = basePermits.filter((p) => {
+            if (baseSeen.has(p.recordNumber)) return false;
+            baseSeen.add(p.recordNumber);
+            return true;
+          });
+          usedDevelopmentPermits = true;
+          log.info("Found development-level permits at base address", {
+            lookupId,
+            baseAddress: lookup.base_address,
+            count: uniquePermits.length,
+          });
+        }
+      } catch (err) {
+        log.warn("Base address scrape failed", {
+          lookupId,
+          baseAddress: lookup.base_address,
+          error: String(err),
+        });
+        // Don't throw — zero permits is still a valid result
+      }
+    }
+
     const validPermits = uniquePermits.filter(
       (p) => scrapedPermitSchema.safeParse(p).success
     );
 
-    // Update lookup to complete
+    // Update lookup to complete with unit metadata
     await supabase
       .from("lookups")
-      .update({ status: "complete", permit_count: validPermits.length })
+      .update({
+        status: "complete",
+        permit_count: validPermits.length,
+        development_level_permits: usedDevelopmentPermits,
+      })
       .eq("id", lookupId);
 
     // Insert permits
@@ -77,7 +127,12 @@ export async function POST(
       );
     }
 
-    log.info("Scrape complete", { lookupId, count: validPermits.length });
+    log.info("Scrape complete", {
+      lookupId,
+      count: validPermits.length,
+      isUnit: lookup.is_unit,
+      usedDevelopmentPermits,
+    });
     return NextResponse.json({ status: "complete", count: validPermits.length });
   } catch (err) {
     await supabase

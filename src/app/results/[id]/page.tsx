@@ -15,6 +15,8 @@ interface LookupResult {
   permit_count: number;
   payment_status: "pending" | "paid" | "failed";
   report_type: "standard" | "attorney";
+  is_unit?: boolean;
+  development_level_permits?: boolean;
   permits: Permit[] | null;
   report: {
     id: string;
@@ -351,6 +353,68 @@ export default function ResultsPage() {
                 >
                   Refresh
                 </button>
+              </div>
+            )}
+
+            {/* Zero-permit contextual notice */}
+            {isPaid && permitCount === 0 && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-semibold text-blue-900 mb-1">
+                      No permits found at this address
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      {result.is_unit
+                        ? "This appears to be a condo, townhome, or unit address. Permits for individual units are typically filed at the building or development level — zero unit-level permits is normal and expected for this property type."
+                        : "No permit records were found at this address in the official database. See the AI analysis below for context on what this means for this specific property."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Development-level permits notice */}
+            {isPaid && result.development_level_permits && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="w-5 h-5 text-amber-600 shrink-0 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-semibold text-amber-900 mb-1">
+                      Showing development-level permits
+                    </div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      No permits were found at the specific unit address. The permits
+                      below were found at the base building address and represent
+                      development or building-level work — not unit-specific permits.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 

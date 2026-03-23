@@ -2,6 +2,21 @@ import type { Permit } from "@/types";
 import type { PropertyData } from "./property-data";
 import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
 
+/**
+ * Zero Permit Edge Cases
+ *
+ * Property Type          | Expected Behavior           | Risk Level
+ * ---------------------- | --------------------------- | ----------
+ * Condo / unit           | No unit-level permits       | Low
+ * Townhome (new build)   | No unit-level permits       | Low
+ * New construction < 5yr | Builder permits only        | Low
+ * Old SFH, no recent sale| May have pre-2000 permits   | Low/Medium
+ * Recent SFH sale, no reno claims | Warrants follow-up | Medium
+ * Recent SFH sale, claims renovation | RED FLAG       | High
+ * Active complaint + 0 permits | RED FLAG             | High
+ * Pre-2000 SFH, major reno claims | RED FLAG          | High
+ */
+
 export interface PermitSummary {
   riskLevel: "low" | "medium" | "high";
   verdict: string;
@@ -21,6 +36,8 @@ export async function generatePermitSummary(
   address: string,
   propertyData?: PropertyData | null,
   listingDescription?: string | null,
+  isUnit?: boolean,
+  isDevelopmentPermit?: boolean,
 ): Promise<PermitSummary> {
   const permitData = permits.map((p) => ({
     record: p.record_number,
@@ -51,15 +68,63 @@ export async function generatePermitSummary(
     ? `\nListing description provided by user:\n"${listingDescription.slice(0, 1000)}"\n`
     : "\nNo listing description provided.\n";
 
+  // Unit address context for condos/townhomes
+  const unitContext = isUnit
+    ? `
+IMPORTANT — UNIT ADDRESS CONTEXT: This is a condo, townhome, or unit address. Permits for individual units are typically filed at the building or development level, not the unit level. Zero permits at the unit address is NORMAL and expected for condominiums and townhome communities. Do NOT flag zero unit-level permits as a red flag unless there is specific evidence of unpermitted work (e.g., a complaint filed at this specific unit address).
+${isDevelopmentPermit ? "NOTE: The permits shown below were found at the base building address — these are development-level permits, not unit-specific permits." : "NOTE: No permits were found at the unit address OR the base building address."}
+`
+    : "";
+
+  // New construction context
+  const newConstructionContext =
+    propertyData?.yearBuilt &&
+    new Date().getFullYear() - propertyData.yearBuilt <= 5
+      ? `
+IMPORTANT — NEW CONSTRUCTION CONTEXT: This property was built in ${propertyData.yearBuilt} — ${new Date().getFullYear() - propertyData.yearBuilt} year(s) ago. New construction permits are typically filed under the developer or builder name, not the individual address. Zero permits at this address is EXPECTED for recently built properties. Do NOT flag as high risk unless there is a specific complaint or code violation on file.
+`
+      : "";
+
+  // Zero permits decision tree
+  const zeroPermitGuide =
+    permits.length === 0
+      ? `
+ZERO PERMITS DECISION TREE — follow in order:
+
+1. Is this a unit/condo/townhome address? (isUnit = ${isUnit})
+   YES → LOW risk if no complaints exist. State that development-level
+         permits are normal for this property type. Do not flag as risk.
+
+2. Is this new construction (built within 5 years)?
+   YES → LOW risk. Builder permits filed under developer name.
+         State this explicitly. Do not flag as risk.
+
+3. Is this a pre-2000 single family home with no recent sale?
+   YES → LOW/MEDIUM risk. Normal for older properties.
+
+4. Is this a single family home sold within 3 years AND listing claims renovation?
+   YES → HIGH risk. Zero permits on a claimed renovation is the core red flag.
+
+5. Is this a single family home sold within 3 years, no renovation claims?
+   YES → MEDIUM risk. Recent sale warrants follow-up but is not alarming.
+
+NEVER flag a condo/townhome/unit address as high risk purely due to zero permits.
+NEVER flag new construction as high risk purely due to zero permits.
+`
+      : "";
+
   const prompt = `You are a senior real estate due diligence analyst. Your job is to give homebuyers a clear, direct verdict on permit records — not a cautious summary, but an actual recommendation.
 
 Property: ${address}
 Property context: ${propertyContext}
 ${flipSignal ? `ALERT: ${flipSignal}` : ""}
 ${investorSignal ? investorSignal : ""}
+${unitContext}
+${newConstructionContext}
 Lookup date: ${new Date().toISOString().split("T")[0]}
 Total permits found: ${permits.length}
 ${listingSection}
+${zeroPermitGuide}
 Permit records:
 ${JSON.stringify(permitData, null, 2)}
 
@@ -90,12 +155,7 @@ Respond with a JSON object only, no markdown, no explanation:
 Risk level guide:
 - low: All permits finaled or issued, no complaints, no expired permits, records consistent with property age and condition
 - medium: 1-2 expired permits with no complaints, or minor issues that need follow-up but are not deal-breakers
-- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits
-
-Zero permits guide:
-- Old property (20+ years), no recent sale, no renovation claims → low/medium (normal for older properties)
-- Recent sale (< 3 years) OR listing claims renovation → HIGH (zero permits on a claimed renovation is a red flag)
-- Recent complaint or code violation with zero permits → HIGH`;
+- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);

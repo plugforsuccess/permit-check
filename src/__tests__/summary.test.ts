@@ -164,4 +164,88 @@ describe("generatePermitSummary", () => {
     expect(promptContent).toContain("ATL Properties LLC");
     expect(promptContent).toContain("non-owner-occupied");
   });
+
+  it("includes unit context when isUnit is true", async () => {
+    const mockResponse = {
+      riskLevel: "low",
+      verdict: "LOW RISK — Zero permits is normal for a condo unit.",
+      summary: "This is a condo unit. Development-level permits are expected.",
+      flags: [],
+      positives: ["Normal for property type"],
+      sellerQuestions: [],
+      listingNotes: [],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: JSON.stringify(mockResponse) }],
+      }),
+    });
+
+    const result = await generatePermitSummary(
+      [],
+      "860 PEACHTREE ST NE UNIT 1506",
+      null,
+      null,
+      true,   // isUnit
+      false,  // isDevelopmentPermit
+    );
+
+    expect(result.riskLevel).toBe("low");
+
+    // Verify the prompt includes unit context
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("UNIT ADDRESS CONTEXT");
+    expect(promptContent).toContain("ZERO PERMITS DECISION TREE");
+    expect(promptContent).toContain("isUnit = true");
+  });
+
+  it("includes new construction context for recent builds", async () => {
+    const mockResponse = {
+      riskLevel: "low",
+      verdict: "LOW RISK — New construction, builder permits filed under developer.",
+      summary: "Property built in 2024.",
+      flags: [],
+      positives: ["New construction"],
+      sellerQuestions: [],
+      listingNotes: [],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: JSON.stringify(mockResponse) }],
+      }),
+    });
+
+    const result = await generatePermitSummary(
+      [],
+      "100 NEW BUILD DR",
+      {
+        beds: 4,
+        baths: 3,
+        sqft: 2500,
+        yearBuilt: 2024,
+        propertyType: "Single Family",
+        lastSalePrice: 500000,
+        lastSaleDate: "2024-11-01",
+        assessedValue: 450000,
+        ownerOccupied: true,
+        ownerName: "John Doe",
+        isInvestorOwned: false,
+      },
+      null,
+      false,
+      false,
+    );
+
+    expect(result.riskLevel).toBe("low");
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("NEW CONSTRUCTION CONTEXT");
+    expect(promptContent).toContain("2024");
+  });
 });
