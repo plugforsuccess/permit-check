@@ -75,14 +75,20 @@ export default function ResultsPage() {
     setFeedbackRating(rating);
 
     try {
-      await fetch(`/api/report/${lookupId}/feedback`, {
+      const res = await fetch(`/api/report/${lookupId}/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating }),
       });
-      setFeedbackSubmitted(true);
+      if (res.ok) {
+        setFeedbackSubmitted(true);
+      } else {
+        // Reset so user can retry
+        setFeedbackRating(null);
+      }
     } catch {
-      // Ignore — feedback is non-critical
+      // Network error — reset so user can retry
+      setFeedbackRating(null);
     }
   };
 
