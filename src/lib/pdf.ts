@@ -72,7 +72,6 @@ export function generateReportHtml(data: ReportData): string {
       <td>${escapeHtml(p.filed_date || "N/A")}</td>
       <td>${escapeHtml(p.issued_date || "N/A")}</td>
       <td>${escapeHtml(p.description || "—")}</td>
-      <td>${p.contractor || "—"}</td>
     </tr>
   `
     )
@@ -329,7 +328,6 @@ export function generateReportHtml(data: ReportData): string {
           <th>Filed Date</th>
           <th>Issued Date</th>
           <th>Description</th>
-          <th>Contractor</th>
         </tr>
       </thead>
       <tbody>
