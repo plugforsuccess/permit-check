@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
 import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
+import { fetchPropertyData } from "@/lib/property-data";
 import { log } from "@/lib/logger";
 import type Stripe from "stripe";
 
@@ -98,12 +99,30 @@ export async function POST(req: Request) {
     log.info("Webhook: permits fetch", { count: permits?.length, error: permitsFetchError?.message });
 
     if (lookup && permits) {
-      // Generate AI summary
+      // Fetch property data from REAPI (non-blocking)
+      let propertyData = null;
+      try {
+        propertyData = await fetchPropertyData(lookup.address_normalized);
+        log.info("Webhook: property data fetched", { lookupId, hasData: !!propertyData });
+      } catch (err) {
+        log.warn("Webhook: property data fetch failed", { lookupId, error: String(err) });
+      }
+
+      // Generate AI summary with property context
       let aiSummary: string | null = null;
       let riskLevel: string | null = null;
 
+      const listingDescription = session.metadata?.listing_description || null;
+
       try {
-        const summary = await generatePermitSummary(permits, lookup.address_normalized);
+        const summary = await generatePermitSummary(
+          permits,
+          lookup.address_normalized,
+          propertyData,
+          listingDescription,
+          lookup.is_unit ?? false,
+          lookup.development_level_permits ?? false,
+        );
         aiSummary = JSON.stringify(summary);
         riskLevel = summary.riskLevel;
         log.info("Webhook: summary generated", { lookupId, riskLevel });

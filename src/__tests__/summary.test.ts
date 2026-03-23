@@ -7,15 +7,17 @@ vi.stubGlobal("fetch", mockFetch);
 // Mock process.env
 vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
 
-// Mock the schemas module to avoid needing zod in test runner
-vi.mock("@/lib/schemas", () => ({
-  permitSummarySchema: {
-    safeParse: (data: Record<string, unknown>) => {
-      if (data.riskLevel && data.summary && Array.isArray(data.flags) && Array.isArray(data.positives)) {
-        return { success: true, data };
-      }
-      return { success: false };
-    },
+// Mock the property-data module
+vi.mock("../lib/property-data", () => ({
+  formatPropertyContext: (p: Record<string, unknown>) =>
+    p.yearBuilt ? `Built: ${p.yearBuilt}` : "Property data unavailable",
+  yearsSinceLastSale: (p: Record<string, unknown>) => {
+    if (!p.lastSaleDate) return null;
+    const saleDate = new Date(p.lastSaleDate as string);
+    if (isNaN(saleDate.getTime())) return null;
+    return Math.floor(
+      (Date.now() - saleDate.getTime()) / (1000 * 60 * 60 * 24 * 365)
+    );
   },
 }));
 
@@ -29,9 +31,12 @@ describe("generatePermitSummary", () => {
   it("returns parsed summary from Claude API", async () => {
     const mockResponse = {
       riskLevel: "low",
+      verdict: "LOW RISK — All permits finaled.",
       summary: "All permits are in good standing.",
       flags: [],
       positives: ["All permits finaled"],
+      sellerQuestions: [],
+      listingNotes: [],
     };
 
     mockFetch.mockResolvedValueOnce({
@@ -59,8 +64,11 @@ describe("generatePermitSummary", () => {
     );
 
     expect(result.riskLevel).toBe("low");
+    expect(result.verdict).toBe("LOW RISK — All permits finaled.");
     expect(result.summary).toBe("All permits are in good standing.");
     expect(result.positives).toContain("All permits finaled");
+    expect(result.sellerQuestions).toEqual([]);
+    expect(result.listingNotes).toEqual([]);
   });
 
   it("returns fallback on API error", async () => {
@@ -84,14 +92,16 @@ describe("generatePermitSummary", () => {
 
     const result = await generatePermitSummary([], "55 TRINITY AVE SW");
     expect(result.riskLevel).toBe("medium");
-    expect(result.summary).toContain("failed");
+    expect(result.verdict).toContain("failed");
+    expect(result.sellerQuestions).toEqual([]);
+    expect(result.listingNotes).toEqual([]);
   });
 
   it("sends correct headers to Claude API", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"riskLevel":"low","summary":"ok","flags":[],"positives":[]}' }],
+        content: [{ text: '{"riskLevel":"low","verdict":"ok","summary":"ok","flags":[],"positives":[],"sellerQuestions":[],"listingNotes":[]}' }],
       }),
     });
 
@@ -107,5 +117,135 @@ describe("generatePermitSummary", () => {
         }),
       })
     );
+  });
+
+  it("accepts optional property data with investor detection", async () => {
+    const mockResponse = {
+      riskLevel: "high",
+      verdict: "HIGH RISK — Recent flip with no permits.",
+      summary: "Property sold recently with zero renovation permits.",
+      flags: ["Zero permits on recent sale"],
+      positives: [],
+      sellerQuestions: ["Can you provide renovation documentation?"],
+      listingNotes: [],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: JSON.stringify(mockResponse) }],
+      }),
+    });
+
+    const result = await generatePermitSummary(
+      [],
+      "1278 GREENWICH ST SW",
+      {
+        beds: 3,
+        baths: 2,
+        sqft: 1500,
+        yearBuilt: 1960,
+        propertyType: "Single Family",
+        lastSalePrice: 250000,
+        lastSaleDate: "2025-06-15",
+        assessedValue: 200000,
+        ownerOccupied: false,
+        ownerName: "ATL Properties LLC",
+        isInvestorOwned: true,
+      }
+    );
+
+    expect(result.riskLevel).toBe("high");
+    expect(result.sellerQuestions).toHaveLength(1);
+
+    // Verify the prompt includes investor signal
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("ATL Properties LLC");
+    expect(promptContent).toContain("non-owner-occupied");
+  });
+
+  it("includes unit context when isUnit is true", async () => {
+    const mockResponse = {
+      riskLevel: "low",
+      verdict: "LOW RISK — Zero permits is normal for a condo unit.",
+      summary: "This is a condo unit. Development-level permits are expected.",
+      flags: [],
+      positives: ["Normal for property type"],
+      sellerQuestions: [],
+      listingNotes: [],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: JSON.stringify(mockResponse) }],
+      }),
+    });
+
+    const result = await generatePermitSummary(
+      [],
+      "860 PEACHTREE ST NE UNIT 1506",
+      null,
+      null,
+      true,   // isUnit
+      false,  // isDevelopmentPermit
+    );
+
+    expect(result.riskLevel).toBe("low");
+
+    // Verify the prompt includes unit context
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("UNIT ADDRESS CONTEXT");
+    expect(promptContent).toContain("ZERO PERMITS DECISION TREE");
+    expect(promptContent).toContain("isUnit = true");
+  });
+
+  it("includes new construction context for recent builds", async () => {
+    const mockResponse = {
+      riskLevel: "low",
+      verdict: "LOW RISK — New construction, builder permits filed under developer.",
+      summary: "Property built in 2024.",
+      flags: [],
+      positives: ["New construction"],
+      sellerQuestions: [],
+      listingNotes: [],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ text: JSON.stringify(mockResponse) }],
+      }),
+    });
+
+    const result = await generatePermitSummary(
+      [],
+      "100 NEW BUILD DR",
+      {
+        beds: 4,
+        baths: 3,
+        sqft: 2500,
+        yearBuilt: 2024,
+        propertyType: "Single Family",
+        lastSalePrice: 500000,
+        lastSaleDate: "2024-11-01",
+        assessedValue: 450000,
+        ownerOccupied: true,
+        ownerName: "John Doe",
+        isInvestorOwned: false,
+      },
+      null,
+      false,
+      false,
+    );
+
+    expect(result.riskLevel).toBe("low");
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const promptContent = callBody.messages[0].content;
+    expect(promptContent).toContain("NEW CONSTRUCTION CONTEXT");
+    expect(promptContent).toContain("2024");
   });
 });

@@ -37,6 +37,8 @@ export async function GET(
       permit_count: lookup.permit_count,
       payment_status: lookup.payment_status,
       report_type: lookup.report_type || "standard",
+      is_unit: lookup.is_unit ?? false,
+      development_level_permits: lookup.development_level_permits ?? false,
       permits: null, // Not revealed until paid
     });
   }
@@ -80,6 +82,8 @@ export async function GET(
     permit_count: lookup.permit_count,
     payment_status: lookup.payment_status,
     report_type: lookup.report_type || "standard",
+    is_unit: lookup.is_unit ?? false,
+    development_level_permits: lookup.development_level_permits ?? false,
     permits,
     report: report
       ? {

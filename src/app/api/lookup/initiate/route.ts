@@ -4,7 +4,7 @@ import {
   detectJurisdiction,
   isZipSupported,
 } from "@/lib/accela/index";
-import { normalizeAddress, validateAddress } from "@/lib/address";
+import { normalizeAddress, validateAddress, detectUnitAddress } from "@/lib/address";
 import { lookupInitiateSchema } from "@/lib/schemas";
 import { rateLimit } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
     // Normalize address
     const addressNormalized = normalizeAddress(address);
 
+    // Detect unit address
+    const { isUnit, baseAddress } = detectUnitAddress(addressNormalized);
+
     // Detect jurisdiction from the full address (before normalization strips zip)
     const jurisdictionId = detectJurisdiction(address);
     log.info("Jurisdiction detected", { jurisdictionId, address: addressNormalized });
@@ -106,6 +109,8 @@ export async function POST(request: NextRequest) {
         report_type: parsed.data.report_type,
         user_id: userId,
         jurisdiction_id: jurisdictionId,
+        is_unit: isUnit,
+        base_address: isUnit ? baseAddress : null,
       })
       .select("id")
       .single();

@@ -36,7 +36,8 @@ export async function createCheckoutSession(
   successUrl: string,
   cancelUrl: string,
   matterReference?: string,
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  listingDescription?: string
 ): Promise<Stripe.Checkout.Session> {
   const stripe = getStripe();
   return stripe.checkout.sessions.create(
@@ -68,6 +69,7 @@ export async function createCheckoutSession(
         lookup_id: lookupId,
         report_type: reportType,
         matter_reference: matterReference ?? "",
+        listing_description: listingDescription?.slice(0, 500) ?? "",
       },
     },
     idempotencyKey ? { idempotencyKey } : undefined

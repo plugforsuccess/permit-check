@@ -88,6 +88,46 @@ export function normalizeAddress(raw: string): string {
   return normalized.join(" ").trim();
 }
 
+// Unit number patterns
+const UNIT_PATTERNS = [
+  /\s+(unit|apt|apartment|#|suite|ste|bldg|building|ph|penthouse)\s*[\w-]+$/i,
+  /\s+\d+[a-z]$/i,       // "1278 Main St 4B"
+  /,\s*\w+\s*\d+.*$/i,   // "1278 Main St, Unit 4"
+];
+
+export function detectUnitAddress(address: string): {
+  isUnit: boolean;
+  baseAddress: string;
+} {
+  const upper = address.trim().toUpperCase();
+
+  for (const pattern of UNIT_PATTERNS) {
+    if (pattern.test(upper)) {
+      const baseAddress = upper.replace(pattern, "").trim();
+      return { isUnit: true, baseAddress };
+    }
+  }
+
+  return { isUnit: false, baseAddress: upper };
+}
+
+export function detectPropertyContext(
+  address: string,
+  yearBuilt?: number | null
+): {
+  isUnit: boolean;
+  isNewConstruction: boolean;
+  baseAddress: string;
+} {
+  const { isUnit, baseAddress } = detectUnitAddress(address);
+  const currentYear = new Date().getFullYear();
+  const isNewConstruction = yearBuilt
+    ? currentYear - yearBuilt <= 5
+    : false;
+
+  return { isUnit, isNewConstruction, baseAddress };
+}
+
 export function validateAddress(address: string): { valid: boolean; error?: string } {
   const trimmed = address.trim();
 

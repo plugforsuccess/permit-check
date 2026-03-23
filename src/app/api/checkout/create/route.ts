@@ -7,6 +7,7 @@ import { config } from "@/lib/config";
 const checkoutSchema = z.object({
   lookup_id: z.string().uuid(),
   matter_reference: z.string().max(100).optional(),
+  listing_description: z.string().max(2000).optional(),
 });
 
 /**
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { lookup_id, matter_reference } = parsed.data;
+    const { lookup_id, matter_reference, listing_description } = parsed.data;
 
     // Verify lookup exists and hasn't already been paid
     const supabase = createServerClient();
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
       successUrl,
       cancelUrl,
       matter_reference,
-      idempotencyKey
+      idempotencyKey,
+      listing_description
     );
 
     return NextResponse.json({ checkout_url: session.url });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeAddress, validateAddress } from "../lib/address";
+import { normalizeAddress, validateAddress, detectUnitAddress, detectPropertyContext } from "../lib/address";
 
 describe("normalizeAddress", () => {
   it("normalizes street type abbreviations", () => {
@@ -56,5 +56,64 @@ describe("validateAddress", () => {
   it("rejects single-word addresses", () => {
     const result = validateAddress("123");
     expect(result.valid).toBe(false);
+  });
+});
+
+describe("detectUnitAddress", () => {
+  it("detects unit addresses", () => {
+    expect(detectUnitAddress("1234 Peachtree St NE Unit 5")).toEqual({
+      isUnit: true,
+      baseAddress: "1234 PEACHTREE ST NE",
+    });
+    expect(detectUnitAddress("456 Main St Apt 2B")).toEqual({
+      isUnit: true,
+      baseAddress: "456 MAIN ST",
+    });
+    expect(detectUnitAddress("789 Oak Ave #101")).toEqual({
+      isUnit: true,
+      baseAddress: "789 OAK AVE",
+    });
+    expect(detectUnitAddress("860 Peachtree St NE Suite 300")).toEqual({
+      isUnit: true,
+      baseAddress: "860 PEACHTREE ST NE",
+    });
+  });
+
+  it("returns isUnit false for non-unit addresses", () => {
+    expect(detectUnitAddress("321 Elm St")).toEqual({
+      isUnit: false,
+      baseAddress: "321 ELM ST",
+    });
+    expect(detectUnitAddress("55 Trinity Ave SW")).toEqual({
+      isUnit: false,
+      baseAddress: "55 TRINITY AVE SW",
+    });
+  });
+});
+
+describe("detectPropertyContext", () => {
+  it("detects new construction from year built", () => {
+    const currentYear = new Date().getFullYear();
+    const result = detectPropertyContext("100 New St", currentYear - 2);
+    expect(result.isNewConstruction).toBe(true);
+    expect(result.isUnit).toBe(false);
+  });
+
+  it("does not flag old properties as new construction", () => {
+    const result = detectPropertyContext("100 Old St", 1960);
+    expect(result.isNewConstruction).toBe(false);
+  });
+
+  it("handles null yearBuilt", () => {
+    const result = detectPropertyContext("100 Main St", null);
+    expect(result.isNewConstruction).toBe(false);
+  });
+
+  it("combines unit detection with new construction", () => {
+    const currentYear = new Date().getFullYear();
+    const result = detectPropertyContext("100 Main St Unit 5", currentYear - 1);
+    expect(result.isUnit).toBe(true);
+    expect(result.isNewConstruction).toBe(true);
+    expect(result.baseAddress).toBe("100 MAIN ST");
   });
 });
