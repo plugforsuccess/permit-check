@@ -1,11 +1,15 @@
 import type { Permit } from "@/types";
-import { permitSummarySchema } from "@/lib/schemas";
+import type { EstatedProperty } from "./estated";
+import { formatPropertyContext } from "./estated";
 
 export interface PermitSummary {
   riskLevel: "low" | "medium" | "high";
+  verdict: string;
   summary: string;
   flags: string[];
   positives: string[];
+  sellerQuestions: string[];
+  listingNotes: string[];
 }
 
 /**
@@ -14,7 +18,9 @@ export interface PermitSummary {
  */
 export async function generatePermitSummary(
   permits: Permit[],
-  address: string
+  address: string,
+  propertyData?: EstatedProperty | null,
+  listingDescription?: string | null
 ): Promise<PermitSummary> {
   const permitData = permits.map((p) => ({
     record: p.record_number,
@@ -24,39 +30,74 @@ export async function generatePermitSummary(
     description: p.description,
   }));
 
-  const prompt = `You are a real estate due diligence expert analyzing permit records for a property.
+  const propertyContext = propertyData
+    ? formatPropertyContext(propertyData)
+    : "Property data not available";
+
+  // Calculate years since last sale for flip detection
+  const yearsSinceLastSale = propertyData?.lastSaleDate
+    ? Math.floor(
+        (Date.now() - new Date(propertyData.lastSaleDate).getTime()) /
+          (1000 * 60 * 60 * 24 * 365)
+      )
+    : null;
+
+  const flipSignal =
+    yearsSinceLastSale !== null && yearsSinceLastSale <= 2
+      ? `Property sold ${yearsSinceLastSale === 0 ? "less than 1 year" : yearsSinceLastSale + " year(s)"} ago — potential flip or recent investor acquisition.`
+      : null;
+
+  const listingSection = listingDescription
+    ? `\nListing description provided by user:\n"${listingDescription.slice(0, 1000)}"\n`
+    : "\nNo listing description provided.\n";
+
+  const prompt = `You are a senior real estate due diligence analyst. Your job is to give homebuyers a clear, direct verdict on permit records — not a cautious summary, but an actual recommendation.
 
 Property: ${address}
-Total permits found: ${permits.length}
+Property context: ${propertyContext}
+${flipSignal ? `ALERT: ${flipSignal}` : ""}
 Lookup date: ${new Date().toISOString().split("T")[0]}
-
+Total permits found: ${permits.length}
+${listingSection}
 Permit records:
 ${JSON.stringify(permitData, null, 2)}
 
-Analyze these permit records and provide a due diligence summary. Focus on:
-1. Expired permits (work started but never finaled/inspected — major red flag)
-2. Building complaints or code violations
-3. Unpermitted work signals (major renovation types with no corresponding permits)
-4. Pattern of recent activity suggesting flip/renovation without proper permits
-5. Positive signals (finaled permits showing work was properly completed)
+RULES:
+1. NEVER use hedging language: no "may indicate", "could suggest", "it's possible that", "cannot be determined", "might mean". State facts directly.
+2. Lead with the verdict — one sentence that tells the buyer exactly where they stand.
+3. Cross-reference listing claims against permits. If listing says "renovated" but there are no renovation permits, say so explicitly.
+4. Flag flips aggressively — if sold recently with no major permits, that's a red flag.
+5. "Seller questions" must be specific and actionable — what should the buyer literally say to their agent or the seller?
+6. If permits.length === 0 and property was recently sold or is listed as renovated, that is HIGH risk — zero permits on a claimed renovation is the core red flag PermitCheck exists to catch.
+7. Duplicate permit records (same record number appearing multiple times) should be counted once.
 
-Respond with a JSON object only, no markdown, no explanation outside the JSON:
+Respond with a JSON object only, no markdown, no explanation:
 {
   "riskLevel": "low" | "medium" | "high",
-  "summary": "2-3 sentence plain-English summary a homebuyer can understand. Be direct and conclusive. State what the records show, not what they might mean.",
-  "flags": ["specific red flag 1", "specific red flag 2"],
-  "positives": ["positive signal 1", "positive signal 2"]
+  "verdict": "Single sentence. Direct. Tells the buyer exactly where they stand. Example: 'HIGH RISK — This property has an open building complaint about unpermitted unit conversion and an expired plumbing permit that was never inspected.'",
+  "summary": "2-3 sentences expanding on the verdict with specific details from the records. Include property context if relevant (year built, last sale price). No hedging.",
+  "flags": ["Specific red flag with record number where applicable", "Another specific flag"],
+  "positives": ["Specific positive signal", "Another positive"],
+  "sellerQuestions": [
+    "Why was permit [RECORD NUMBER] for [TYPE] filed in [YEAR] never finaled or inspected?",
+    "What work was performed under the [YEAR] building complaint [RECORD NUMBER]?",
+    "Can you provide documentation that the [TYPE] work was completed by a licensed contractor?"
+  ],
+  "listingNotes": ["Observation about listing vs permit records if listing description was provided", "Another observation"]
 }
 
 Risk level guide:
-- low: All permits finaled or issued, no complaints, no expired permits
-- medium: Some expired permits or incomplete work, but no complaints
-- high: Building complaints, multiple expired permits, signs of unpermitted work
+- low: All permits finaled or issued, no complaints, no expired permits, records consistent with property age and condition
+- medium: 1-2 expired permits with no complaints, or minor issues that need follow-up but are not deal-breakers
+- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits
 
-If permits.length === 0: riskLevel should be "medium", summary should note that zero permits may indicate no work was done OR that work was done without permits — cannot be determined from records alone.`;
+Zero permits guide:
+- Old property (20+ years), no recent sale, no renovation claims → low/medium (normal for older properties)
+- Recent sale (< 3 years) OR listing claims renovation → HIGH (zero permits on a claimed renovation is a red flag)
+- Recent complaint or code violation with zero permits → HIGH`;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
 
   let response: Response;
   try {
@@ -68,8 +109,8 @@ If permits.length === 0: riskLevel should be "medium", summary should note that 
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       }),
       signal: controller.signal,
@@ -87,23 +128,27 @@ If permits.length === 0: riskLevel should be "medium", summary should note that 
 
   try {
     const raw = JSON.parse(text.replace(/```json|```/g, "").trim());
-    const validated = permitSummarySchema.safeParse(raw);
-    if (validated.success) {
-      return validated.data;
-    }
-    // Partial data — use what we can
     return {
       riskLevel: raw.riskLevel ?? "medium",
-      summary: raw.summary ?? "Summary unavailable.",
+      verdict: raw.verdict ?? raw.summary ?? "Summary unavailable.",
+      summary: raw.summary ?? "",
       flags: Array.isArray(raw.flags) ? raw.flags : [],
       positives: Array.isArray(raw.positives) ? raw.positives : [],
+      sellerQuestions: Array.isArray(raw.sellerQuestions)
+        ? raw.sellerQuestions
+        : [],
+      listingNotes: Array.isArray(raw.listingNotes) ? raw.listingNotes : [],
     };
   } catch {
     return {
       riskLevel: "medium",
-      summary: "Summary generation failed. Please review permit records directly.",
+      verdict:
+        "Summary generation failed. Please review permit records directly.",
+      summary: "",
       flags: [],
       positives: [],
+      sellerQuestions: [],
+      listingNotes: [],
     };
   }
 }

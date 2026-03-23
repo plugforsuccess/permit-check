@@ -4,8 +4,18 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PropertyStreetView from "@/components/PropertyStreetView";
+import ReferralCards from "@/components/ReferralCards";
 import Disclaimer from "@/components/Disclaimer";
 import type { Permit } from "@/types";
+
+interface ReferralCard {
+  id: string;
+  title: string;
+  description: string;
+  cta: string;
+  href: string;
+  icon: "inspector" | "attorney" | "lender" | "contractor";
+}
 
 interface LookupResult {
   lookup_id: string;
@@ -21,9 +31,12 @@ interface LookupResult {
     expires_at: string;
     summary?: {
       riskLevel: "low" | "medium" | "high";
+      verdict: string;
       summary: string;
       flags: string[];
       positives: string[];
+      sellerQuestions: string[];
+      listingNotes: string[];
     } | null;
     risk_level?: string | null;
   } | null;
@@ -48,6 +61,7 @@ export default function ResultsPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [pollingForPayment, setPollingForPayment] = useState(false);
   const [matterReference, setMatterReference] = useState("");
+  const [referralCards, setReferralCards] = useState<ReferralCard[]>([]);
 
   const fetchResults = useCallback(async () => {
     try {
@@ -114,6 +128,19 @@ export default function ResultsPage() {
       fetchResults();
     }
   }, [paymentSuccess, fetchResults]);
+
+  // Fetch referral cards when we have a risk level
+  useEffect(() => {
+    const riskLevel = result?.report?.summary?.riskLevel;
+    if (!riskLevel || result?.payment_status !== "paid") return;
+
+    fetch(`/api/referrals?risk=${riskLevel}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.cards)) setReferralCards(data.cards);
+      })
+      .catch(() => {});
+  }, [result?.report?.summary?.riskLevel, result?.payment_status]);
 
   const handleCheckout = async () => {
     setCheckoutLoading(true);
@@ -378,15 +405,28 @@ export default function ResultsPage() {
                       ? "Medium Risk"
                       : "Low Risk"}
                   </span>
-                  <span className="text-xs text-gray-500 font-medium">AI-Generated Summary</span>
+                  <span className="text-xs text-gray-500 font-medium">AI-Generated Analysis</span>
                 </div>
 
-                <p className={`text-sm leading-relaxed mb-4 font-medium ${
+                {/* Verdict — bold one-liner */}
+                {result.report.summary.verdict && (
+                  <p className={`text-base font-bold mb-2 ${
+                    result.report.summary.riskLevel === "high"
+                      ? "text-red-900"
+                      : result.report.summary.riskLevel === "medium"
+                      ? "text-yellow-900"
+                      : "text-green-900"
+                  }`}>
+                    {result.report.summary.verdict}
+                  </p>
+                )}
+
+                <p className={`text-sm leading-relaxed mb-4 ${
                   result.report.summary.riskLevel === "high"
-                    ? "text-red-900"
+                    ? "text-red-800"
                     : result.report.summary.riskLevel === "medium"
-                    ? "text-yellow-900"
-                    : "text-green-900"
+                    ? "text-yellow-800"
+                    : "text-green-800"
                 }`}>
                   {result.report.summary.summary}
                 </p>
@@ -408,7 +448,7 @@ export default function ResultsPage() {
                 )}
 
                 {result.report.summary.positives.length > 0 && (
-                  <div>
+                  <div className="mb-3">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
                       Positive Signals
                     </div>
@@ -423,13 +463,50 @@ export default function ResultsPage() {
                   </div>
                 )}
 
+                {result.report.summary.sellerQuestions && result.report.summary.sellerQuestions.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                      What to Ask the Seller
+                    </div>
+                    <ul className="space-y-1.5">
+                      {result.report.summary.sellerQuestions.map((q, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-800">
+                          <span className="text-blue-500 mt-0.5 shrink-0 font-bold">{i + 1}.</span>
+                          {q}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {result.report.summary.listingNotes && result.report.summary.listingNotes.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                      Listing Observations
+                    </div>
+                    <ul className="space-y-1">
+                      {result.report.summary.listingNotes.map((note, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <p className="text-xs text-gray-400">
-                    AI analysis based on official permit records. Not a substitute for
+                    AI analysis based on official permit records and property data. Not a substitute for
                     professional inspection or legal advice.
                   </p>
                 </div>
               </div>
+            )}
+
+            {/* Referral CTAs — shown only after payment, based on risk level */}
+            {referralCards.length > 0 && (
+              <ReferralCards cards={referralCards} />
             )}
 
             <PermitTable permits={result.permits} />
