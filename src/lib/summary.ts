@@ -208,12 +208,14 @@ IMPORTANT — COMMERCIAL/MULTI-FAMILY PROPERTY: This property is classified as "
   let listingSection = "\nNo listing description provided.\n";
 
   if (listingDescription) {
-    const claims = extractListingClaims(listingDescription);
+    // Truncate once — claim extraction and raw text shown to model must use the same input
+    const truncatedListing = listingDescription.slice(0, 1500);
+    const claims = extractListingClaims(truncatedListing);
     const permitData = permits.map((p) => ({ type: p.type, status: p.status }));
     const claimsCrossRef = formatClaimsForPrompt(claims, permitData);
 
     listingSection = `
-Listing description (raw): "${listingDescription.slice(0, 1000)}"
+Listing description (raw): "${truncatedListing}"
 
 ${claimsCrossRef || "No specific renovation claims detected in listing text.\n"}
 `;
