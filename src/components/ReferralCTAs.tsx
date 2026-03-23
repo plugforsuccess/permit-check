@@ -16,7 +16,6 @@ interface ReferralCard {
   icon: string;
 }
 
-// Update these URLs with your actual affiliate IDs before deploying
 const REFERRAL_CARDS: ReferralCard[] = [
   {
     id: "attorney",
@@ -25,7 +24,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
     description:
       "Permit issues can affect your contract rights and negotiating position. Get a free 15-minute consultation.",
     ctaText: "Find an attorney \u2192",
-    ctaUrl: "https://www.avvo.com/real-estate-lawyer.html",
+    ctaUrl:
+      process.env.NEXT_PUBLIC_AFFILIATE_ATTORNEY ||
+      "https://www.avvo.com/real-estate-lawyer/ga/atlanta.html",
     showOn: ["medium", "high"],
     icon: "\u2696\uFE0F",
   },
@@ -36,7 +37,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
     description:
       "Verify what work was actually done and whether it meets code \u2014 regardless of permits on file.",
     ctaText: "Find an inspector \u2192",
-    ctaUrl: "https://www.homeadvisor.com/c.Home_Inspectors.html",
+    ctaUrl:
+      process.env.NEXT_PUBLIC_AFFILIATE_INSPECTOR ||
+      "https://www.angi.com/companylist/us/ga/atlanta/home-inspection.htm",
     showOn: ["medium", "high"],
     icon: "\uD83D\uDD0D",
   },
@@ -47,7 +50,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
     description:
       "Expired permits may require re-inspection or corrective work. Get a free estimate before closing.",
     ctaText: "Find a contractor \u2192",
-    ctaUrl: "https://www.homeadvisor.com/",
+    ctaUrl:
+      process.env.NEXT_PUBLIC_AFFILIATE_CONTRACTOR ||
+      "https://www.angi.com/companylist/us/ga/atlanta/general-contractors.htm",
     showOn: ["high"],
     icon: "\uD83D\uDD27",
   },
@@ -58,7 +63,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
     description:
       "Clean permit history means a smoother appraisal. Lock in your rate while due diligence is complete.",
     ctaText: "Compare rates \u2192",
-    ctaUrl: "https://www.lendingtree.com/home/mortgage/",
+    ctaUrl:
+      process.env.NEXT_PUBLIC_AFFILIATE_MORTGAGE ||
+      "https://www.lendingtree.com/home/mortgage/",
     showOn: ["low"],
     icon: "\uD83C\uDFE6",
   },
@@ -69,7 +76,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
     description:
       "An experienced agent can help you negotiate permit issues into the purchase price or contract terms.",
     ctaText: "Find an agent \u2192",
-    ctaUrl: "https://www.realtor.com/realestateagents/",
+    ctaUrl:
+      process.env.NEXT_PUBLIC_AFFILIATE_AGENT ||
+      "https://www.realtor.com/realestateagents/atlanta_ga",
     showOn: ["low", "medium", "high"],
     icon: "\uD83C\uDFE0",
   },
