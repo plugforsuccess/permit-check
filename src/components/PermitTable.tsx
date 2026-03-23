@@ -97,6 +97,11 @@ export default function PermitTable({
               </span>
             </div>
             <div className="text-sm text-gray-700 mb-1">{permit.type}</div>
+            {permit.module && permit.module !== "Building" && (
+              <span className="inline-block text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full mb-1">
+                {permit.module}
+              </span>
+            )}
             {permit.description && (
               <div className="text-xs text-gray-500 mb-2 leading-relaxed line-clamp-2">
                 {permit.description}
@@ -117,6 +122,7 @@ export default function PermitTable({
               {[
                 "Record #",
                 "Type",
+                "Module",
                 "Status",
                 "Filed Date",
                 "Issued Date",
@@ -144,6 +150,9 @@ export default function PermitTable({
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700">
                   {permit.type}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">
+                  {permit.module ?? "Building"}
                 </td>
                 <td className="px-4 py-3">
                   <span

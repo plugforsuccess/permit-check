@@ -30,6 +30,7 @@ export interface PermitRecord {
   issuedDate: string | null;
   description: string;
   address: string;
+  module?: string; // "Building", "Electrical", "Plumbing", etc.
 }
 
 export interface ScrapeResult {
@@ -133,8 +134,116 @@ async function launchBrowser(): Promise<Browser> {
 }
 
 /**
- * Scrape permit records from an Accela portal.
- * Returns all pages of results. Never throws — returns [] on failure.
+ * Scrape a single module's permit records from an Accela portal.
+ */
+async function scrapeModule(
+  page: Page,
+  searchUrl: string,
+  parsed: ReturnType<typeof parseAddressForPortal>,
+  normalizedAddress: string,
+  jurisdiction: JurisdictionConfig
+): Promise<PermitRecord[]> {
+  await page.goto(searchUrl, {
+    waitUntil: "networkidle",
+    timeout: BROWSER_TIMEOUT,
+  });
+
+  await page.waitForSelector(SELECTORS.streetNumberFrom, {
+    timeout: SELECTOR_TIMEOUT,
+  });
+  await page.waitForTimeout(1000);
+
+  await page.click(SELECTORS.streetNumberFrom);
+  await page.fill(SELECTORS.streetNumberFrom, parsed.streetNumber);
+  await page.click(SELECTORS.streetName);
+  await page.fill(SELECTORS.streetName, parsed.streetName);
+
+  if (parsed.streetSuffix) {
+    await page.selectOption(SELECTORS.streetSuffix, parsed.streetSuffix);
+  }
+
+  if (jurisdiction.hasQuadrant && parsed.quadrant) {
+    await page.selectOption(SELECTORS.quadrant, parsed.quadrant);
+  }
+
+  if (jurisdiction.hasDateRange) {
+    await page.click(SELECTORS.startDate);
+    await page.fill(SELECTORS.startDate, "01/01/1990");
+    await page.click(SELECTORS.endDate);
+    await page.fill(
+      SELECTORS.endDate,
+      new Date().toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      })
+    );
+  }
+
+  await page.waitForTimeout(500);
+  await page.click(SELECTORS.searchButton);
+
+  try {
+    await page.waitForSelector(SELECTORS.resultsTable, {
+      timeout: SELECTOR_TIMEOUT,
+    });
+  } catch {
+    // No results for this module — normal, not an error
+    return [];
+  }
+
+  const modulePermits: PermitRecord[] = [];
+  const MAX_PAGES = 10;
+  let pageCount = 0;
+
+  while (pageCount < MAX_PAGES) {
+    pageCount++;
+    const pagePermits = await parseResultsTable(
+      page,
+      normalizedAddress,
+      jurisdiction.columnMap,
+      jurisdiction.resultsTableSelector
+    );
+    modulePermits.push(...pagePermits);
+
+    // Pagination
+    let hasNextPage = false;
+    const standardNext = await page.$("a.aca_pagination_PagerNextStyle");
+    if (standardNext) {
+      await standardNext.click();
+      hasNextPage = true;
+    } else {
+      const textNext = await page
+        .getByText("Next >", { exact: true })
+        .first();
+      const isVisible = await textNext.isVisible().catch(() => false);
+      if (isVisible) {
+        await textNext.click();
+        hasNextPage = true;
+      }
+    }
+
+    if (!hasNextPage) break;
+
+    try {
+      await page.waitForLoadState("networkidle", {
+        timeout: SELECTOR_TIMEOUT,
+      });
+      await page.waitForSelector(SELECTORS.resultsTable, {
+        timeout: SELECTOR_TIMEOUT,
+      });
+      await page.waitForTimeout(500);
+    } catch {
+      break;
+    }
+  }
+
+  return modulePermits;
+}
+
+/**
+ * Scrape permit records from an Accela portal across all configured modules.
+ * Deduplicates by record number across modules. Never throws — returns [] on failure.
  */
 export async function scrapeAccelaPermits(
   streetNumber: string,
@@ -148,7 +257,7 @@ export async function scrapeAccelaPermits(
   const parsed = parseAddressForPortal(normalizedAddress);
 
   console.log(
-    `[accela-scraper] Jurisdiction: ${jurisdiction.name} | address: number="${parsed.streetNumber}" name="${parsed.streetName}" suffix="${parsed.streetSuffix}" quadrant="${parsed.quadrant}"`
+    `[accela-scraper] Jurisdiction: ${jurisdiction.name} | modules: ${jurisdiction.modules.map((m) => m.name).join(", ")}`
   );
 
   try {
@@ -157,124 +266,68 @@ export async function scrapeAccelaPermits(
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     });
-    const page = await context.newPage();
-    page.setDefaultTimeout(BROWSER_TIMEOUT);
-
-    console.log("[accela-scraper] Navigating to portal...");
-    await page.goto(jurisdiction.searchUrl, {
-      waitUntil: "networkidle",
-      timeout: BROWSER_TIMEOUT,
-    });
-
-    await page.waitForSelector(SELECTORS.streetNumberFrom, {
-      timeout: SELECTOR_TIMEOUT,
-    });
-    await page.waitForTimeout(1000);
-
-    console.log("[accela-scraper] Filling search form...");
-    await page.click(SELECTORS.streetNumberFrom);
-    await page.fill(SELECTORS.streetNumberFrom, parsed.streetNumber);
-
-    await page.click(SELECTORS.streetName);
-    await page.fill(SELECTORS.streetName, parsed.streetName);
-
-    if (parsed.streetSuffix) {
-      await page.selectOption(SELECTORS.streetSuffix, parsed.streetSuffix);
-    }
-
-    // Only Atlanta has the quadrant dropdown
-    if (jurisdiction.hasQuadrant && parsed.quadrant) {
-      await page.selectOption(SELECTORS.quadrant, parsed.quadrant);
-    }
-
-    // Only Atlanta has date range fields
-    if (jurisdiction.hasDateRange) {
-      await page.click(SELECTORS.startDate);
-      await page.fill(SELECTORS.startDate, "01/01/2000");
-      await page.click(SELECTORS.endDate);
-      await page.fill(
-        SELECTORS.endDate,
-        new Date().toLocaleDateString("en-US", {
-          month: "2-digit",
-          day: "2-digit",
-          year: "numeric",
-        })
-      );
-    }
-
-    await page.waitForTimeout(500);
-
-    console.log("[accela-scraper] Submitting search...");
-    await page.click(SELECTORS.searchButton);
-
-    try {
-      await page.waitForSelector(SELECTORS.resultsTable, {
-        timeout: SELECTOR_TIMEOUT,
-      });
-    } catch {
-      const title = await page.title();
-      const url = page.url();
-      console.log(
-        `[accela-scraper] No results table found. Page: "${title}" URL: ${url}`
-      );
-      return { permits: [], truncated: false };
-    }
 
     const allPermits: PermitRecord[] = [];
-    const MAX_PAGES = 10; // cap at 10 pages = ~100 records max
-    let pageCount = 0;
+    const seenRecordNumbers = new Set<string>();
+    let anyTruncated = false;
 
-    while (pageCount < MAX_PAGES) {
-      pageCount++;
-      console.log(`[accela-scraper] Parsing results page ${pageCount}...`);
-      const pagePermits = await parseResultsTable(
-        page,
-        normalizedAddress,
-        jurisdiction.columnMap,
-        jurisdiction.resultsTableSelector
-      );
-      allPermits.push(...pagePermits);
+    // Scrape each module sequentially
+    for (const mod of jurisdiction.modules) {
+      console.log(`[accela-scraper] Scraping module: ${mod.name}`);
 
-      // Try standard pagination link first, then postback text link
-      let hasNextPage = false;
-
-      const standardNext = await page.$("a.aca_pagination_PagerNextStyle");
-      if (standardNext) {
-        await standardNext.click();
-        hasNextPage = true;
-      } else {
-        // Try postback-style text link (Gwinnett and others)
-        const textNext = await page.getByText("Next >", { exact: true }).first();
-        const isVisible = await textNext.isVisible().catch(() => false);
-        if (isVisible) {
-          await textNext.click();
-          hasNextPage = true;
-        }
-      }
-
-      if (!hasNextPage) break;
+      const page = await context.newPage();
+      page.setDefaultTimeout(BROWSER_TIMEOUT);
 
       try {
-        await page.waitForLoadState("networkidle", { timeout: SELECTOR_TIMEOUT });
-        await page.waitForSelector(SELECTORS.resultsTable, { timeout: SELECTOR_TIMEOUT });
-        await page.waitForTimeout(500);
-      } catch {
-        break;
-      }
-    }
+        const modulePermits = await scrapeModule(
+          page,
+          mod.searchUrl,
+          parsed,
+          normalizedAddress,
+          jurisdiction
+        );
 
-    const truncated = pageCount >= MAX_PAGES;
-    if (truncated) {
-      console.warn(`[accela-scraper] Hit page limit of ${MAX_PAGES} for ${streetName} — results truncated`);
+        // Tag each permit with its source module
+        modulePermits.forEach((p) => (p.module = mod.name));
+
+        // Deduplicate across modules — same record can appear in multiple modules
+        let newCount = 0;
+        for (const permit of modulePermits) {
+          if (!seenRecordNumbers.has(permit.recordNumber)) {
+            seenRecordNumbers.add(permit.recordNumber);
+            allPermits.push(permit);
+            newCount++;
+          }
+        }
+
+        if (modulePermits.length >= 100) anyTruncated = true;
+
+        console.log(
+          `[accela-scraper] Module ${mod.name}: ${modulePermits.length} records, ${newCount} new`
+        );
+      } catch (err) {
+        // Don't fail entire scrape if one module fails — log and continue
+        console.error(
+          `[accela-scraper] Module ${mod.name} failed:`,
+          err
+        );
+      } finally {
+        await page.close();
+      }
+
+      // Brief pause between modules to avoid rate limiting
+      if (jurisdiction.modules.indexOf(mod) < jurisdiction.modules.length - 1) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     }
 
     console.log(
-      `[accela-scraper] Found ${allPermits.length} total permit records${truncated ? " (TRUNCATED)" : ""}`
+      `[accela-scraper] Total: ${allPermits.length} unique permit records across all modules`
     );
-    return { permits: allPermits, truncated };
+    return { permits: allPermits, truncated: anyTruncated };
   } catch (error) {
     console.error("[accela-scraper] Scraping failed:", error);
-    throw error; // Let caller handle retries
+    throw error;
   } finally {
     if (browser) await browser.close();
   }

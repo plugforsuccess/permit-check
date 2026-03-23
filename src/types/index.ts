@@ -8,6 +8,7 @@ export interface Permit {
   issued_date: string | null;
   description: string;
   contractor: string | null;
+  module?: string;
 }
 
 export type PermitStatus =

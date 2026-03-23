@@ -128,6 +128,7 @@ export async function POST(
           issued_date: p.issuedDate,
           description: p.description,
           address: p.address,
+          module: p.module ?? "Building",
         }))
       );
     }
