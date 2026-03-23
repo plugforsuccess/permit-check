@@ -1,9 +1,16 @@
+export interface AccelaModule {
+  name: string;        // display name e.g. "Electrical"
+  moduleKey: string;   // URL param e.g. "Electrical"
+  searchUrl: string;   // full search URL for this module
+}
+
 export interface JurisdictionConfig {
   id: string;
   name: string;
   state: string;
   portalUrl: string;
   searchUrl: string;
+  modules: AccelaModule[]; // all modules to scrape
   hasQuadrant: boolean; // NE/NW/SE/SW directional dropdown
   hasDateRange: boolean; // start/end date fields
   nextPageSelector: string; // CSS selector for the Next page link
@@ -28,6 +35,38 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
     portalUrl: "https://aca-prod.accela.com/ATLANTA_GA",
     searchUrl:
       "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Building&customglobalsearch=true",
+    modules: [
+      {
+        name: "Building",
+        moduleKey: "Building",
+        searchUrl:
+          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Building&customglobalsearch=true",
+      },
+      {
+        name: "Electrical",
+        moduleKey: "Electrical",
+        searchUrl:
+          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Electrical&customglobalsearch=true",
+      },
+      {
+        name: "Plumbing",
+        moduleKey: "Plumbing",
+        searchUrl:
+          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Plumbing&customglobalsearch=true",
+      },
+      {
+        name: "Mechanical",
+        moduleKey: "Mechanical",
+        searchUrl:
+          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Mechanical&customglobalsearch=true",
+      },
+      {
+        name: "Fire",
+        moduleKey: "Fire",
+        searchUrl:
+          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Fire&customglobalsearch=true",
+      },
+    ],
     hasQuadrant: true,
     hasDateRange: true,
     nextPageSelector: "a.aca_pagination_PagerNextStyle",
@@ -51,6 +90,14 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
     portalUrl: "https://aca-prod.accela.com/GWINNETT",
     searchUrl:
       "https://aca-prod.accela.com/GWINNETT/Cap/CapHome.aspx?module=Building",
+    modules: [
+      {
+        name: "Building",
+        moduleKey: "Building",
+        searchUrl:
+          "https://aca-prod.accela.com/GWINNETT/Cap/CapHome.aspx?module=Building",
+      },
+    ],
     hasQuadrant: false,
     hasDateRange: false,
     nextPageSelector: "a.aca_simple_text", // will match by text content in scraper
