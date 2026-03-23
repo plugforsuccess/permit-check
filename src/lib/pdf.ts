@@ -33,6 +33,8 @@ export interface ReportData {
     flags: string[];
     positives: string[];
   } | null;
+  agentName?: string;
+  brokerage?: string;
 }
 
 /**
@@ -250,6 +252,16 @@ export function generateReportHtml(data: ReportData): string {
       Report ID: ${lookupId}
     </div>
   </div>
+
+  ${data.agentName ? `
+  <div style="text-align: right; margin-bottom: 16px;">
+    <div style="font-size: 10px; color: #6b7280; margin-bottom: 2px;">Prepared for</div>
+    <div style="font-size: 12px; font-weight: 600; color: #111827;">${escapeHtml(data.agentName)}</div>
+    ${data.brokerage
+      ? `<div style="font-size: 11px; color: #6b7280;">${escapeHtml(data.brokerage)}</div>`
+      : ""}
+  </div>
+  ` : ""}
 
   <div class="summary-box">
     <strong>Property Address:</strong> ${address}<br/>

@@ -39,8 +39,55 @@ export async function POST(req: Request) {
     );
   }
 
+  // Handle subscription lifecycle events
+  if (
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.deleted"
+  ) {
+    const subscription = event.data.object as Stripe.Subscription;
+    const userId = subscription.metadata?.user_id;
+
+    if (userId) {
+      const supabase = createServerClient();
+      await supabase
+        .from("users")
+        .update({
+          subscription_status: subscription.status as string,
+        })
+        .eq("id", userId);
+
+      log.info("Webhook: subscription status updated", {
+        userId,
+        status: subscription.status,
+      });
+    }
+
+    return NextResponse.json({ received: true });
+  }
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // Subscription checkout — handle separately from per-lookup payments
+    if (session.mode === "subscription") {
+      const userId = session.metadata?.user_id;
+
+      if (userId && session.customer) {
+        const supabase = createServerClient();
+        await supabase.from("users").upsert({
+          id: userId,
+          email: session.customer_email ?? "",
+          stripe_customer_id: session.customer as string,
+          stripe_subscription_id: session.subscription as string,
+          subscription_status: "active",
+        });
+
+        log.info("Webhook: agent subscription activated", { userId });
+      }
+
+      return NextResponse.json({ received: true });
+    }
+
     const lookupId = session.metadata?.lookup_id;
     const reportType =
       (session.metadata?.report_type as "standard" | "attorney") || "standard";

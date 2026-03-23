@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase";
 import { generateReportHtml } from "@/lib/pdf";
 import { generatePdfFromHtml } from "@/lib/pdf-generator";
 import { rateLimit } from "@/lib/ratelimit";
+import { hasAgentAccess } from "@/lib/subscription";
 
 export const maxDuration = 60; // seconds — attorney PDF generation needs more time
 
@@ -101,6 +102,23 @@ export async function GET(
     try { parsedSummary = JSON.parse(report.ai_summary); } catch { /* ignore */ }
   }
 
+  // Fetch agent branding if applicable
+  let agentName: string | undefined;
+  let brokerage: string | undefined;
+
+  if (lookup.user_id) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("agent_name, brokerage, subscription_status")
+      .eq("id", lookup.user_id)
+      .single();
+
+    if (profile && hasAgentAccess(profile.subscription_status)) {
+      agentName = profile.agent_name ?? undefined;
+      brokerage = profile.brokerage ?? undefined;
+    }
+  }
+
   // Generate HTML report
   const reportHtml = generateReportHtml({
     address: lookup.address_normalized,
@@ -110,6 +128,8 @@ export async function GET(
     reportType: lookup.report_type || "standard",
     matterReference: report.matter_reference ?? undefined,
     summary: parsedSummary,
+    agentName,
+    brokerage,
   });
 
   // Standard: return HTML with auto-print for browser print-to-PDF
