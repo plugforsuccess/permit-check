@@ -66,10 +66,12 @@ export default function ResultsPage() {
   const [watchEmail, setWatchEmail] = useState("");
   const [watchAdded, setWatchAdded] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
+  const [watchError, setWatchError] = useState<string | null>(null);
 
   const handleAddWatch = async () => {
     if (!watchEmail || watchAdded) return;
     setWatchLoading(true);
+    setWatchError(null);
 
     try {
       const res = await fetch("/api/watchlist/add", {
@@ -82,9 +84,16 @@ export default function ResultsPage() {
         }),
       });
 
-      if (res.ok) setWatchAdded(true);
+      if (res.ok) {
+        setWatchAdded(true);
+      } else {
+        const data = await res.json().catch(() => null);
+        setWatchError(
+          data?.error ?? "Unable to start monitoring. Please try again."
+        );
+      }
     } catch {
-      // ignore
+      setWatchError("Unable to start monitoring. Please try again.");
     } finally {
       setWatchLoading(false);
     }
@@ -713,6 +722,9 @@ export default function ResultsPage() {
                     {watchLoading ? "Adding..." : "Monitor"}
                   </button>
                 </div>
+                {watchError && (
+                  <p className="mt-2 text-xs text-red-600">{watchError}</p>
+                )}
               </div>
             ) : (
               <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">

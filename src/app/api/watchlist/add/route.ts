@@ -2,15 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { normalizeAddress } from "@/lib/address";
 import { detectJurisdiction } from "@/lib/accela/index";
+import { rateLimit } from "@/lib/ratelimit";
 import { z } from "zod";
+
+const MAX_WATCHES_PER_EMAIL = 5;
 
 const schema = z.object({
   address: z.string().min(5).max(200),
   email: z.string().email(),
-  lookup_id: z.string().uuid().optional(),
+  lookup_id: z.string().uuid(),
 });
 
 export async function POST(request: NextRequest) {
+  // Rate limit by IP
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+  const allowed = await rateLimit(`watchlist:${ip}`);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   const raw = await request.json();
   const parsed = schema.safeParse(raw);
 
@@ -21,20 +36,18 @@ export async function POST(request: NextRequest) {
   const { address, email, lookup_id } = parsed.data;
   const supabase = createServerClient();
 
-  // Verify email is from a paid lookup if lookup_id provided
-  if (lookup_id) {
-    const { data: lookup } = await supabase
-      .from("lookups")
-      .select("payment_status, address_normalized, permit_count")
-      .eq("id", lookup_id)
-      .single();
+  // Verify lookup exists and is paid
+  const { data: lookup } = await supabase
+    .from("lookups")
+    .select("payment_status, permit_count")
+    .eq("id", lookup_id)
+    .single();
 
-    if (!lookup || lookup.payment_status !== "paid") {
-      return NextResponse.json(
-        { error: "Watchlist requires a paid report" },
-        { status: 402 }
-      );
-    }
+  if (!lookup || lookup.payment_status !== "paid") {
+    return NextResponse.json(
+      { error: "Watchlist requires a paid report" },
+      { status: 402 }
+    );
   }
 
   const addressNormalized = normalizeAddress(address);
@@ -56,23 +69,30 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Enforce per-email cap on active watches
+  const { count } = await supabase
+    .from("watchlist")
+    .select("id", { count: "exact", head: true })
+    .eq("email", email)
+    .eq("active", true);
+
+  if (count !== null && count >= MAX_WATCHES_PER_EMAIL) {
+    return NextResponse.json(
+      {
+        error: `You can monitor up to ${MAX_WATCHES_PER_EMAIL} addresses at a time. Remove an existing watch to add a new one.`,
+      },
+      { status: 409 }
+    );
+  }
+
   // Free tier: 30-day expiry
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
-  // Get current permit count for baseline
-  let currentPermitCount = 0;
-  if (lookup_id) {
-    const { data: lookup } = await supabase
-      .from("lookups")
-      .select("permit_count")
-      .eq("id", lookup_id)
-      .single();
-    currentPermitCount = lookup?.permit_count ?? 0;
-  }
+  const currentPermitCount = lookup.permit_count ?? 0;
 
   const { error } = await supabase.from("watchlist").insert({
-    lookup_id: lookup_id ?? null,
+    lookup_id,
     address_normalized: addressNormalized,
     jurisdiction_id: jurisdictionId,
     email,

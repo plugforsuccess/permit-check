@@ -27,9 +27,9 @@ const TEST_CASES = [
 ];
 
 export async function GET(request: Request) {
-  // Verify this is a legitimate Vercel cron call
+  // Verify this is a legitimate Vercel cron call — reject if secret is unset
   const authHeader = request.headers.get("authorization");
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
