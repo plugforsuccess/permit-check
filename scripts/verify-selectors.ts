@@ -9,8 +9,13 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { chromium } from "playwright-core";
-import type { AccelaModule } from "../src/lib/accela/jurisdictions";
+import { chromium, type Page } from "playwright-core";
+
+interface AccelaModule {
+  name: string;
+  moduleKey: string;
+  searchUrl: string;
+}
 
 const STANDARD_MODULES = [
   "Building",
@@ -66,11 +71,61 @@ interface VerifiedConfig {
   nextPageSelector: string | null;
   nextPageText: string | null;
   columnMap: ColumnMap;
-  confirmedModules: AccelaModule[];
+  modules: AccelaModule[];
   testResultCount: number;
   screenshotPath: string;
   status: "success" | "partial" | "failed";
   notes: string[];
+}
+
+async function detectModules(
+  page: Page,
+  baseUrl: string
+): Promise<AccelaModule[]> {
+  const confirmed: AccelaModule[] = [];
+
+  for (const moduleName of STANDARD_MODULES) {
+    const moduleUrl = `${baseUrl}/Cap/CapHome.aspx?module=${moduleName}&customglobalsearch=true`;
+
+    try {
+      await page.goto(moduleUrl, {
+        waitUntil: "networkidle",
+        timeout: 10000,
+      });
+
+      // Check if the street number field exists — confirms module is active
+      const fieldExists = await page.$(
+        "#ctl00_PlaceHolderMain_generalSearchForm_txtGSNumber_ChildControl0"
+      ).catch(() => null);
+
+      if (fieldExists) {
+        confirmed.push({
+          name: moduleName,
+          moduleKey: moduleName,
+          searchUrl: moduleUrl,
+        });
+        console.log(`    ✓ ${moduleName}`);
+      } else {
+        console.log(`    ✗ ${moduleName} — form not found`);
+      }
+    } catch {
+      console.log(`    ✗ ${moduleName} — failed to load`);
+    }
+
+    // Brief pause between module checks
+    await page.waitForTimeout(500);
+  }
+
+  // Always ensure Building is included — fall back even if detection fails
+  if (!confirmed.find((m) => m.name === "Building")) {
+    confirmed.unshift({
+      name: "Building",
+      moduleKey: "Building",
+      searchUrl: `${baseUrl}/Cap/CapHome.aspx?module=Building&customglobalsearch=true`,
+    });
+  }
+
+  return confirmed;
 }
 
 async function verifyJurisdiction(
@@ -101,37 +156,11 @@ async function verifyJurisdiction(
     console.log(`  Navigating to ${searchUrl}...`);
     await page.goto(searchUrl, { waitUntil: "networkidle", timeout: 20000 });
 
-    // Discover which modules are available on this portal
-    const confirmedModules: AccelaModule[] = [];
-    console.log(`  Discovering available modules...`);
-
-    for (const moduleName of STANDARD_MODULES) {
-      const moduleUrl = `${baseUrl}/Cap/CapHome.aspx?module=${moduleName}&customglobalsearch=true`;
-
-      try {
-        await page.goto(moduleUrl, { waitUntil: "networkidle", timeout: 10000 });
-
-        // Check if the search form loaded — if the street number field exists, module is valid
-        const fieldExists = await page.$(
-          "#ctl00_PlaceHolderMain_generalSearchForm_txtGSNumber_ChildControl0"
-        ).catch(() => null);
-
-        if (fieldExists) {
-          confirmedModules.push({
-            name: moduleName,
-            moduleKey: moduleName,
-            searchUrl: moduleUrl,
-          });
-          console.log(`  ✓ Module confirmed: ${moduleName}`);
-        } else {
-          console.log(`  ✗ Module not available: ${moduleName}`);
-        }
-      } catch {
-        console.log(`  ✗ Module failed to load: ${moduleName}`);
-      }
-    }
-
-    notes.push(`Confirmed modules: ${confirmedModules.map((m) => m.name).join(", ") || "none"}`);
+    // Detect which modules are available on this portal
+    console.log(`  Detecting modules...`);
+    const confirmedModules = await detectModules(page, baseUrl);
+    console.log(`  Modules found: ${confirmedModules.map((m) => m.name).join(", ")}`);
+    notes.push(`Modules: ${confirmedModules.map((m) => m.name).join(", ")}`);
 
     // Navigate back to Building module for the rest of verification
     await page.goto(searchUrl, { waitUntil: "networkidle", timeout: 20000 });
@@ -329,7 +358,7 @@ async function verifyJurisdiction(
       nextPageSelector: nextPageInfo?.selector ?? null,
       nextPageText: nextPageInfo?.text ?? null,
       columnMap,
-      confirmedModules,
+      modules: confirmedModules,
       testResultCount: resultCount,
       screenshotPath,
       status: columnMap.recordNumber >= 0 ? "success" : "partial",
@@ -371,12 +400,16 @@ async function verifyJurisdiction(
 }
 
 function generateJurisdictionConfig(config: VerifiedConfig): string {
-  const modulesStr = config.confirmedModules
+  const modulesStr = config.modules
     .map(
       (m) =>
-        `      { name: "${m.name}", moduleKey: "${m.moduleKey}", searchUrl: "${m.searchUrl}" },`
+        `    {
+      name: "${m.name}",
+      moduleKey: "${m.name}",
+      searchUrl: "${m.searchUrl}",
+    }`
     )
-    .join("\n");
+    .join(",\n  ");
 
   return `  ${config.agencyCode}: {
     id: "${config.agencyCode}",
@@ -385,7 +418,7 @@ function generateJurisdictionConfig(config: VerifiedConfig): string {
     portalUrl: "${config.portalUrl}",
     searchUrl: "${config.searchUrl}",
     modules: [
-${modulesStr}
+  ${modulesStr}
     ],
     hasQuadrant: ${config.hasQuadrant},
     hasDateRange: ${config.hasDateRange},
