@@ -17,6 +17,7 @@ interface LookupResult {
   report_type: "standard" | "attorney";
   is_unit?: boolean;
   development_level_permits?: boolean;
+  permits_truncated?: boolean;
   permits: Permit[] | null;
   report: {
     id: string;
@@ -412,6 +413,38 @@ export default function ResultsPage() {
                       No permits were found at the specific unit address. The permits
                       below were found at the base building address and represent
                       development or building-level work — not unit-specific permits.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Truncation warning */}
+            {isPaid && result.permits_truncated && (
+              <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="w-5 h-5 text-orange-600 shrink-0 mt-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-semibold text-orange-900 mb-1">
+                      Permit records may be incomplete
+                    </div>
+                    <p className="text-xs text-orange-800 leading-relaxed">
+                      This property has a large number of permit records and the search
+                      results were truncated. The permits shown below may not represent the
+                      complete history. We recommend requesting full permit records directly
+                      from the local jurisdiction for a comprehensive review.
                     </p>
                   </div>
                 </div>

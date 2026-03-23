@@ -107,6 +107,13 @@ export function detectJurisdiction(normalizedAddress: string): string {
     if (atlantaZips.includes(zip)) return "ATLANTA_GA";
   }
 
+  // Zip codes shared between Atlanta and unincorporated areas
+  // These may have permits in either jurisdiction
+  const borderZips = ["30305", "30319", "30324", "30329", "30338", "30340", "30341", "30342", "30345", "30350"];
+  if (zipMatch && borderZips.includes(zipMatch[1])) {
+    console.warn(`[jurisdictions] Zip ${zipMatch[1]} is near Atlanta/county border — defaulting to Atlanta but permits may be in county jurisdiction`);
+  }
+
   // Default to Atlanta if no zip or unrecognized
   return "ATLANTA_GA";
 }

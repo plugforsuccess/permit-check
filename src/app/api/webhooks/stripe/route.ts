@@ -122,6 +122,7 @@ export async function POST(req: Request) {
           listingDescription,
           lookup.is_unit ?? false,
           lookup.development_level_permits ?? false,
+          lookup.permits_truncated ?? false,
         );
         aiSummary = JSON.stringify(summary);
         riskLevel = summary.riskLevel;
