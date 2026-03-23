@@ -92,7 +92,7 @@ export async function sendWatchlistAlert(
   await getResend().emails.send({
     from: process.env.EMAIL_FROM || "alerts@updates.permitcheck.org",
     to,
-    subject: `New permit activity at ${escapeHtml(address)}`,
+    subject: `New permit activity at ${address}`,
     html,
   });
 }

@@ -18,21 +18,39 @@ export async function GET(request: Request) {
   const supabase = createServerClient();
   const now = new Date();
 
-  // Fetch active, non-expired watches not checked in 24h
+  // Step 1: Deactivate all expired watches first, so they stop counting
+  // against per-email caps and don't get processed.
+  const { data: expiredRows } = await supabase
+    .from("watchlist")
+    .update({ active: false })
+    .eq("active", true)
+    .not("expires_at", "is", "null")
+    .lt("expires_at", now.toISOString())
+    .select("id");
+
+  const deactivated = expiredRows?.length ?? 0;
+
+  if (deactivated > 0) {
+    log.info("Watchlist cron: deactivated expired watches", {
+      count: deactivated,
+    });
+  }
+
+  // Step 2: Fetch active watches not checked in 24h, oldest-first for fairness
   const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   const { data: watches } = await supabase
     .from("watchlist")
     .select("*")
     .eq("active", true)
-    .or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`)
     .or(
       `last_checked_at.is.null,last_checked_at.lt.${cutoff.toISOString()}`
     )
+    .order("last_checked_at", { ascending: true, nullsFirst: true })
     .limit(50); // Process max 50 watches per cron run
 
   if (!watches || watches.length === 0) {
-    return NextResponse.json({ checked: 0, alerts: 0 });
+    return NextResponse.json({ checked: 0, alerts: 0, deactivated: deactivated ?? 0 });
   }
 
   log.info("Watchlist cron: checking addresses", { count: watches.length });
@@ -65,12 +83,21 @@ export async function GET(request: Request) {
 
       // Send alert if new permits found
       if (currentCount > previousCount) {
-        const newPermits = result.permits.slice(0, currentCount - previousCount);
+        // Identify new permits by filedDate (most recent first), falling
+        // back to taking from the end of the array if dates aren't available.
+        const diff = currentCount - previousCount;
+        const sorted = [...result.permits].sort((a, b) => {
+          if (!a.filedDate && !b.filedDate) return 0;
+          if (!a.filedDate) return 1;
+          if (!b.filedDate) return -1;
+          return b.filedDate.localeCompare(a.filedDate);
+        });
+        const newPermits = sorted.slice(0, diff);
 
         await sendWatchlistAlert({
           to: watch.email,
           address: watch.address_normalized,
-          newPermitCount: currentCount - previousCount,
+          newPermitCount: diff,
           newPermits,
           reportUrl: watch.lookup_id
             ? `${process.env.NEXT_PUBLIC_APP_URL}/results/${watch.lookup_id}`
@@ -80,16 +107,8 @@ export async function GET(request: Request) {
         alertsSent++;
         log.info("Watchlist: alert sent", {
           address: watch.address_normalized,
-          newCount: currentCount - previousCount,
+          newCount: diff,
         });
-      }
-
-      // Deactivate expired watches
-      if (watch.expires_at && new Date(watch.expires_at) < now) {
-        await supabase
-          .from("watchlist")
-          .update({ active: false })
-          .eq("id", watch.id);
       }
 
       // Pause between scrapes
@@ -105,5 +124,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     checked: watches.length,
     alerts: alertsSent,
+    deactivated: deactivated ?? 0,
   });
 }

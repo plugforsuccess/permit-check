@@ -26,7 +26,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const raw = await request.json();
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
   const parsed = schema.safeParse(raw);
 
   if (!parsed.success) {
@@ -52,6 +58,7 @@ export async function POST(request: NextRequest) {
 
   const addressNormalized = normalizeAddress(address);
   const jurisdictionId = detectJurisdiction(address);
+  const now = new Date();
 
   // Check if already watching this address+email
   const { data: existing } = await supabase
@@ -69,12 +76,13 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Enforce per-email cap on active watches
+  // Enforce per-email cap on active, non-expired watches only
   const { count } = await supabase
     .from("watchlist")
     .select("id", { count: "exact", head: true })
     .eq("email", email)
-    .eq("active", true);
+    .eq("active", true)
+    .or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`);
 
   if (count !== null && count >= MAX_WATCHES_PER_EMAIL) {
     return NextResponse.json(
@@ -91,21 +99,56 @@ export async function POST(request: NextRequest) {
 
   const currentPermitCount = lookup.permit_count ?? 0;
 
-  const { error } = await supabase.from("watchlist").insert({
-    lookup_id,
-    address_normalized: addressNormalized,
-    jurisdiction_id: jurisdictionId,
-    email,
-    active: true,
-    last_permit_count: currentPermitCount,
-    expires_at: expiresAt.toISOString(),
-  });
+  // Upsert to handle TOCTOU race: if a concurrent request inserted the same
+  // address+email between our check and this insert, we re-activate instead
+  // of creating a duplicate. Requires a unique index on
+  // (address_normalized, email) — see migration notes.
+  if (existing && !existing.active) {
+    // Re-activate an existing inactive watch
+    const { error } = await supabase
+      .from("watchlist")
+      .update({
+        lookup_id,
+        jurisdiction_id: jurisdictionId,
+        active: true,
+        last_permit_count: currentPermitCount,
+        expires_at: expiresAt.toISOString(),
+        last_checked_at: null,
+      })
+      .eq("id", existing.id);
 
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to add watchlist" },
-      { status: 500 }
-    );
+    if (error) {
+      return NextResponse.json(
+        { error: "Failed to add watchlist" },
+        { status: 500 }
+      );
+    }
+  } else {
+    // Insert new watch
+    const { error } = await supabase.from("watchlist").insert({
+      lookup_id,
+      address_normalized: addressNormalized,
+      jurisdiction_id: jurisdictionId,
+      email,
+      active: true,
+      last_permit_count: currentPermitCount,
+      expires_at: expiresAt.toISOString(),
+    });
+
+    if (error) {
+      // If duplicate key error from race, treat as success
+      if (error.code === "23505") {
+        return NextResponse.json({
+          success: true,
+          message: "Already monitoring this address",
+          already_active: true,
+        });
+      }
+      return NextResponse.json(
+        { error: "Failed to add watchlist" },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json({
