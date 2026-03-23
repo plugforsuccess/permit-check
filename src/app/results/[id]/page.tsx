@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
+import PermitTeaser from "@/components/PermitTeaser";
 import PropertyStreetView from "@/components/PropertyStreetView";
 import ReferralCTAs from "@/components/ReferralCTAs";
 import Disclaimer from "@/components/Disclaimer";
@@ -18,6 +19,9 @@ interface LookupResult {
   is_unit?: boolean;
   development_level_permits?: boolean;
   permits_truncated?: boolean;
+  status_breakdown?: Record<string, number>;
+  has_complaints?: boolean;
+  has_expired?: boolean;
   permits: Permit[] | null;
   report: {
     id: string;
@@ -613,7 +617,7 @@ export default function ResultsPage() {
             </div>
           </>
         ) : (
-          /* STATE 1: Unpaid — blurred teaser + payment CTA */
+          /* STATE 1: Unpaid — teaser with real status counts + payment CTA */
           <div>
             {/* Locked risk badge — shown in unpaid state to drive conversion */}
             <div className="mb-5 rounded-xl border-2 border-gray-200 bg-gray-50 p-4 flex items-center justify-between">
@@ -637,22 +641,13 @@ export default function ResultsPage() {
               </span>
             </div>
 
-            <PermitTable
-              permits={Array.from(
-                { length: Math.max(Math.min(permitCount, 5), 3) },
-                (_, i) => ({
-                  id: `placeholder-${i}`,
-                  lookup_id: lookupId,
-                  record_number: "BLD-XXXX-XXXXX",
-                  type: "Building Permit",
-                  status: "Issued" as const,
-                  filed_date: "XXXX-XX-XX",
-                  issued_date: "XXXX-XX-XX",
-                  description: "Permit details hidden until payment",
-                  contractor: "XXXXXXXXXX",
-                })
-              )}
-              isBlurred={true}
+            {/* Teaser — shows real counts without record details */}
+            <PermitTeaser
+              permitCount={permitCount}
+              statusBreakdown={result.status_breakdown ?? {}}
+              hasComplaints={result.has_complaints ?? false}
+              hasExpired={result.has_expired ?? false}
+              isUnit={result.is_unit ?? false}
             />
 
             {/* Matter Reference — attorney reports only */}

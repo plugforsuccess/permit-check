@@ -29,7 +29,35 @@ export async function GET(
 
   // Check payment status
   if (lookup.payment_status !== "paid") {
-    // Return teaser data (address and count only, no permit details)
+    // Fetch only status and type — no record numbers or details
+    const { data: teaserPermits } = await supabase
+      .from("permits")
+      .select("status, type")
+      .eq("lookup_id", lookupId);
+
+    // Build status breakdown
+    const permits = teaserPermits ?? [];
+    const statusBreakdown = permits.reduce<Record<string, number>>(
+      (acc: Record<string, number>, p: { status: string; type: string }) => {
+        acc[p.status] = (acc[p.status] ?? 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    // Check for high-signal permit types
+    const hasComplaints = permits.some(
+      (p: { status: string; type: string }) =>
+        p.type?.toLowerCase().includes("complaint") ||
+        p.type?.toLowerCase().includes("violation") ||
+        p.type?.toLowerCase().includes("code")
+    );
+
+    const hasExpired = permits.some(
+      (p: { status: string; type: string }) => p.status === "Expired"
+    );
+
+    // Return teaser data (status counts only, no record details)
     return NextResponse.json({
       lookup_id: lookup.id,
       address: lookup.address_raw || lookup.address_normalized,
@@ -40,6 +68,9 @@ export async function GET(
       is_unit: lookup.is_unit ?? false,
       development_level_permits: lookup.development_level_permits ?? false,
       permits_truncated: lookup.permits_truncated ?? false,
+      status_breakdown: statusBreakdown,
+      has_complaints: hasComplaints,
+      has_expired: hasExpired,
       permits: null, // Not revealed until paid
     });
   }
