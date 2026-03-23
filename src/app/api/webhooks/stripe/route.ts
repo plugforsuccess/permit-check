@@ -196,36 +196,52 @@ export async function POST(req: Request) {
       }
 
       if (reportType === "attorney") {
+        // Guard: abort PDF gen if it takes >20s to avoid Stripe webhook timeout (30s).
+        // On-demand generation in the download route serves as fallback.
+        const PDF_TIMEOUT_MS = 20_000;
         try {
-          const reportHtml = generateReportHtml({
-            address: lookup.address_normalized,
-            lookupDate: new Date(lookup.created_at).toISOString().split("T")[0],
-            lookupId,
-            permits,
-            reportType: "attorney",
-            matterReference: session.metadata?.matter_reference || undefined,
-            summary: parsedSummary,
-          });
+          const pdfResult = await Promise.race([
+            (async () => {
+              const reportHtml = generateReportHtml({
+                address: lookup.address_normalized,
+                lookupDate: new Date(lookup.created_at).toISOString().split("T")[0],
+                lookupId,
+                permits,
+                reportType: "attorney",
+                matterReference: session.metadata?.matter_reference || undefined,
+                summary: parsedSummary,
+              });
 
-          const pdfBuffer = await generatePdfFromHtml(reportHtml);
-          const fileName = `${lookupId}/report.pdf`;
+              const pdfBuffer = await generatePdfFromHtml(reportHtml);
+              const fileName = `${lookupId}/report.pdf`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("reports")
-            .upload(fileName, pdfBuffer, {
-              contentType: "application/pdf",
-              upsert: true,
-            });
+              const { error: uploadError } = await supabase.storage
+                .from("reports")
+                .upload(fileName, pdfBuffer, {
+                  contentType: "application/pdf",
+                  upsert: true,
+                });
 
-          if (uploadError) {
-            log.error("Webhook: PDF upload failed", {
-              lookupId,
-              error: uploadError.message,
-            });
-          } else {
-            pdfStoragePath = fileName;
-            log.info("Webhook: PDF pre-generated and stored", { lookupId, fileName });
-          }
+              if (uploadError) {
+                log.error("Webhook: PDF upload failed", {
+                  lookupId,
+                  error: uploadError.message,
+                });
+                return null;
+              }
+
+              log.info("Webhook: PDF pre-generated and stored", { lookupId, fileName });
+              return fileName;
+            })(),
+            new Promise<null>((resolve) => {
+              setTimeout(() => {
+                log.warn("Webhook: PDF generation timed out, will use on-demand", { lookupId });
+                resolve(null);
+              }, PDF_TIMEOUT_MS);
+            }),
+          ]);
+
+          pdfStoragePath = pdfResult;
         } catch (err) {
           log.error("Webhook: PDF generation failed", {
             lookupId,

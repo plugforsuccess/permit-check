@@ -65,17 +65,28 @@ export default function ResultsPage() {
   const [shareLoading, setShareLoading] = useState(false);
 
   const handleShare = async () => {
+    if (!result?.report?.download_url) return;
     setShareLoading(true);
     try {
+      // Extract download token from the report URL for authorization
+      const downloadUrl = new URL(result.report.download_url, window.location.origin);
+      const downloadToken = downloadUrl.searchParams.get("token");
+
       const res = await fetch(`/api/report/${lookupId}/share`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: downloadToken }),
       });
       const data = await res.json();
       if (data.share_url) {
         setShareUrl(data.share_url);
-        await navigator.clipboard.writeText(data.share_url);
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 3000);
+        try {
+          await navigator.clipboard.writeText(data.share_url);
+          setShareCopied(true);
+          setTimeout(() => setShareCopied(false), 3000);
+        } catch {
+          // Clipboard API unavailable (HTTP or denied) — URL shown via state
+        }
       }
     } catch {
       // ignore
@@ -360,6 +371,14 @@ export default function ResultsPage() {
                   </svg>
                   {shareCopied ? "Link copied!" : shareLoading ? "Generating..." : "Share Report"}
                 </button>
+                {shareUrl && !shareCopied && (
+                  <input
+                    readOnly
+                    value={shareUrl}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="w-full sm:w-auto px-3 py-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg font-mono"
+                  />
+                )}
               </div>
             ) : (
               <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">

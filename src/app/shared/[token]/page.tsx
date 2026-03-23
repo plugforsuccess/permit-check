@@ -1,6 +1,10 @@
 import { createServerClient } from "@/lib/supabase";
 import PermitTable from "@/components/PermitTable";
+import Disclaimer from "@/components/Disclaimer";
 import { notFound } from "next/navigation";
+
+// Share tokens are 48 hex chars (24 random bytes)
+const SHARE_TOKEN_REGEX = /^[a-f0-9]{48}$/;
 
 export default async function SharedReportPage({
   params,
@@ -8,6 +12,12 @@ export default async function SharedReportPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
+
+  // Validate token format before hitting the database
+  if (!SHARE_TOKEN_REGEX.test(token)) {
+    return notFound();
+  }
+
   const supabase = createServerClient();
 
   // Look up report by share token
@@ -102,10 +112,17 @@ export default async function SharedReportPage({
             {summary.summary && (
               <p className="text-sm text-gray-700 mt-2">{summary.summary}</p>
             )}
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <p className="text-xs text-gray-400">
+                AI analysis based on official permit records. Not a substitute for professional inspection or legal advice.
+              </p>
+            </div>
           </div>
         )}
 
         <PermitTable permits={permits as never[]} />
+
+        <Disclaimer />
 
         {/* CTA to search own address */}
         <div className="mt-8 pt-8 border-t border-gray-100 text-center">
