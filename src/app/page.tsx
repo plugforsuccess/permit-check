@@ -201,9 +201,13 @@ function HomePageContent() {
 
       {/* Pricing */}
       <section id="pricing" className="py-16">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-10">Pricing</h2>
-          <div className="grid sm:grid-cols-2 gap-6">
+        <div className="max-w-5xl mx-auto px-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Pricing</h2>
+          <p className="text-gray-500 mb-10 text-sm">
+            Pay once per report, or subscribe for unlimited searches.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-6">
+
             {/* Standard */}
             <div className="border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
               <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
@@ -211,9 +215,10 @@ function HomePageContent() {
               <ul className="space-y-3 text-sm text-gray-700">
                 <li>✓ Full permit history for one address</li>
                 <li>✓ All permit types — building, electrical, plumbing, HVAC</li>
-                <li>✓ Filed date, issued date, status, contractor</li>
+                <li>✓ Filed date, issued date, and status for every permit</li>
+                <li>✓ AI due diligence analysis</li>
                 <li>✓ Downloadable PDF report</li>
-                <li>✓ Data sourced directly from official government permit databases</li>
+                <li>✓ Official government data</li>
               </ul>
             </div>
 
@@ -228,10 +233,33 @@ function HomePageContent() {
                 <li>✓ Everything in Standard</li>
                 <li>✓ Formal cover page with chain of custody</li>
                 <li>✓ Report ID for evidentiary use</li>
-                <li>✓ Suitable for real estate litigation and due diligence</li>
-                <li>✓ Matter reference field available</li>
+                <li>✓ Suitable for real estate litigation</li>
+                <li>✓ Matter reference field</li>
               </ul>
             </div>
+
+            {/* Agent Plan */}
+            <div className="border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
+              <div className="absolute -top-3 left-6 px-3 py-1 bg-[#c9a84c] text-[#0f1f3d] text-xs font-semibold rounded-full">
+                For agents
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">$99</div>
+              <div className="text-sm text-gray-500 mb-6">per month · unlimited</div>
+              <ul className="space-y-3 text-sm text-gray-700 mb-8">
+                <li>✓ Unlimited property searches</li>
+                <li>✓ Your name on every report</li>
+                <li>✓ Full lookup history + re-downloads</li>
+                <li>✓ AI analysis on every search</li>
+                <li>✓ Cancel anytime</li>
+              </ul>
+              <a
+                href="/subscribe"
+                className="block w-full text-center px-5 py-3 bg-[#c9a84c] text-[#0f1f3d] rounded-xl font-bold text-sm hover:bg-[#b8973d] transition-colors"
+              >
+                Subscribe as Agent
+              </a>
+            </div>
+
           </div>
         </div>
       </section>

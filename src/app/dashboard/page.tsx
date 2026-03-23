@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import Disclaimer from "@/components/Disclaimer";
+import {
+  hasAgentAccess,
+  getSubscriptionMessage,
+  getSubscriptionCTA,
+} from "@/lib/subscription";
 
 interface LookupHistory {
   id: string;
@@ -27,6 +32,13 @@ export default function DashboardPage() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [userProfile, setUserProfile] = useState<{
+    agent_name: string | null;
+    brokerage: string | null;
+    subscription_status: string | null;
+    stripe_customer_id: string | null;
+  } | null>(null);
+  const [session, setSession] = useState<{ user: { id: string; email?: string }; access_token: string } | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +62,9 @@ export default function DashboardPage() {
       }
 
       setIsAuthenticated(true);
+      setSession(data.session);
       fetchHistory(data.session.access_token);
+      fetchProfile(data.session.user.id);
     } catch {
       setAuthError("Authentication failed. Please try again.");
     }
@@ -75,12 +89,40 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchProfile = async (userId: string) => {
+    const supabase = getSupabaseClient();
+    const { data: profile } = await supabase
+      .from("users")
+      .select("agent_name, brokerage, subscription_status, stripe_customer_id")
+      .eq("id", userId)
+      .single();
+
+    if (profile) setUserProfile(profile);
+  };
+
+  const handleManageSubscription = async () => {
+    const supabase = getSupabaseClient();
+    const {
+      data: { session: currentSession },
+    } = await supabase.auth.getSession();
+    if (!currentSession) return;
+
+    const res = await fetch("/api/subscription/portal", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${currentSession.access_token}` },
+    });
+    const data = await res.json();
+    if (data.portal_url) window.location.href = data.portal_url;
+  };
+
   useEffect(() => {
     const supabase = getSupabaseClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s) {
         setIsAuthenticated(true);
-        fetchHistory(session.access_token);
+        setSession(s);
+        fetchHistory(s.access_token);
+        fetchProfile(s.user.id);
       } else {
         setLoading(false);
       }
@@ -195,12 +237,79 @@ export default function DashboardPage() {
               await supabase.auth.signOut();
               setIsAuthenticated(false);
               setLookups([]);
+              setUserProfile(null);
+              setSession(null);
             }}
             className="text-sm text-gray-500 hover:text-gray-700"
           >
             Sign Out
           </button>
         </div>
+
+        {typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("subscription") === "success" && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+            <svg className="w-5 h-5 text-green-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <p className="text-green-800 font-medium text-sm">
+              Agent Plan activated — unlimited searches are now available.
+            </p>
+          </div>
+        )}
+
+        {userProfile && (
+          <div className="mb-8 p-5 bg-white border border-gray-200 rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {userProfile.agent_name ?? session?.user?.email}
+                </div>
+                {userProfile.brokerage && (
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {userProfile.brokerage}
+                  </div>
+                )}
+              </div>
+              <span
+                className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                  hasAgentAccess(userProfile.subscription_status)
+                    ? "bg-[#c9a84c]/10 text-[#c9a84c]"
+                    : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {hasAgentAccess(userProfile.subscription_status)
+                  ? "Agent Plan — Active"
+                  : userProfile.subscription_status === "canceled"
+                  ? "Subscription Canceled"
+                  : userProfile.subscription_status === "past_due"
+                  ? "Payment Failed"
+                  : "No Active Subscription"}
+              </span>
+            </div>
+
+            {hasAgentAccess(userProfile.subscription_status) ? (
+              <button
+                onClick={handleManageSubscription}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Manage billing →
+              </button>
+            ) : (
+              <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <p className="text-sm text-gray-700 font-medium mb-3">
+                  {getSubscriptionMessage(userProfile.subscription_status)}
+                </p>
+                <a
+                  href="/subscribe"
+                  className="inline-block text-sm font-semibold text-white bg-[#0f1f3d] px-4 py-2 rounded-lg hover:bg-[#1a3560] transition-colors"
+                >
+                  {getSubscriptionCTA(userProfile.subscription_status)}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-4" role="status" aria-label="Loading history">

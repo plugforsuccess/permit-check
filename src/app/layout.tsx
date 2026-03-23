@@ -83,7 +83,7 @@ export default function RootLayout({
               <a href="/" className="flex items-center">
                 <Logo size="md" variant="light" />
               </a>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-4">
                 <a
                   href="/#pricing"
                   className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-50"
@@ -91,10 +91,16 @@ export default function RootLayout({
                   Pricing
                 </a>
                 <a
-                  href="/dashboard"
-                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-50"
+                  href="/subscribe"
+                  className="hidden sm:block text-sm font-semibold text-[#c9a84c] hover:text-[#b8973d] transition-colors"
                 >
-                  Dashboard
+                  Agent Plan
+                </a>
+                <a
+                  href="/dashboard"
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Sign In
                 </a>
               </div>
             </div>
