@@ -322,31 +322,59 @@ Risk level guide:
 - medium: 1-2 expired permits with no complaints, or minor issues that need follow-up but are not deal-breakers
 - high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits, stalled permits 2+ years old`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const MAX_RETRIES = 2;
+  let response: Response | null = null;
+  let lastError: Error | null = null;
 
-  let response: Response;
-  try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        messages: [{ role: "user", content: prompt }],
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+    try {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }],
+        }),
+        signal: controller.signal,
+      });
+
+      if (response.ok) break; // success — exit retry loop
+
+      // Retryable status codes: 429 (rate limit), 529 (overloaded), 503
+      const retryable = [429, 503, 529].includes(response.status);
+      if (!retryable || attempt === MAX_RETRIES) {
+        throw new Error(`Claude API error: ${response.status}`);
+      }
+
+      // Respect Retry-After header if present
+      const retryAfter = response.headers.get("retry-after");
+      const waitMs = retryAfter
+        ? parseInt(retryAfter) * 1000
+        : 3000 * attempt; // 3s, 6s
+
+      console.warn(
+        `[summary] Claude API ${response.status} on attempt ${attempt} — retrying in ${waitMs}ms`
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt === MAX_RETRIES) throw lastError;
+      await new Promise((r) => setTimeout(r, 3000 * attempt));
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(`Claude API error: ${response.status}`);
+  if (!response || !response.ok) {
+    throw lastError ?? new Error("Claude API failed after retries");
   }
 
   const data = await response.json();
