@@ -6,6 +6,8 @@ import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
 import { fetchPropertyData } from "@/lib/property-data";
 import { log } from "@/lib/logger";
+import { sendReportEmail } from "@/lib/email";
+import type { PermitSummary } from "@/lib/summary";
 import type Stripe from "stripe";
 
 /**
@@ -161,6 +163,40 @@ export async function POST(req: Request) {
 
       if (reportError) {
         log.error("Webhook: report insert failed", { lookupId, error: reportError.message });
+      }
+
+      // Send report email to the buyer
+      const customerEmail = session.customer_details?.email;
+      if (customerEmail && reportData) {
+        try {
+          let parsedSummary: PermitSummary | null = null;
+          if (reportData.ai_summary) {
+            try {
+              parsedSummary = JSON.parse(reportData.ai_summary) as PermitSummary;
+            } catch {
+              // ignore parse error
+            }
+          }
+
+          await sendReportEmail({
+            to: customerEmail,
+            address: lookup.address_normalized,
+            lookupId,
+            downloadUrl: `${process.env.NEXT_PUBLIC_APP_URL}${reportData.pdf_url}`,
+            permitCount: permits.length,
+            summary: parsedSummary,
+            reportType,
+            expiresAt: reportData.expires_at,
+          });
+
+          log.info("Webhook: report email sent", { lookupId, to: customerEmail });
+        } catch (err) {
+          log.error("Webhook: email send failed", {
+            lookupId,
+            error: String(err),
+          });
+          // Don't block — email failure should not affect payment confirmation
+        }
       }
     } else {
       log.warn("Webhook: skipped report insert", { lookupId, hasLookup: !!lookup, hasPermits: !!permits });
