@@ -112,11 +112,14 @@ export async function POST(req: Request) {
       let aiSummary: string | null = null;
       let riskLevel: string | null = null;
 
+      const listingDescription = session.metadata?.listing_description || null;
+
       try {
         const summary = await generatePermitSummary(
           permits,
           lookup.address_normalized,
-          propertyData
+          propertyData,
+          listingDescription
         );
         aiSummary = JSON.stringify(summary);
         riskLevel = summary.riskLevel;

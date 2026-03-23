@@ -14,12 +14,12 @@ export const scrapedPermitSchema = z.object({
 /** Validates AI-generated permit summary after JSON.parse. */
 export const permitSummarySchema = z.object({
   riskLevel: z.enum(["low", "medium", "high"]),
-  verdict: z.string().max(500),
+  verdict: z.string().max(300),
   summary: z.string().max(1000),
   flags: z.array(z.string().max(300)),
   positives: z.array(z.string().max(300)),
-  sellerQuestions: z.array(z.string().max(500)),
-  listingNotes: z.array(z.string().max(500)),
+  sellerQuestions: z.array(z.string().max(300)),
+  listingNotes: z.array(z.string().max(300)),
 });
 
 export const addressSchema = z.object({

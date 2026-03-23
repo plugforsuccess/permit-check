@@ -4,18 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PropertyStreetView from "@/components/PropertyStreetView";
-import ReferralCards from "@/components/ReferralCards";
+import ReferralCTAs from "@/components/ReferralCTAs";
 import Disclaimer from "@/components/Disclaimer";
 import type { Permit } from "@/types";
-
-interface ReferralCard {
-  id: string;
-  title: string;
-  description: string;
-  cta: string;
-  href: string;
-  icon: "inspector" | "attorney" | "lender" | "contractor";
-}
 
 interface LookupResult {
   lookup_id: string;
@@ -61,7 +52,7 @@ export default function ResultsPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [pollingForPayment, setPollingForPayment] = useState(false);
   const [matterReference, setMatterReference] = useState("");
-  const [referralCards, setReferralCards] = useState<ReferralCard[]>([]);
+  const [listingDescription, setListingDescription] = useState("");
 
   const fetchResults = useCallback(async () => {
     try {
@@ -129,19 +120,6 @@ export default function ResultsPage() {
     }
   }, [paymentSuccess, fetchResults]);
 
-  // Fetch referral cards when we have a risk level
-  useEffect(() => {
-    const riskLevel = result?.report?.summary?.riskLevel;
-    if (!riskLevel || result?.payment_status !== "paid") return;
-
-    fetch(`/api/referrals?risk=${riskLevel}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.cards)) setReferralCards(data.cards);
-      })
-      .catch(() => {});
-  }, [result?.report?.summary?.riskLevel, result?.payment_status]);
-
   const handleCheckout = async () => {
     setCheckoutLoading(true);
     try {
@@ -151,6 +129,7 @@ export default function ResultsPage() {
         body: JSON.stringify({
           lookup_id: lookupId,
           matter_reference: matterReference || undefined,
+          listing_description: listingDescription || undefined,
         }),
       });
 
@@ -384,6 +363,7 @@ export default function ResultsPage() {
                   ? "border-yellow-200 bg-yellow-50"
                   : "border-green-200 bg-green-50"
               }`}>
+                {/* Risk badge */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
                     result.report.summary.riskLevel === "high"
@@ -405,34 +385,49 @@ export default function ResultsPage() {
                       ? "Medium Risk"
                       : "Low Risk"}
                   </span>
-                  <span className="text-xs text-gray-500 font-medium">AI-Generated Analysis</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    AI Due Diligence Analysis
+                  </span>
                 </div>
 
-                {/* Verdict — bold one-liner */}
-                {result.report.summary.verdict && (
-                  <p className={`text-base font-bold mb-2 ${
-                    result.report.summary.riskLevel === "high"
-                      ? "text-red-900"
-                      : result.report.summary.riskLevel === "medium"
-                      ? "text-yellow-900"
-                      : "text-green-900"
-                  }`}>
-                    {result.report.summary.verdict}
+                {/* Verdict — bold, direct */}
+                <p className={`text-base font-bold leading-snug mb-2 ${
+                  result.report.summary.riskLevel === "high"
+                    ? "text-red-900"
+                    : result.report.summary.riskLevel === "medium"
+                    ? "text-yellow-900"
+                    : "text-green-900"
+                }`}>
+                  {result.report.summary.verdict}
+                </p>
+
+                {/* Summary */}
+                {result.report.summary.summary && (
+                  <p className="text-sm leading-relaxed text-gray-700 mb-4">
+                    {result.report.summary.summary}
                   </p>
                 )}
 
-                <p className={`text-sm leading-relaxed mb-4 ${
-                  result.report.summary.riskLevel === "high"
-                    ? "text-red-800"
-                    : result.report.summary.riskLevel === "medium"
-                    ? "text-yellow-800"
-                    : "text-green-800"
-                }`}>
-                  {result.report.summary.summary}
-                </p>
+                {/* Listing notes — only shown if listing description was provided */}
+                {result.report.summary.listingNotes.length > 0 && (
+                  <div className="mb-4 p-3 bg-white/60 rounded-lg border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                      Listing vs. Permit Records
+                    </div>
+                    <ul className="space-y-1">
+                      {result.report.summary.listingNotes.map((note, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                          <span className="text-amber-500 mt-0.5 shrink-0">&#x26A0;</span>
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
+                {/* Red flags */}
                 {result.report.summary.flags.length > 0 && (
-                  <div className="mb-3">
+                  <div className="mb-4">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
                       Red Flags
                     </div>
@@ -447,8 +442,9 @@ export default function ResultsPage() {
                   </div>
                 )}
 
+                {/* Positive signals */}
                 {result.report.summary.positives.length > 0 && (
-                  <div className="mb-3">
+                  <div className="mb-4">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
                       Positive Signals
                     </div>
@@ -463,32 +459,19 @@ export default function ResultsPage() {
                   </div>
                 )}
 
-                {result.report.summary.sellerQuestions && result.report.summary.sellerQuestions.length > 0 && (
-                  <div className="mb-3">
+                {/* What to ask the seller */}
+                {result.report.summary.sellerQuestions.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                      What to Ask the Seller
+                      What to ask the seller
                     </div>
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-2">
                       {result.report.summary.sellerQuestions.map((q, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-gray-800">
-                          <span className="text-blue-500 mt-0.5 shrink-0 font-bold">{i + 1}.</span>
-                          {q}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {result.report.summary.listingNotes && result.report.summary.listingNotes.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                      Listing Observations
-                    </div>
-                    <ul className="space-y-1">
-                      {result.report.summary.listingNotes.map((note, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                          <span className="text-gray-400 mt-0.5 shrink-0">&bull;</span>
-                          {note}
+                          <span className="text-[#0f1f3d] font-bold mt-0.5 shrink-0">
+                            {i + 1}.
+                          </span>
+                          {q}
                         </li>
                       ))}
                     </ul>
@@ -497,16 +480,19 @@ export default function ResultsPage() {
 
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <p className="text-xs text-gray-400">
-                    AI analysis based on official permit records and property data. Not a substitute for
-                    professional inspection or legal advice.
+                    AI analysis based on official permit records
+                    {result.report.summary.listingNotes.length > 0
+                      ? " and listing description provided"
+                      : ""}
+                    . Not a substitute for professional inspection or legal advice.
                   </p>
                 </div>
               </div>
             )}
 
             {/* Referral CTAs — shown only after payment, based on risk level */}
-            {referralCards.length > 0 && (
-              <ReferralCards cards={referralCards} />
+            {result.report?.summary?.riskLevel && (
+              <ReferralCTAs riskLevel={result.report.summary.riskLevel} />
             )}
 
             <PermitTable permits={result.permits} />
@@ -588,6 +574,31 @@ export default function ResultsPage() {
                 </p>
               </div>
             )}
+
+            {/* Optional listing description for enhanced AI analysis */}
+            <div className="mb-5 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+              <label className="block text-sm font-semibold text-gray-800 mb-1">
+                Enhance your AI analysis{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Paste the property listing description below. Our AI will cross-reference
+                the seller&apos;s renovation claims against the official permit records.
+              </p>
+              <textarea
+                value={listingDescription}
+                onChange={(e) => setListingDescription(e.target.value)}
+                placeholder="Paste the listing description here — e.g. 'Fully renovated 4BR home with new kitchen, bathrooms, and roof. Updated electrical and plumbing throughout...'"
+                rows={4}
+                maxLength={2000}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none text-gray-700 placeholder-gray-400"
+              />
+              {listingDescription.length > 0 && (
+                <p className="mt-1 text-xs text-blue-600 font-medium">
+                  Listing description will be included in your AI analysis
+                </p>
+              )}
+            </div>
 
             {/* Payment CTA — sticky on mobile for visibility */}
             <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:backdrop-blur-none mt-8">
