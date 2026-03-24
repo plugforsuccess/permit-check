@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PermitTeaser from "@/components/PermitTeaser";
@@ -61,7 +61,6 @@ export default function ResultsPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [pollingForPayment, setPollingForPayment] = useState(false);
   const [matterReference, setMatterReference] = useState("");
-  const [listingDescription, setListingDescription] = useState("");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
@@ -74,7 +73,6 @@ export default function ResultsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [clipboardError, setClipboardError] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
   const [listingText, setListingText] = useState("");
   const [listingAnalyzing, setListingAnalyzing] = useState(false);
   const [listingAnalyzed, setListingAnalyzed] = useState(false);
@@ -169,9 +167,7 @@ export default function ResultsPage() {
   const handlePasteFromClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) {
-        setListingDescription(text.slice(0, 2000));
-      }
+      if (text) setListingText(text.slice(0, 2000));
     } catch {
       setClipboardError(true);
       setTimeout(() => setClipboardError(false), 3000);
@@ -306,49 +302,6 @@ export default function ResultsPage() {
     }
   }, [paymentSuccess, fetchResults]);
 
-  // Auto-trigger report regeneration after a data refresh:
-  // paid + permits loaded + no report = post-refresh state
-  const regenerateTriggered = useRef(false);
-
-  useEffect(() => {
-    if (!result) return;
-    if (result.payment_status !== "paid") return;
-    if (!result.permits) return;
-    // Trigger regeneration if no report exists, or if a placeholder report
-    // was left behind (no summary and no risk_level = incomplete)
-    const reportComplete = result.report?.summary || result.report?.risk_level;
-    if (result.report && reportComplete) return;
-    if (regenerateTriggered.current) return;
-
-    regenerateTriggered.current = true;
-    setRegenerating(true);
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch(`/api/lookup/${lookupId}/regenerate`, {
-          method: "POST",
-        });
-        if (!res.ok) {
-          setRegenerating(false);
-          return;
-        }
-        // Regeneration complete on the server — refetch to get the new report
-        if (!cancelled) {
-          await fetchResults();
-          setRegenerating(false);
-        }
-      } catch {
-        if (!cancelled) setRegenerating(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [result, lookupId, fetchResults]);
-
   const handleCheckout = async () => {
     setCheckoutLoading(true);
     try {
@@ -358,7 +311,7 @@ export default function ResultsPage() {
         body: JSON.stringify({
           lookup_id: lookupId,
           matter_reference: matterReference || undefined,
-          listing_description: listingDescription || undefined,
+          listing_description: listingText || undefined,
         }),
       });
 
@@ -531,7 +484,7 @@ export default function ResultsPage() {
                 <button
                   onClick={() => {
                     if (listingAnalyzed || (result.report?.summary?.listingNotes?.length ?? 0) > 0) {
-                      window.open(result.report!.download_url, "_blank");
+                      window.open(result.report!.download_url, "_blank", "noopener,noreferrer");
                     } else {
                       setShowListingModal(true);
                     }
@@ -585,10 +538,10 @@ export default function ResultsPage() {
                   />
                 )}
               </div>
-            ) : (
-              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+            ) : listingAnalyzing ? (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
                 <svg
-                  className="animate-spin h-5 w-5 text-yellow-600 shrink-0"
+                  className="animate-spin h-5 w-5 text-blue-600 shrink-0"
                   viewBox="0 0 24 24"
                   fill="none"
                 >
@@ -606,21 +559,11 @@ export default function ResultsPage() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                   />
                 </svg>
-                <p className="text-yellow-800 text-sm">
-                  {regenerating
-                    ? "Regenerating AI analysis with updated permit data\u2026"
-                    : "Generating your report\u2026 This usually takes a few seconds."}
+                <p className="text-blue-800 text-sm">
+                  Analyzing listing against permit records…
                 </p>
-                {!regenerating && (
-                  <button
-                    onClick={() => fetchResults()}
-                    className="ml-auto text-sm px-4 py-1.5 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors shrink-0"
-                  >
-                    Refresh
-                  </button>
-                )}
               </div>
-            )}
+            ) : null}
 
             {/* Zero-permit contextual notice */}
             {isPaid && permitCount === 0 && (
@@ -943,6 +886,19 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
+                <div className="flex items-center justify-end mb-1">
+                  <button
+                    onClick={handlePasteFromClipboard}
+                    className="flex items-center gap-1.5 text-xs text-[#0f1f3d] font-medium hover:underline"
+                    type="button"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    {clipboardError ? "Clipboard access denied" : "Paste from clipboard"}
+                  </button>
+                </div>
+
                 <textarea
                   value={listingText}
                   onChange={(e) => setListingText(e.target.value)}
@@ -1088,7 +1044,7 @@ export default function ResultsPage() {
                     <button
                       onClick={() => {
                         setShowListingModal(false);
-                        window.open(result.report!.download_url, "_blank");
+                        window.open(result.report!.download_url, "_blank", "noopener,noreferrer");
                       }}
                       className="w-full px-4 py-3 bg-gray-50 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-100 transition-colors"
                     >
@@ -1176,14 +1132,14 @@ export default function ResultsPage() {
                 the seller&apos;s renovation claims against the official permit records.
               </p>
               <textarea
-                value={listingDescription}
-                onChange={(e) => setListingDescription(e.target.value)}
+                value={listingText}
+                onChange={(e) => setListingText(e.target.value)}
                 placeholder="Paste the listing description here — e.g. 'Fully renovated 4BR home with new kitchen, bathrooms, and roof. Updated electrical and plumbing throughout...'"
                 rows={4}
                 maxLength={2000}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none text-gray-700 placeholder-gray-400"
               />
-              {listingDescription.length > 0 && (
+              {listingText.length > 0 && (
                 <p className="mt-1 text-xs text-blue-600 font-medium">
                   Listing description will be included in your AI analysis
                 </p>
