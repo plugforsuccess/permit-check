@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { scrapeAccelaPermits } from "@/lib/accela/index";
 import { scrapedPermitSchema, UUID_RE } from "@/lib/schemas";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
 
 export const maxDuration = 300;
@@ -40,8 +40,7 @@ export async function POST(
   }
 
   // Verify caller is the same IP that initiated the lookup
-  const callerIp =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const callerIp = extractClientIp(request);
   if (lookup.initiator_ip && callerIp !== lookup.initiator_ip) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

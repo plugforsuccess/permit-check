@@ -11,7 +11,7 @@ const ORIGIN_EXEMPT_PREFIXES = ["/api/webhooks/", "/api/cron/"];
  * Prevents CSRF attacks by rejecting requests from unexpected origins.
  */
 export function originMiddleware(request: NextRequest): NextResponse | null {
-  if (request.method !== "POST" && request.method !== "PUT" && request.method !== "DELETE") {
+  if (request.method !== "POST" && request.method !== "PUT" && request.method !== "DELETE" && request.method !== "PATCH") {
     return null;
   }
 

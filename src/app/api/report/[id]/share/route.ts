@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { randomBytes } from "crypto";
+import { randomBytes, timingSafeEqual } from "crypto";
 import { config } from "@/lib/config";
 import { rateLimit } from "@/lib/ratelimit";
 import { UUID_RE } from "@/lib/schemas";
+
+/** Constant-time string comparison to prevent timing attacks on tokens. */
+function safeTokenEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 export async function POST(
   request: NextRequest,
@@ -59,7 +65,7 @@ async function handleShare(lookupId: string, token: string) {
     .eq("lookup_id", lookupId)
     .single();
 
-  if (!report || report.download_token !== token) {
+  if (!report || !safeTokenEqual(report.download_token, token)) {
     return NextResponse.json(
       { error: "Report not found or unauthorized" },
       { status: 404 }
