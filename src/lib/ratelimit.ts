@@ -30,6 +30,26 @@ export function extractClientIp(request: { headers: { get(name: string): string 
   return forwarded?.split(",")[0]?.trim() || "unknown";
 }
 
+// Separate rate limiter for status polling — more permissive (60 req/60s)
+let _statusRatelimit: Ratelimit | null = null;
+
+function getStatusRatelimit(): Ratelimit {
+  if (!_statusRatelimit) {
+    validateEnv();
+    _statusRatelimit = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(60, "60 s"),
+      analytics: true,
+    });
+  }
+  return _statusRatelimit;
+}
+
+export async function rateLimitStatus(identifier: string): Promise<boolean> {
+  const { success } = await getStatusRatelimit().limit(identifier);
+  return success;
+}
+
 export async function rateLimit(identifier: string): Promise<boolean> {
   const { success } = await getRatelimit().limit(identifier);
   if (!success) {
