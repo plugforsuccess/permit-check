@@ -7,35 +7,25 @@ import Logo from "@/components/Logo";
 interface Step {
   id: string;
   label: string;
-  sublabel: string;
   doneAfterMs: number;
 }
 
 const STEPS: Step[] = [
-  {
-    id: "verified",
-    label: "Address verified",
-    sublabel: "",
-    doneAfterMs: 500,
-  },
-  {
-    id: "connected",
-    label: "Connected to permit database",
-    sublabel: "",
-    doneAfterMs: 3000,
-  },
-  {
-    id: "searching",
-    label: "Searching permit records",
-    sublabel: "Scanning records since 2000...",
-    doneAfterMs: Infinity,
-  },
-  {
-    id: "preparing",
-    label: "Preparing your report",
-    sublabel: "Almost there",
-    doneAfterMs: Infinity,
-  },
+  { id: "verified",  label: "Address verified",            doneAfterMs: 500      },
+  { id: "connected", label: "Connected to permit database", doneAfterMs: 3000     },
+  { id: "searching", label: "Searching permit records",     doneAfterMs: Infinity },
+  { id: "preparing", label: "Preparing your report",        doneAfterMs: Infinity },
+];
+
+const SEARCH_MESSAGES = [
+  { headline: "Scanning building permits",     sub: "Checking all permit types since 1990"                          },
+  { headline: "Checking electrical records",   sub: "Wiring upgrades are among the most commonly unpermitted"       },
+  { headline: "Reviewing plumbing history",    sub: "Bathroom and kitchen remodels often require permits"           },
+  { headline: "Searching mechanical permits",  sub: "HVAC replacements require permits in most jurisdictions"       },
+  { headline: "Checking for code complaints",  sub: "Active complaints can affect closing and title"                },
+  { headline: "Reviewing permit statuses",     sub: "Expired permits may require re-inspection before closing"      },
+  { headline: "Cross-referencing all modules", sub: "We search 5 permit categories in the official database"        },
+  { headline: "Compiling permit history",      sub: "Assembling your complete record from 1990 to today"            },
 ];
 
 type StepStatus = "pending" | "active" | "done";
@@ -54,10 +44,13 @@ export default function SearchingPage() {
     searching: "pending",
     preparing: "pending",
   });
-
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [messageVisible, setMessageVisible] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const redirecting = useRef(false);
 
-  // Animate the timed steps
+  // Animate timed steps
   useEffect(() => {
     setStepStatuses((s) => ({ ...s, verified: "active" }));
     setTimeout(() => {
@@ -68,43 +61,61 @@ export default function SearchingPage() {
     }, 1800);
   }, []);
 
-  // Poll the status endpoint with exponential backoff
+  // Rotate search messages with fade
+  useEffect(() => {
+    if (stepStatuses.searching !== "active") return;
+    const interval = setInterval(() => {
+      setMessageVisible(false);
+      setTimeout(() => {
+        setMessageIndex((i) => (i + 1) % SEARCH_MESSAGES.length);
+        setMessageVisible(true);
+      }, 400);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [stepStatuses.searching]);
+
+  // Progress bar simulation
+  useEffect(() => {
+    if (stepStatuses.searching !== "active") return;
+    let p = 5;
+    setProgress(5);
+    const interval = setInterval(() => {
+      p = Math.min(p + (88 - p) * 0.03, 88);
+      setProgress(p);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [stepStatuses.searching]);
+
+  // Jump to 100% on complete
+  useEffect(() => {
+    if (stepStatuses.preparing === "active") setProgress(100);
+  }, [stepStatuses.preparing]);
+
+  // Elapsed time counter
+  useEffect(() => {
+    if (stepStatuses.searching !== "active") return;
+    const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(interval);
+  }, [stepStatuses.searching]);
+
+  // Poll status endpoint
   useEffect(() => {
     if (!lookupId) return;
-
     let timeoutId: NodeJS.Timeout | null = null;
     let attempt = 0;
 
     const poll = async () => {
       try {
         const res = await fetch(`/api/lookup/${lookupId}/status`);
-
-        if (res.status === 503) {
-          router.push(`/?error=scraper_unavailable`);
-          return;
-        }
-
-        if (!res.ok) {
-          scheduleNext();
-          return;
-        }
-
+        if (res.status === 503) { router.push(`/?error=scraper_unavailable`); return; }
+        if (!res.ok) { scheduleNext(); return; }
         const data = await res.json();
-
         if (data.status === "complete" && !redirecting.current) {
           redirecting.current = true;
-
-          setStepStatuses((s) => ({
-            ...s,
-            searching: "done",
-            preparing: "active",
-          }));
-
+          setStepStatuses((s) => ({ ...s, searching: "done", preparing: "active" }));
           setTimeout(() => {
             setStepStatuses((s) => ({ ...s, preparing: "done" }));
-            setTimeout(() => {
-              router.push(`/results/${lookupId}`);
-            }, 400);
+            setTimeout(() => { router.push(`/results/${lookupId}`); }, 400);
           }, 800);
           return;
         } else if (data.status === "error" && !redirecting.current) {
@@ -112,31 +123,31 @@ export default function SearchingPage() {
           router.push(`/results/${lookupId}?error=scrape_failed`);
           return;
         }
-      } catch {
-        // ignore poll errors
-      }
+      } catch { /* ignore */ }
       scheduleNext();
     };
 
     const scheduleNext = () => {
       attempt++;
-      // Backoff: 2s, 3s, 4s, 5s, then cap at 5s
       const delay = Math.min(2000 + attempt * 1000, 5000);
       timeoutId = setTimeout(poll, delay);
     };
 
     poll();
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
+    return () => { if (timeoutId) clearTimeout(timeoutId); };
   }, [lookupId, router]);
+
+  const currentMessage = SEARCH_MESSAGES[messageIndex % SEARCH_MESSAGES.length];
+  const isSearching = stepStatuses.searching === "active";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-16">
 
       {/* Back link */}
-      <a href="/" className="self-start mb-8 text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1.5">
+      <a
+        href="/"
+        className="self-start mb-8 text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1.5"
+      >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
@@ -145,11 +156,11 @@ export default function SearchingPage() {
 
       {/* Brand */}
       <Logo size="md" variant="light" className="mb-1" />
-      <div className="text-sm text-gray-400 mb-12">Property Permit Verification</div>
+      <div className="text-sm text-gray-400 mb-10">Property Permit Verification</div>
 
       {/* Address pill */}
       {address && (
-        <div className="bg-[#0f1f3d]/5 border border-[#0f1f3d]/20 rounded-xl px-4 py-3 mb-8 sm:mb-10 flex items-start gap-2 max-w-sm w-full">
+        <div className="bg-[#0f1f3d]/5 border border-[#0f1f3d]/20 rounded-xl px-4 py-3 mb-8 flex items-start gap-2 max-w-sm w-full">
           <svg className="w-4 h-4 text-[#0f1f3d] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -158,8 +169,16 @@ export default function SearchingPage() {
         </div>
       )}
 
+      {/* Progress bar */}
+      <div className="w-full max-w-sm h-1 bg-gray-100 rounded-full overflow-hidden mb-8">
+        <div
+          className="h-full bg-[#c9a84c] rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
       {/* Steps */}
-      <div className="flex flex-col gap-4 w-full max-w-sm mb-12" aria-live="polite" role="status">
+      <div className="flex flex-col gap-4 w-full max-w-sm mb-6" aria-live="polite" role="status">
         {STEPS.map((step, i) => {
           const status = stepStatuses[step.id];
           const sublabel =
@@ -167,12 +186,16 @@ export default function SearchingPage() {
               ? `${jurisdiction}${address.match(/\d{5}/) ? ` · ${address.match(/\d{5}/)?.[0]}` : ""}`
               : step.id === "connected"
               ? `${jurisdiction} permit system`
-              : step.sublabel;
+              : step.id === "searching" && status === "active"
+              ? currentMessage.headline
+              : step.id === "searching"
+              ? "Scanning records since 1990"
+              : "";
 
           return (
             <div
               key={step.id}
-              className={`flex items-center gap-3.5 transition-opacity duration-500 ${
+              className={`flex items-center gap-3.5 transition-all duration-500 ${
                 status === "pending" ? "opacity-30" : "opacity-100"
               }`}
             >
@@ -208,9 +231,7 @@ export default function SearchingPage() {
               <div>
                 <div className="text-sm font-medium text-gray-900">{step.label}</div>
                 {sublabel && (
-                  <div className={`text-xs text-gray-500 ${status === "active" && step.id === "searching" ? "animate-pulse" : ""}`}>
-                    {sublabel}
-                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{sublabel}</div>
                 )}
               </div>
             </div>
@@ -218,11 +239,44 @@ export default function SearchingPage() {
         })}
       </div>
 
+      {/* Rotating message card — only during searching */}
+      {isSearching && (
+        <div
+          className="w-full max-w-sm bg-[#0f1f3d]/3 border border-[#0f1f3d]/10 rounded-xl px-4 py-3 mb-4 transition-all duration-400"
+          style={{
+            opacity: messageVisible ? 1 : 0,
+            transform: messageVisible ? "translateY(0)" : "translateY(4px)",
+            transition: "opacity 0.4s ease, transform 0.4s ease",
+          }}
+        >
+          <div className="flex items-start gap-2.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#c9a84c] shrink-0 mt-1.5 animate-pulse" />
+            <div>
+              <div className="text-xs font-semibold text-[#0f1f3d]">
+                {currentMessage.headline}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {currentMessage.sub}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Elapsed time */}
+      {isSearching && elapsed > 5 && (
+        <p className="text-xs text-gray-400 mb-6">
+          {elapsed}s elapsed · typically 15–45 seconds
+        </p>
+      )}
+
       {/* Footer note */}
-      <p className="text-xs text-gray-400 text-center max-w-xs sm:max-w-sm leading-relaxed">
-        This usually takes 15–20 seconds. We&apos;re searching the official
-        government permit database on your behalf.
-      </p>
+      {!isSearching && (
+        <p className="text-xs text-gray-400 text-center max-w-xs leading-relaxed mt-2">
+          This usually takes 15–20 seconds. We&apos;re searching the official
+          government permit database on your behalf.
+        </p>
+      )}
 
     </div>
   );
