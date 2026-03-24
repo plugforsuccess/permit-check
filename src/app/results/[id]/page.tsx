@@ -278,8 +278,11 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!result) return;
     if (result.payment_status !== "paid") return;
-    if (result.report) return;
     if (!result.permits) return;
+    // Trigger regeneration if no report exists, or if a placeholder report
+    // was left behind (no summary and no risk_level = incomplete)
+    const reportComplete = result.report?.summary || result.report?.risk_level;
+    if (result.report && reportComplete) return;
     if (regenerateTriggered.current) return;
 
     regenerateTriggered.current = true;
@@ -488,7 +491,7 @@ export default function ResultsPage() {
         {isPaid && result.permits ? (
           <>
             {/* Download button */}
-            {result.report ? (
+            {result.report && (result.report.summary || result.report.risk_level) ? (
               <div className="mb-6 flex flex-wrap items-center gap-4">
                 <a
                   href={result.report.download_url}

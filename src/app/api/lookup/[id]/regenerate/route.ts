@@ -67,55 +67,25 @@ export async function POST(
     );
   }
 
-  // Check if a report already exists (avoid duplicate regeneration)
+  // Check if a fully-generated report already exists (has ai_summary).
+  // Placeholders from a prior crashed attempt (ai_summary = null) are
+  // treated as non-existent and will be overwritten.
   const { data: existingReport } = await supabase
     .from("reports")
-    .select("id")
+    .select("id, ai_summary")
     .eq("lookup_id", lookupId)
     .single();
 
-  if (existingReport) {
+  if (existingReport?.ai_summary) {
     return NextResponse.json({ status: "already_exists" });
   }
 
-  // Claim this regeneration by inserting a placeholder report.
-  // The upsert with ignoreDuplicates ensures only one request wins the race.
-  const placeholderToken = randomBytes(32).toString("hex");
-  const { error: claimError } = await supabase
-    .from("reports")
-    .upsert(
-      {
-        lookup_id: lookupId,
-        download_token: placeholderToken,
-        pdf_url: "",
-        expires_at: new Date(0).toISOString(),
-        ai_summary: null,
-        risk_level: null,
-      },
-      { onConflict: "lookup_id", ignoreDuplicates: true }
-    );
-
-  if (claimError) {
-    log.error("Regenerate: claim insert failed", {
-      lookupId,
-      error: claimError.message,
-    });
-    return NextResponse.json(
-      { error: "Failed to start regeneration" },
-      { status: 500 }
-    );
-  }
-
-  // Verify we won the claim (another request may have inserted first)
-  const { data: claimedReport } = await supabase
-    .from("reports")
-    .select("download_token")
-    .eq("lookup_id", lookupId)
-    .single();
-
-  if (claimedReport?.download_token !== placeholderToken) {
-    // Another request won the race — let it handle regeneration
-    return NextResponse.json({ status: "already_exists" });
+  // Delete any stale placeholder from a prior failed attempt
+  if (existingReport && !existingReport.ai_summary) {
+    await supabase
+      .from("reports")
+      .delete()
+      .eq("lookup_id", lookupId);
   }
 
   // Fetch permits
