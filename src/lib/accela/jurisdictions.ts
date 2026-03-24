@@ -42,30 +42,8 @@ export const JURISDICTIONS: Record<string, JurisdictionConfig> = {
         searchUrl:
           "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Building&customglobalsearch=true",
       },
-      {
-        name: "Electrical",
-        moduleKey: "Electrical",
-        searchUrl:
-          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Electrical&customglobalsearch=true",
-      },
-      {
-        name: "Plumbing",
-        moduleKey: "Plumbing",
-        searchUrl:
-          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Plumbing&customglobalsearch=true",
-      },
-      {
-        name: "Mechanical",
-        moduleKey: "Mechanical",
-        searchUrl:
-          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Mechanical&customglobalsearch=true",
-      },
-      {
-        name: "Fire",
-        moduleKey: "Fire",
-        searchUrl:
-          "https://aca-prod.accela.com/ATLANTA_GA/Cap/CapHome.aspx?module=Fire&customglobalsearch=true",
-      },
+      // Electrical, Plumbing, Mechanical, Fire temporarily disabled
+      // Re-enable after implementing retry logic or Accela API access
     ],
     hasQuadrant: true,
     hasDateRange: true,
