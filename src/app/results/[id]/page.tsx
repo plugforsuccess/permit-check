@@ -75,6 +75,11 @@ export default function ResultsPage() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [clipboardError, setClipboardError] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [listingText, setListingText] = useState("");
+  const [listingAnalyzing, setListingAnalyzing] = useState(false);
+  const [listingAnalyzed, setListingAnalyzed] = useState(false);
+  const [listingError, setListingError] = useState<string | null>(null);
+  const [showListingModal, setShowListingModal] = useState(false);
 
   const handleFeedback = async (rating: 1 | -1) => {
     if (feedbackSubmitted) return;
@@ -95,6 +100,35 @@ export default function ResultsPage() {
     } catch {
       // Network error — reset so user can retry
       setFeedbackRating(null);
+    }
+  };
+
+  const handleAnalyzeListing = async () => {
+    if (!listingText.trim() || listingAnalyzing) return;
+    setListingAnalyzing(true);
+    setListingError(null);
+
+    try {
+      const res = await fetch(`/api/lookup/${lookupId}/analyze-listing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listing_description: listingText }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setListingError(data.error || "Analysis failed. Please try again.");
+        return;
+      }
+
+      // Refresh the results to show new summary
+      setListingAnalyzed(true);
+      await fetchResults();
+    } catch {
+      setListingError("Unable to connect. Please try again.");
+    } finally {
+      setListingAnalyzing(false);
     }
   };
 
@@ -494,10 +528,14 @@ export default function ResultsPage() {
             {/* Download button */}
             {result.report && (result.report.summary || result.report.risk_level) ? (
               <div className="mb-6 flex flex-wrap items-center gap-4">
-                <a
-                  href={result.report.download_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => {
+                    if (listingAnalyzed || (result.report?.summary?.listingNotes?.length ?? 0) > 0) {
+                      window.open(result.report!.download_url, "_blank");
+                    } else {
+                      setShowListingModal(true);
+                    }
+                  }}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors"
                 >
                   <svg
@@ -514,7 +552,7 @@ export default function ResultsPage() {
                     />
                   </svg>
                   Download PDF Report
-                </a>
+                </button>
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
@@ -815,7 +853,23 @@ export default function ResultsPage() {
                   </div>
                 )}
 
-                <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between">
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  {/* Inline listing prompt — only when no listing analysis done yet */}
+                  {result.report.summary.listingNotes.length === 0 && !listingAnalyzed && (
+                    <div className="mb-3">
+                      <button
+                        onClick={() => {
+                          document
+                            .getElementById("listing-panel")
+                            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
+                      >
+                        Have the listing? Cross-reference renovation claims against permits →
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
                   <p className="text-xs text-gray-400">
                     AI analysis based on official permit records
                     {result.report.summary.listingNotes.length > 0
@@ -856,6 +910,7 @@ export default function ResultsPage() {
                   ) : (
                     <span className="text-xs text-gray-400">Thanks for your feedback</span>
                   )}
+                  </div>
                 </div>
               </div>
             )}
@@ -866,6 +921,69 @@ export default function ResultsPage() {
                 riskLevel={result.report.summary.riskLevel}
                 address={result.address_normalized || result.address}
               />
+            )}
+
+            {/* Listing Cross-Reference — shown on paid results */}
+            {isPaid && !listingAnalyzed && (
+              <div id="listing-panel" className="mb-8 border border-blue-100 bg-blue-50 rounded-2xl p-5">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      Cross-reference with listing
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Paste the property listing and our AI will flag renovation
+                      claims that have no permits on file.
+                    </p>
+                  </div>
+                </div>
+
+                <textarea
+                  value={listingText}
+                  onChange={(e) => setListingText(e.target.value)}
+                  placeholder="Paste listing description — e.g. 'Fully renovated 4BR with new kitchen, updated electrical, new roof...'"
+                  rows={3}
+                  maxLength={2000}
+                  className="w-full px-3 py-2.5 text-sm border border-blue-200 bg-white rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none resize-none text-gray-700 placeholder-gray-400 mb-3"
+                />
+
+                {listingError && (
+                  <p className="text-xs text-red-600 mb-3">{listingError}</p>
+                )}
+
+                <button
+                  onClick={handleAnalyzeListing}
+                  disabled={!listingText.trim() || listingAnalyzing}
+                  className="px-4 py-2 bg-[#0f1f3d] text-white text-sm font-semibold rounded-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {listingAnalyzing ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Analyzing listing...
+                    </>
+                  ) : (
+                    "Analyze Listing"
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Show confirmation after analysis completes */}
+            {isPaid && listingAnalyzed && (
+              <div className="mb-8 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                AI analysis updated with listing cross-reference
+              </div>
             )}
 
             <PermitTable permits={result.permits} />
@@ -933,6 +1051,53 @@ export default function ResultsPage() {
                 Search Another Address
               </a>
             </div>
+
+            {showListingModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div
+                  className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  onClick={() => setShowListingModal(false)}
+                />
+                <div className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 z-10">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900 text-center mb-2">
+                    Add listing to your report?
+                  </h3>
+                  <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
+                    Cross-referencing the property listing flags renovation claims
+                    that have no permits on file. Takes 5–8 seconds.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        setShowListingModal(false);
+                        setTimeout(() => {
+                          document
+                            .getElementById("listing-panel")
+                            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }, 100);
+                      }}
+                      className="w-full px-4 py-3 bg-[#0f1f3d] text-white text-sm font-semibold rounded-xl hover:bg-[#1a3560] transition-colors"
+                    >
+                      Add listing first
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowListingModal(false);
+                        window.open(result.report!.download_url, "_blank");
+                      }}
+                      className="w-full px-4 py-3 bg-gray-50 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-100 transition-colors"
+                    >
+                      Skip — download now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           /* STATE 1: Unpaid — teaser with real status counts + payment CTA */
