@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PermitTeaser from "@/components/PermitTeaser";
 import PropertyStreetView from "@/components/PropertyStreetView";
@@ -50,6 +50,7 @@ interface LookupStatus {
 export default function ResultsPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const lookupId = params.id as string;
   const paymentSuccess = searchParams.get("payment") === "success";
 
@@ -69,6 +70,8 @@ export default function ResultsPage() {
   const [watchError, setWatchError] = useState<string | null>(null);
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [clipboardError, setClipboardError] = useState(false);
 
   const handleFeedback = async (rating: 1 | -1) => {
     if (feedbackSubmitted) return;
@@ -89,6 +92,39 @@ export default function ResultsPage() {
     } catch {
       // Network error — reset so user can retry
       setFeedbackRating(null);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+
+    try {
+      const res = await fetch(`/api/lookup/${lookupId}/refresh`, {
+        method: "POST",
+      });
+
+      if (res.ok) {
+        router.push(
+          `/searching/${lookupId}?address=${encodeURIComponent(
+            result?.address_normalized ?? ""
+          )}&refresh=true`
+        );
+      }
+    } catch {
+      setRefreshing(false);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setListingDescription(text.slice(0, 2000));
+      }
+    } catch {
+      setClipboardError(true);
+      setTimeout(() => setClipboardError(false), 3000);
     }
   };
 
@@ -429,6 +465,16 @@ export default function ResultsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                   {shareCopied ? "Link copied!" : shareLoading ? "Generating..." : "Share Report"}
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {refreshing ? "Refreshing..." : "Refresh Data"}
                 </button>
                 {shareUrl && !shareCopied && (
                   <input
@@ -865,10 +911,22 @@ export default function ResultsPage() {
 
             {/* Optional listing description for enhanced AI analysis */}
             <div className="mb-5 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-              <label className="block text-sm font-semibold text-gray-800 mb-1">
-                Enhance your AI analysis{" "}
-                <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-sm font-semibold text-gray-800">
+                  Enhance your AI analysis{" "}
+                  <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <button
+                  onClick={handlePasteFromClipboard}
+                  className="flex items-center gap-1.5 text-xs text-[#0f1f3d] font-medium hover:underline"
+                  type="button"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  {clipboardError ? "Clipboard access denied" : "Paste from clipboard"}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mb-3">
                 Paste the property listing description below. Our AI will cross-reference
                 the seller&apos;s renovation claims against the official permit records.

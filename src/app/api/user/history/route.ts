@@ -59,7 +59,9 @@ export async function GET(request: NextRequest) {
         reports (
           id,
           pdf_url,
-          expires_at
+          expires_at,
+          risk_level,
+          ai_summary
         )
       `
       )

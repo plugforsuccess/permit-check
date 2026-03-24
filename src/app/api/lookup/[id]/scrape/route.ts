@@ -8,10 +8,11 @@ import { log } from "@/lib/logger";
 export const maxDuration = 300;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+  const force = request.nextUrl.searchParams.get("force") === "true";
 
   if (!UUID_RE.test(lookupId)) {
     return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
@@ -31,7 +32,7 @@ export async function POST(
   // Fetch the lookup row
   const { data: lookup } = await supabase
     .from("lookups")
-    .select("id, address_normalized, jurisdiction_id, status, is_unit, base_address")
+    .select("id, address_normalized, jurisdiction_id, status, is_unit, base_address, payment_status")
     .eq("id", lookupId)
     .single();
 
@@ -39,9 +40,29 @@ export async function POST(
     return NextResponse.json({ error: "Lookup not found" }, { status: 404 });
   }
 
-  // Already complete — don't re-scrape
-  if (lookup.status === "complete") {
+  // Allow re-scrape if force=true AND lookup is paid
+  if (lookup.status === "complete" && !force) {
     return NextResponse.json({ status: "already_complete" });
+  }
+
+  if (force && lookup.payment_status !== "paid") {
+    return NextResponse.json(
+      { error: "Payment required to refresh" },
+      { status: 402 }
+    );
+  }
+
+  // If force refresh — delete existing permits and reset status
+  if (force) {
+    await supabase
+      .from("permits")
+      .delete()
+      .eq("lookup_id", lookupId);
+
+    await supabase
+      .from("lookups")
+      .update({ status: "pending", permit_count: 0 })
+      .eq("id", lookupId);
   }
 
   try {
