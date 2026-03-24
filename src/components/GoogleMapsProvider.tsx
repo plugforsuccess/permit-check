@@ -6,6 +6,8 @@ import { createContext, useContext, useState, useCallback } from "react";
 const MapsReadyContext = createContext(false);
 export const useMapsReady = () => useContext(MapsReadyContext);
 
+const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+
 export default function GoogleMapsProvider({
   children,
 }: {
@@ -14,9 +16,17 @@ export default function GoogleMapsProvider({
   const [mapsReady, setMapsReady] = useState(false);
   const handleLoad = useCallback(() => setMapsReady(true), []);
 
+  if (!apiKey) {
+    return (
+      <MapsReadyContext.Provider value={false}>
+        {children}
+      </MapsReadyContext.Provider>
+    );
+  }
+
   return (
     <APIProvider
-      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
+      apiKey={apiKey}
       libraries={["places", "geocoding"]}
       onLoad={handleLoad}
     >
