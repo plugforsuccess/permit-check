@@ -729,7 +729,7 @@ async function fetchInspectionHistory(
       }
 
       return records;
-    });
+    }) as InspectionRecord[];
 
     return inspections;
   } catch (err) {
