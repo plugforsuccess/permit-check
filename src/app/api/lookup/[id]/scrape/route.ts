@@ -136,7 +136,7 @@ export async function POST(
 
     // Insert permits
     if (validPermits.length > 0) {
-      await supabase.from("permits").insert(
+      const { error: insertError } = await supabase.from("permits").insert(
         validPermits.map((p) => ({
           lookup_id: lookupId,
           record_number: p.recordNumber,
@@ -152,6 +152,16 @@ export async function POST(
             : null,
         }))
       );
+
+      if (insertError) {
+        log.error("Permits insert failed", {
+          lookupId,
+          error: insertError.message,
+          count: validPermits.length,
+        });
+      } else {
+        log.info("Permits inserted", { lookupId, count: validPermits.length });
+      }
     }
 
     log.info("Scrape complete", {
