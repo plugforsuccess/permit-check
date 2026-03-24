@@ -67,6 +67,30 @@ export default function ResultsPage() {
   const [watchAdded, setWatchAdded] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
   const [watchError, setWatchError] = useState<string | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  const handleFeedback = async (rating: 1 | -1) => {
+    if (feedbackSubmitted) return;
+    setFeedbackRating(rating);
+
+    try {
+      const res = await fetch(`/api/report/${lookupId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating }),
+      });
+      if (res.ok) {
+        setFeedbackSubmitted(true);
+      } else {
+        // Reset so user can retry
+        setFeedbackRating(null);
+      }
+    } catch {
+      // Network error — reset so user can retry
+      setFeedbackRating(null);
+    }
+  };
 
   const handleAddWatch = async () => {
     if (!watchEmail || watchAdded) return;
@@ -666,14 +690,47 @@ export default function ResultsPage() {
                   </div>
                 )}
 
-                <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between">
                   <p className="text-xs text-gray-400">
                     AI analysis based on official permit records
                     {result.report.summary.listingNotes.length > 0
                       ? " and listing description provided"
                       : ""}
-                    . Not a substitute for professional inspection or legal advice.
+                    . Not legal advice.
                   </p>
+                  {!feedbackSubmitted ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-400 mr-1">Helpful?</span>
+                      <button
+                        onClick={() => handleFeedback(1)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          feedbackRating === 1
+                            ? "bg-green-100 text-green-700"
+                            : "text-gray-400 hover:text-green-600 hover:bg-green-50"
+                        }`}
+                        aria-label="Helpful"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(-1)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          feedbackRating === -1
+                            ? "bg-red-100 text-red-700"
+                            : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        }`}
+                        aria-label="Not helpful"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">Thanks for your feedback</span>
+                  )}
                 </div>
               </div>
             )}

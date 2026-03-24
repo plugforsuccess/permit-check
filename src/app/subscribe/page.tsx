@@ -147,6 +147,7 @@ export default function SubscribePage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="8+ characters"
+                minLength={8}
                 className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-[#0f1f3d] focus:ring-1 focus:ring-[#0f1f3d] outline-none"
               />
             </div>

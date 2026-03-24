@@ -294,18 +294,18 @@ export function generateReportHtml(data: ReportData): string {
       data.summary.riskLevel === "high" ? "#7f1d1d" :
       data.summary.riskLevel === "medium" ? "#78350f" : "#14532d"
     };">
-      ${data.summary.summary}
+      ${escapeHtml(data.summary.summary)}
     </p>
     ${data.summary.flags.length > 0 ? `
       <div style="margin-bottom: 10px;">
         <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #374151; margin-bottom: 6px;">Red Flags</div>
-        ${data.summary.flags.map(f => `<div style="font-size: 11px; color: #991b1b; margin-bottom: 3px;">&#x2715; ${f}</div>`).join("")}
+        ${data.summary.flags.map(f => `<div style="font-size: 11px; color: #991b1b; margin-bottom: 3px;">&#x2715; ${escapeHtml(f)}</div>`).join("")}
       </div>
     ` : ""}
     ${data.summary.positives.length > 0 ? `
       <div>
         <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #374151; margin-bottom: 6px;">Positive Signals</div>
-        ${data.summary.positives.map(p => `<div style="font-size: 11px; color: #166534; margin-bottom: 3px;">&#x2713; ${p}</div>`).join("")}
+        ${data.summary.positives.map(p => `<div style="font-size: 11px; color: #166534; margin-bottom: 3px;">&#x2713; ${escapeHtml(p)}</div>`).join("")}
       </div>
     ` : ""}
     <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #9ca3af;">

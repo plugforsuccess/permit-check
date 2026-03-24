@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
+import { rateLimit } from "@/lib/ratelimit";
+import { UUID_RE } from "@/lib/schemas";
 
 /**
  * GET /api/lookup/:id/results
  * Returns permit data for a confirmed, paid lookup.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
+
+  if (!UUID_RE.test(lookupId)) {
+    return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
+  }
+
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const allowed = await rateLimit(`results:${ip}`);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429 }
+    );
+  }
 
   const supabase = createServerClient();
 
@@ -127,5 +143,7 @@ export async function GET(
           risk_level: report.risk_level,
         }
       : null,
+  }, {
+    headers: { "Cache-Control": "private, no-store" },
   });
 }

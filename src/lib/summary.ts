@@ -1,6 +1,8 @@
 import type { Permit } from "@/types";
 import type { PropertyData } from "./property-data";
 import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
+import { extractListingClaims, formatClaimsForPrompt } from "./listing-parser";
+import { permitSummarySchema } from "./schemas";
 
 /**
  * Zero Permit Edge Cases
@@ -204,9 +206,42 @@ IMPORTANT — COMMERCIAL/MULTI-FAMILY PROPERTY: This property is classified as "
 `
     : "";
 
-  const listingSection = listingDescription
-    ? `\nListing description provided by user:\n"${listingDescription.slice(0, 1500)}"\n`
-    : "\nNo listing description provided.\n";
+  let listingSection = "\nNo listing description provided.\n";
+
+  if (listingDescription) {
+    // Truncate once — claim extraction and raw text shown to model must use the same input
+    const truncatedListing = listingDescription.slice(0, 1500);
+    const claims = extractListingClaims(truncatedListing);
+    const permitData = permits.map((p) => ({ type: p.type, status: p.status }));
+    const claimsCrossRef = formatClaimsForPrompt(claims, permitData);
+
+    listingSection = `
+Listing description (raw): "${truncatedListing}"
+
+${claimsCrossRef || "No specific renovation claims detected in listing text.\n"}
+`;
+
+    // Log high-severity unmatched claims for monitoring
+    const highSeverityUnmatched = claims.filter(
+      (c) =>
+        c.severity === "high" &&
+        c.permitTypes.length > 0 &&
+        !permits.some((p) =>
+          c.permitTypes.some((pt) =>
+            p.type.toLowerCase().includes(
+              pt.toLowerCase().split(" - ")[1] ?? pt.toLowerCase()
+            )
+          )
+        )
+    );
+
+    if (highSeverityUnmatched.length > 0) {
+      console.log(
+        "[summary] High-severity unmatched claims:",
+        highSeverityUnmatched.map((c) => c.type).join(", ")
+      );
+    }
+  }
 
   // Unit address context for condos/townhomes
   const unitContext = isUnit
@@ -293,6 +328,11 @@ RULES:
 1. NEVER use hedging language: no "may indicate", "could suggest", "it's possible that", "cannot be determined", "might mean". State facts directly.
 2. Lead with the verdict — one sentence that tells the buyer exactly where they stand.
 3. Cross-reference listing claims against permits. If listing says "renovated" but there are no renovation permits, say so explicitly.
+   3a. The LISTING CLAIM CROSS-REFERENCE section above shows each renovation claim with whether a matching permit exists.
+   3b. "NO PERMIT ON FILE — HIGH RISK" claims must be flagged explicitly in your flags array with the specific claim quoted.
+   3c. "PERMIT FOUND" claims should be noted as positive signals.
+   3d. "NO PERMIT EXPECTED" claims (cosmetic) should be ignored.
+   3e. If multiple HIGH RISK unmatched claims exist, the verdict must be HIGH RISK.
 4. Flag flips aggressively — if sold recently with no major permits, that's a red flag.
 5. "Seller questions" must be specific and actionable — what should the buyer literally say to their agent or the seller?
 6. If permits.length === 0 and property was recently sold or is listed as renovated, that is HIGH risk — zero permits on a claimed renovation is the core red flag PermitCheck exists to catch.
@@ -382,16 +422,33 @@ Risk level guide:
 
   try {
     const raw = JSON.parse(text.replace(/```json|```/g, "").trim());
+    const parsed = permitSummarySchema.safeParse(raw);
+    if (parsed.success) {
+      return parsed.data;
+    }
+    // Schema validation failed — use safe fallbacks for each field
     return {
-      riskLevel: raw.riskLevel ?? "medium",
-      verdict: raw.verdict ?? raw.summary ?? "Summary unavailable.",
-      summary: raw.summary ?? "",
-      flags: Array.isArray(raw.flags) ? raw.flags : [],
-      positives: Array.isArray(raw.positives) ? raw.positives : [],
-      sellerQuestions: Array.isArray(raw.sellerQuestions)
-        ? raw.sellerQuestions
+      riskLevel: (["low", "medium", "high"] as const).includes(raw.riskLevel)
+        ? raw.riskLevel
+        : "medium",
+      verdict: typeof raw.verdict === "string"
+        ? raw.verdict.slice(0, 300)
+        : "Summary unavailable.",
+      summary: typeof raw.summary === "string"
+        ? raw.summary.slice(0, 1000)
+        : "",
+      flags: Array.isArray(raw.flags)
+        ? raw.flags.filter((f: unknown): f is string => typeof f === "string").map((f: string) => f.slice(0, 300))
         : [],
-      listingNotes: Array.isArray(raw.listingNotes) ? raw.listingNotes : [],
+      positives: Array.isArray(raw.positives)
+        ? raw.positives.filter((p: unknown): p is string => typeof p === "string").map((p: string) => p.slice(0, 300))
+        : [],
+      sellerQuestions: Array.isArray(raw.sellerQuestions)
+        ? raw.sellerQuestions.filter((q: unknown): q is string => typeof q === "string").map((q: string) => q.slice(0, 300))
+        : [],
+      listingNotes: Array.isArray(raw.listingNotes)
+        ? raw.listingNotes.filter((n: unknown): n is string => typeof n === "string").map((n: string) => n.slice(0, 300))
+        : [],
     };
   } catch {
     return {

@@ -135,13 +135,13 @@ export async function sendReportEmail(
               <table cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
                 <tr>
                   <td style="padding-right: 12px;">
-                    <a href="${reportUrl}"
+                    <a href="${escapeHtml(reportUrl)}"
                        style="display: inline-block; padding: 12px 24px; background: #0f1f3d; color: white; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">
                       View Full Report
                     </a>
                   </td>
                   <td>
-                    <a href="${downloadUrl}"
+                    <a href="${escapeHtml(downloadUrl)}"
                        style="display: inline-block; padding: 12px 24px; background: white; color: #0f1f3d; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600; border: 1.5px solid #0f1f3d;">
                       Download PDF
                     </a>
