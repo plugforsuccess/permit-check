@@ -446,10 +446,10 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-bold text-gray-900 mb-4">
                   Comparing {selectedForCompare.size} properties
                 </h3>
-                <div className={`grid gap-4 ${
-                  selectedForCompare.size === 2 ? "grid-cols-2"
-                  : selectedForCompare.size === 3 ? "grid-cols-3"
-                  : "grid-cols-4"
+                <div className={`grid gap-4 grid-cols-2 ${
+                  selectedForCompare.size === 3 ? "sm:grid-cols-3"
+                  : selectedForCompare.size === 4 ? "sm:grid-cols-4"
+                  : ""
                 }`}>
                   {lookups
                     .filter((l) => selectedForCompare.has(l.id))

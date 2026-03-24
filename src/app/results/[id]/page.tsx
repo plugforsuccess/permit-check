@@ -104,13 +104,22 @@ export default function ResultsPage() {
         method: "POST",
       });
 
-      if (res.ok) {
-        router.push(
-          `/searching/${lookupId}?address=${encodeURIComponent(
-            result?.address_normalized ?? ""
-          )}&refresh=true`
-        );
+      if (!res.ok) {
+        setRefreshing(false);
+        return;
       }
+
+      // Fire scrape in background (mirrors normal flow from home page)
+      fetch(`/api/lookup/${lookupId}/scrape`, { method: "POST" }).catch(
+        () => {}
+      );
+
+      // Redirect to searching page to show progress
+      router.push(
+        `/searching/${lookupId}?address=${encodeURIComponent(
+          result?.address_normalized ?? ""
+        )}&refresh=true`
+      );
     } catch {
       setRefreshing(false);
     }

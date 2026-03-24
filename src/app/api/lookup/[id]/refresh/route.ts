@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { UUID_RE } from "@/lib/schemas";
-import { config } from "@/lib/config";
+import { rateLimit } from "@/lib/ratelimit";
 
 const REFRESH_FREE_DAYS = 30;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
@@ -15,12 +15,23 @@ export async function POST(
     return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
   }
 
+  // Rate limit by lookup ID — prevents repeated refresh abuse
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const allowed = await rateLimit(`refresh:${ip}:${lookupId}`);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429 }
+    );
+  }
+
   const supabase = createServerClient();
 
-  // Verify lookup is paid
+  // Verify lookup exists and is paid
   const { data: lookup } = await supabase
     .from("lookups")
-    .select("id, payment_status, paid_at, address_normalized")
+    .select("id, payment_status, paid_at, address_normalized, status")
     .eq("id", lookupId)
     .single();
 
@@ -46,19 +57,26 @@ export async function POST(
     // For now, allow free refresh always
   }
 
-  // Trigger scrape with force=true
-  const scrapeUrl = `${config.app.baseUrl}/api/lookup/${lookupId}/scrape?force=true`;
-  const scrapeRes = await fetch(scrapeUrl, { method: "POST" });
+  // Delete existing permits
+  await supabase
+    .from("permits")
+    .delete()
+    .eq("lookup_id", lookupId);
 
-  if (!scrapeRes.ok) {
-    return NextResponse.json(
-      { error: "Refresh failed" },
-      { status: 500 }
-    );
-  }
+  // Delete stale report (AI summary, PDF, risk_level) so it gets regenerated
+  await supabase
+    .from("reports")
+    .delete()
+    .eq("lookup_id", lookupId);
+
+  // Reset lookup status so scrape endpoint will accept it
+  await supabase
+    .from("lookups")
+    .update({ status: "pending", permit_count: 0 })
+    .eq("id", lookupId);
 
   return NextResponse.json({
-    status: "refreshing",
+    status: "ready_to_scrape",
     free_refresh: isFreeRefresh,
     days_since_paid: daysSincePaid,
   });
