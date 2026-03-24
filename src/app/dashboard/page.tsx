@@ -21,12 +21,17 @@ interface LookupHistory {
     id: string;
     pdf_url: string;
     expires_at: string;
+    risk_level: string | null;
   }>;
 }
 
 export default function DashboardPage() {
   const [lookups, setLookups] = useState<LookupHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(
+    new Set()
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +44,18 @@ export default function DashboardPage() {
     stripe_customer_id: string | null;
   } | null>(null);
   const [session, setSession] = useState<{ user: { id: string; email?: string }; access_token: string } | null>(null);
+
+  const toggleCompare = (lookupId: string) => {
+    setSelectedForCompare((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(lookupId)) {
+        next.delete(lookupId);
+      } else if (next.size < 4) {
+        next.add(lookupId);
+      }
+      return next;
+    });
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -324,7 +341,162 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        ) : lookups.length === 0 ? (
+        ) : lookups.length > 0 ? (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-gray-900">Your Lookups</h2>
+              {lookups.filter((l) => l.payment_status === "paid").length >= 2 && (
+                <button
+                  onClick={() => {
+                    setCompareMode(!compareMode);
+                    setSelectedForCompare(new Set());
+                  }}
+                  className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                    compareMode
+                      ? "bg-[#0f1f3d] text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {compareMode ? "Exit Compare" : "Compare Properties"}
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {lookups.map((lookup) => {
+                const report = lookup.reports?.[0];
+                const isExpired = report
+                  ? new Date(report.expires_at) < new Date()
+                  : true;
+                const isSelected = selectedForCompare.has(lookup.id);
+
+                return (
+                  <div
+                    key={lookup.id}
+                    className={`relative bg-white border rounded-xl p-6 flex items-center justify-between transition-all ${
+                      compareMode && isSelected
+                        ? "border-[#0f1f3d] ring-2 ring-[#0f1f3d]/20"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    {compareMode && lookup.payment_status === "paid" && (
+                      <button
+                        onClick={() => toggleCompare(lookup.id)}
+                        className={`absolute top-3 right-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                          isSelected
+                            ? "bg-[#0f1f3d] border-[#0f1f3d]"
+                            : "border-gray-300 hover:border-[#0f1f3d]"
+                        }`}
+                      >
+                        {isSelected && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        {lookup.address_raw || lookup.address_normalized}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-sm text-gray-500">
+                          {new Date(lookup.created_at).toLocaleDateString()}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {lookup.permit_count} permits
+                        </span>
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                          {lookup.report_type}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`/results/${lookup.id}`}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        View Results
+                      </a>
+                      {report && !isExpired && (
+                        <a
+                          href={report.pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm px-4 py-2 bg-[#0f1f3d] text-white rounded-lg hover:bg-[#1a3560] transition-colors"
+                        >
+                          Download PDF
+                        </a>
+                      )}
+                      {report && isExpired && (
+                        <span className="text-sm text-gray-400">
+                          Report expired
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Comparison Panel */}
+            {compareMode && selectedForCompare.size >= 2 && (
+              <div className="mt-6 p-5 bg-white border border-gray-200 rounded-xl">
+                <h3 className="text-sm font-bold text-gray-900 mb-4">
+                  Comparing {selectedForCompare.size} properties
+                </h3>
+                <div className={`grid gap-4 grid-cols-2 ${
+                  selectedForCompare.size === 3 ? "sm:grid-cols-3"
+                  : selectedForCompare.size === 4 ? "sm:grid-cols-4"
+                  : ""
+                }`}>
+                  {lookups
+                    .filter((l) => selectedForCompare.has(l.id))
+                    .map((lookup) => {
+                      const report = lookup.reports?.[0];
+                      const riskLevel = report?.risk_level as "low" | "medium" | "high" | null;
+
+                      return (
+                        <div key={lookup.id} className="text-center">
+                          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide mb-3 ${
+                            riskLevel === "high"
+                              ? "bg-red-100 text-red-800"
+                              : riskLevel === "medium"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : riskLevel === "low"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-500"
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${
+                              riskLevel === "high" ? "bg-red-500"
+                              : riskLevel === "medium" ? "bg-yellow-500"
+                              : riskLevel === "low" ? "bg-green-500"
+                              : "bg-gray-400"
+                            }`} />
+                            {riskLevel ? `${riskLevel} risk` : "No analysis"}
+                          </div>
+                          <div className="text-xs font-medium text-gray-900 mb-1 leading-tight">
+                            {lookup.address_normalized || lookup.address_raw}
+                          </div>
+                          <div className="text-xs text-gray-500 mb-3">
+                            {lookup.permit_count ?? 0} permits
+                          </div>
+                          {report && (
+                            <a
+                              href={`/results/${lookup.id}`}
+                              className="text-xs text-[#0f1f3d] underline"
+                            >
+                              View report →
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
           <div className="text-center py-12 bg-gray-50 rounded-xl">
             <div className="text-4xl mb-4">📋</div>
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
@@ -339,62 +511,6 @@ export default function DashboardPage() {
             >
               Search an Address
             </a>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {lookups.map((lookup) => {
-              const report = lookup.reports?.[0];
-              const isExpired = report
-                ? new Date(report.expires_at) < new Date()
-                : true;
-
-              return (
-                <div
-                  key={lookup.id}
-                  className="bg-white border border-gray-200 rounded-xl p-6 flex items-center justify-between"
-                >
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {lookup.address_raw || lookup.address_normalized}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-1">
-                      <span className="text-sm text-gray-500">
-                        {new Date(lookup.created_at).toLocaleDateString()}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {lookup.permit_count} permits
-                      </span>
-                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
-                        {lookup.report_type}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <a
-                      href={`/results/${lookup.id}`}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      View Results
-                    </a>
-                    {report && !isExpired && (
-                      <a
-                        href={report.pdf_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm px-4 py-2 bg-[#0f1f3d] text-white rounded-lg hover:bg-[#1a3560] transition-colors"
-                      >
-                        Download PDF
-                      </a>
-                    )}
-                    {report && isExpired && (
-                      <span className="text-sm text-gray-400">
-                        Report expired
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
 

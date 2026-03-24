@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PermitTeaser from "@/components/PermitTeaser";
 import PropertyStreetView from "@/components/PropertyStreetView";
@@ -50,6 +50,7 @@ interface LookupStatus {
 export default function ResultsPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const lookupId = params.id as string;
   const paymentSuccess = searchParams.get("payment") === "success";
 
@@ -69,6 +70,10 @@ export default function ResultsPage() {
   const [watchError, setWatchError] = useState<string | null>(null);
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [clipboardError, setClipboardError] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const handleFeedback = async (rating: 1 | -1) => {
     if (feedbackSubmitted) return;
@@ -89,6 +94,52 @@ export default function ResultsPage() {
     } catch {
       // Network error — reset so user can retry
       setFeedbackRating(null);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setRefreshError(null);
+
+    try {
+      const res = await fetch(`/api/lookup/${lookupId}/refresh`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setRefreshError(data?.error ?? "Unable to refresh. Please try again.");
+        setTimeout(() => setRefreshError(null), 5000);
+        setRefreshing(false);
+        return;
+      }
+
+      // Fire scrape in background (mirrors normal flow from home page)
+      fetch(`/api/lookup/${lookupId}/scrape`, { method: "POST" }).catch(
+        () => {}
+      );
+
+      // Redirect to searching page to show progress
+      router.push(
+        `/searching/${lookupId}?address=${encodeURIComponent(
+          result?.address_normalized ?? ""
+        )}&refresh=true`
+      );
+    } catch {
+      setRefreshing(false);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setListingDescription(text.slice(0, 2000));
+      }
+    } catch {
+      setClipboardError(true);
+      setTimeout(() => setClipboardError(false), 3000);
     }
   };
 
@@ -219,6 +270,49 @@ export default function ResultsPage() {
       fetchResults();
     }
   }, [paymentSuccess, fetchResults]);
+
+  // Auto-trigger report regeneration after a data refresh:
+  // paid + permits loaded + no report = post-refresh state
+  const regenerateTriggered = useRef(false);
+
+  useEffect(() => {
+    if (!result) return;
+    if (result.payment_status !== "paid") return;
+    if (!result.permits) return;
+    // Trigger regeneration if no report exists, or if a placeholder report
+    // was left behind (no summary and no risk_level = incomplete)
+    const reportComplete = result.report?.summary || result.report?.risk_level;
+    if (result.report && reportComplete) return;
+    if (regenerateTriggered.current) return;
+
+    regenerateTriggered.current = true;
+    setRegenerating(true);
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/lookup/${lookupId}/regenerate`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          setRegenerating(false);
+          return;
+        }
+        // Regeneration complete on the server — refetch to get the new report
+        if (!cancelled) {
+          await fetchResults();
+          setRegenerating(false);
+        }
+      } catch {
+        if (!cancelled) setRegenerating(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [result, lookupId, fetchResults]);
 
   const handleCheckout = async () => {
     setCheckoutLoading(true);
@@ -397,7 +491,7 @@ export default function ResultsPage() {
         {isPaid && result.permits ? (
           <>
             {/* Download button */}
-            {result.report ? (
+            {result.report && (result.report.summary || result.report.risk_level) ? (
               <div className="mb-6 flex flex-wrap items-center gap-4">
                 <a
                   href={result.report.download_url}
@@ -430,6 +524,19 @@ export default function ResultsPage() {
                   </svg>
                   {shareCopied ? "Link copied!" : shareLoading ? "Generating..." : "Share Report"}
                 </button>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {refreshing ? "Refreshing..." : "Refresh Data"}
+                </button>
+                {refreshError && (
+                  <span className="text-xs text-red-600">{refreshError}</span>
+                )}
                 {shareUrl && !shareCopied && (
                   <input
                     readOnly
@@ -461,14 +568,18 @@ export default function ResultsPage() {
                   />
                 </svg>
                 <p className="text-yellow-800 text-sm">
-                  Generating your report&hellip; This usually takes a few seconds.
+                  {regenerating
+                    ? "Regenerating AI analysis with updated permit data\u2026"
+                    : "Generating your report\u2026 This usually takes a few seconds."}
                 </p>
-                <button
-                  onClick={() => fetchResults()}
-                  className="ml-auto text-sm px-4 py-1.5 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors shrink-0"
-                >
-                  Refresh
-                </button>
+                {!regenerating && (
+                  <button
+                    onClick={() => fetchResults()}
+                    className="ml-auto text-sm px-4 py-1.5 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors shrink-0"
+                  >
+                    Refresh
+                  </button>
+                )}
               </div>
             )}
 
@@ -865,10 +976,22 @@ export default function ResultsPage() {
 
             {/* Optional listing description for enhanced AI analysis */}
             <div className="mb-5 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-              <label className="block text-sm font-semibold text-gray-800 mb-1">
-                Enhance your AI analysis{" "}
-                <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-sm font-semibold text-gray-800">
+                  Enhance your AI analysis{" "}
+                  <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <button
+                  onClick={handlePasteFromClipboard}
+                  className="flex items-center gap-1.5 text-xs text-[#0f1f3d] font-medium hover:underline"
+                  type="button"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  {clipboardError ? "Clipboard access denied" : "Paste from clipboard"}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mb-3">
                 Paste the property listing description below. Our AI will cross-reference
                 the seller&apos;s renovation claims against the official permit records.
