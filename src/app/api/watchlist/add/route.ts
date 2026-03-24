@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { normalizeAddress } from "@/lib/address";
 import { detectJurisdiction } from "@/lib/accela/index";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { z } from "zod";
 
 const MAX_WATCHES_PER_EMAIL = 5;
@@ -15,9 +15,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   // Rate limit by IP
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown";
+  const ip = extractClientIp(request);
   const allowed = await rateLimit(`watchlist:${ip}`);
   if (!allowed) {
     return NextResponse.json(

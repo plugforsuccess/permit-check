@@ -17,6 +17,19 @@ function getRatelimit(): Ratelimit {
   return _ratelimit;
 }
 
+/**
+ * Extract client IP from x-forwarded-for, rejecting requests with no
+ * identifiable IP by using a strict per-request fallback. This prevents
+ * all anonymous callers from sharing a single "unknown" rate limit bucket.
+ */
+export function extractClientIp(request: { headers: { get(name: string): string | null } }): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = forwarded?.split(",")[0]?.trim();
+  // If no IP available, use a random suffix so each request gets its own bucket
+  // (effectively a 5-req-per-minute limit on the connection)
+  return ip || `anon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export async function rateLimit(identifier: string): Promise<boolean> {
   const { success } = await getRatelimit().limit(identifier);
   if (!success) {

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { getStripe } from "@/lib/stripe";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = extractClientIp(request);
   const allowed = await rateLimit(`sub-portal:${ip}`);
   if (!allowed) {
     return NextResponse.json(

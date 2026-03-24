@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 
 /**
  * GET /api/user/history
@@ -8,9 +8,7 @@ import { rateLimit } from "@/lib/ratelimit";
  */
 export async function GET(request: NextRequest) {
   try {
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      "unknown";
+    const ip = extractClientIp(request);
     const allowed = await rateLimit(`history:${ip}`);
     if (!allowed) {
       return NextResponse.json(
