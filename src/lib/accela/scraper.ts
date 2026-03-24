@@ -528,6 +528,7 @@ export async function scrapeAccelaPermits(
     );
 
     // Selectively fetch inspection history for high-signal permits
+    const FETCH_INSPECTION_HISTORY = process.env.FETCH_INSPECTION_HISTORY === "true";
     const HIGH_SIGNAL_STATUSES = new Set(["Expired", "In Review"]);
     const COMPLAINT_TYPES = /complaint|violation|code/i;
 
@@ -549,7 +550,9 @@ export async function scrapeAccelaPermits(
     });
 
     // Cap at 5 detail page fetches to limit runtime
-    const detailFetchTargets = permitsNeedingDetail.slice(0, 5);
+    const detailFetchTargets = FETCH_INSPECTION_HISTORY
+      ? permitsNeedingDetail.slice(0, 5)
+      : [];
 
     if (detailFetchTargets.length > 0) {
       console.log(
