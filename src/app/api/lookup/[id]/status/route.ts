@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { rateLimit, extractClientIp } from "@/lib/ratelimit";
+import { rateLimitStatus, extractClientIp } from "@/lib/ratelimit";
 import { UUID_RE } from "@/lib/schemas";
 
 /**
@@ -19,7 +19,7 @@ export async function GET(
   }
 
   const ip = extractClientIp(request);
-  const allowed = await rateLimit(`status:${ip}`);
+  const allowed = await rateLimitStatus(`status:${lookupId}`);
   if (!allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
