@@ -243,6 +243,24 @@ async function scrapeModule(
 }
 
 /**
+ * Check if a permit address matches the expected street number using a
+ * word-boundary check to avoid substring false positives
+ * (e.g. "12" matching "123 GREENWICH").
+ */
+function addressMatchesStreetNumber(
+  permitAddress: string,
+  streetNumber: string
+): boolean {
+  // Escape any non-digit chars (defensive — streetNumber should be numeric)
+  const escaped = streetNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match street number at word boundary — start of string or after whitespace
+  const re = new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`);
+  return re.test(permitAddress);
+}
+
+const FALLBACK_PAUSE_MS = 1000;
+
+/**
  * Fallback wrapper around scrapeModule. If the primary exact search returns zero
  * results, tries progressively looser searches:
  * 1. Street name only (drop suffix + quadrant)
@@ -277,16 +295,19 @@ async function scrapeModuleWithFallback(
       quadrant: "",
     };
 
+    await new Promise((r) => setTimeout(r, FALLBACK_PAUSE_MS));
+
     try {
       const loosePermits = await scrapeModule(
         page, searchUrl, looseParsed, normalizedAddress, jurisdiction
       );
 
       if (loosePermits.length > 0) {
-        // Filter to results that match the original street number
+        // Filter to results whose address contains the original street number
+        // at a word boundary — prevents "12" matching "123 GREENWICH"
         const filtered = loosePermits.filter((p) => {
-          if (!p.address) return true; // no address to filter on
-          return p.address.includes(parsed.streetNumber);
+          if (!p.address) return false;
+          return addressMatchesStreetNumber(p.address, parsed.streetNumber);
         });
 
         if (filtered.length > 0) {
@@ -304,7 +325,7 @@ async function scrapeModuleWithFallback(
   // Fallback 2 — adjacent street numbers (±1)
   // Handles off-by-one addressing errors
   const streetNum = parseInt(parsed.streetNumber, 10);
-  if (!isNaN(streetNum)) {
+  if (!isNaN(streetNum) && parsed.streetName) {
     for (const offset of [-1, 1]) {
       const adjacentNum = String(streetNum + offset);
       console.log(
@@ -313,16 +334,29 @@ async function scrapeModuleWithFallback(
 
       const adjacentParsed = { ...parsed, streetNumber: adjacentNum };
 
+      await new Promise((r) => setTimeout(r, FALLBACK_PAUSE_MS));
+
       try {
         const adjacentPermits = await scrapeModule(
           page, searchUrl, adjacentParsed, normalizedAddress, jurisdiction
         );
 
         if (adjacentPermits.length > 0) {
-          console.log(
-            `[accela-scraper] Adjacent number fallback found ${adjacentPermits.length} permits at ${adjacentNum}`
-          );
-          return { permits: adjacentPermits, usedFallback: true };
+          // Verify results actually match the adjacent address street name
+          const verified = adjacentPermits.filter((p) => {
+            if (!p.address) return false;
+            return (
+              addressMatchesStreetNumber(p.address, adjacentNum) &&
+              p.address.toUpperCase().includes(parsed.streetName.toUpperCase())
+            );
+          });
+
+          if (verified.length > 0) {
+            console.log(
+              `[accela-scraper] Adjacent number fallback found ${verified.length} permits at ${adjacentNum}`
+            );
+            return { permits: verified, usedFallback: true };
+          }
         }
       } catch (err) {
         console.warn(
