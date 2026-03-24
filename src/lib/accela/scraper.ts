@@ -13,8 +13,8 @@ import { chromium as playwrightChromium } from "playwright-core";
 
 const CHROMIUM_REMOTE_URL =
   "https://github.com/Sparticuz/chromium/releases/download/v137.0.0/chromium-v137.0.0-pack.x64.tar";
-import type { Browser, Page } from "playwright-core";
-import { getJurisdiction, type JurisdictionConfig } from "./jurisdictions";
+import type { Browser, BrowserContext, Page } from "playwright-core";
+import { getJurisdiction, type AccelaModule, type JurisdictionConfig } from "./jurisdictions";
 
 export interface InspectionRecord {
   inspectionType: string;
@@ -397,6 +397,53 @@ async function scrapeModuleWithFallback(
   return { permits: [], usedFallback: false };
 }
 
+const RETRY_DELAY_MS = 8000;
+const MAX_ATTEMPTS = 2;
+
+/**
+ * Retry wrapper around scrapeModuleWithFallback. If the module times out,
+ * wait 8 seconds and try once more before giving up — handles transient
+ * portal rate-limiting without skipping the module entirely.
+ */
+async function scrapeModuleWithRetry(
+  context: BrowserContext,
+  mod: AccelaModule,
+  parsed: ReturnType<typeof parseAddressForPortal>,
+  normalizedAddress: string,
+  jurisdiction: JurisdictionConfig
+): Promise<{ permits: PermitRecord[]; usedFallback: boolean; rawCountBeforeFilter?: number }> {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const page = await context.newPage();
+    page.setDefaultTimeout(BROWSER_TIMEOUT);
+
+    try {
+      const result = await scrapeModuleWithFallback(
+        page,
+        mod.searchUrl,
+        parsed,
+        normalizedAddress,
+        jurisdiction
+      );
+      return result;
+    } catch (err) {
+      console.error(
+        `[accela-scraper] Module ${mod.name} attempt ${attempt} failed:`,
+        err
+      );
+      if (attempt < MAX_ATTEMPTS) {
+        console.log(
+          `[accela-scraper] Retrying ${mod.name} in ${RETRY_DELAY_MS / 1000} seconds...`
+        );
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      }
+    } finally {
+      await page.close();
+    }
+  }
+
+  return { permits: [], usedFallback: false };
+}
+
 /**
  * Scrape permit records from an Accela portal across all configured modules.
  * Deduplicates by record number across modules. Never throws — returns [] on failure.
@@ -428,64 +475,51 @@ export async function scrapeAccelaPermits(
     let anyTruncated = false;
     let usedFuzzyMatch = false;
 
-    // Scrape each module sequentially
+    // Scrape each module sequentially with retry on failure
     for (const mod of jurisdiction.modules) {
       console.log(`[accela-scraper] Scraping module: ${mod.name}`);
 
-      const page = await context.newPage();
-      page.setDefaultTimeout(BROWSER_TIMEOUT);
+      const { permits: modulePermits, usedFallback, rawCountBeforeFilter } =
+        await scrapeModuleWithRetry(
+          context,
+          mod,
+          parsed,
+          normalizedAddress,
+          jurisdiction
+        );
 
-      try {
-        const { permits: modulePermits, usedFallback, rawCountBeforeFilter } =
-          await scrapeModuleWithFallback(
-            page,
-            mod.searchUrl,
-            parsed,
-            normalizedAddress,
-            jurisdiction
-          );
-
-        if (usedFallback) {
-          usedFuzzyMatch = true;
-          console.log(
-            `[accela-scraper] Module ${mod.name}: used fuzzy fallback`
-          );
-        }
-
-        // Tag each permit with its source module
-        modulePermits.forEach((p) => (p.module = mod.name));
-
-        // Deduplicate across modules — same record can appear in multiple modules
-        let newCount = 0;
-        for (const permit of modulePermits) {
-          if (!seenRecordNumbers.has(permit.recordNumber)) {
-            seenRecordNumbers.add(permit.recordNumber);
-            allPermits.push(permit);
-            newCount++;
-          }
-        }
-
-        // Use raw count before filtering for truncation check — fallback
-        // filtering can reduce 150→3 results, masking truncation
-        const countForTruncation = rawCountBeforeFilter ?? modulePermits.length;
-        if (countForTruncation >= 100) anyTruncated = true;
-
+      if (usedFallback) {
+        usedFuzzyMatch = true;
         console.log(
-          `[accela-scraper] Module ${mod.name}: ${modulePermits.length} records, ${newCount} new`
+          `[accela-scraper] Module ${mod.name}: used fuzzy fallback`
         );
-      } catch (err) {
-        // Don't fail entire scrape if one module fails — log and continue
-        console.error(
-          `[accela-scraper] Module ${mod.name} failed:`,
-          err
-        );
-      } finally {
-        await page.close();
       }
 
-      // Brief pause between modules to avoid rate limiting
+      // Tag each permit with its source module
+      modulePermits.forEach((p) => (p.module = mod.name));
+
+      // Deduplicate across modules — same record can appear in multiple modules
+      let newCount = 0;
+      for (const permit of modulePermits) {
+        if (!seenRecordNumbers.has(permit.recordNumber)) {
+          seenRecordNumbers.add(permit.recordNumber);
+          allPermits.push(permit);
+          newCount++;
+        }
+      }
+
+      // Use raw count before filtering for truncation check — fallback
+      // filtering can reduce 150→3 results, masking truncation
+      const countForTruncation = rawCountBeforeFilter ?? modulePermits.length;
+      if (countForTruncation >= 100) anyTruncated = true;
+
+      console.log(
+        `[accela-scraper] Module ${mod.name}: ${modulePermits.length} records, ${newCount} new`
+      );
+
+      // Pause between modules to avoid rate limiting
       if (jurisdiction.modules.indexOf(mod) < jurisdiction.modules.length - 1) {
-        await new Promise((r) => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, 5000));
       }
     }
 
