@@ -42,6 +42,15 @@ export async function POST(request: NextRequest) {
 
     // Verify lookup exists and hasn't already been paid
     const supabase = createServerClient();
+
+    // Save listing description to DB before creating Stripe session
+    if (listing_description) {
+      await supabase
+        .from("lookups")
+        .update({ listing_description: listing_description.slice(0, 2000) })
+        .eq("id", lookup_id);
+    }
+
     const { data: lookup, error: lookupError } = await supabase
       .from("lookups")
       .select("id, address_normalized, payment_status, permit_count, report_type")
@@ -102,7 +111,6 @@ export async function POST(request: NextRequest) {
       cancelUrl,
       matter_reference,
       idempotencyKey,
-      listing_description
     );
 
     return NextResponse.json({ checkout_url: session.url }, {
