@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PermitTeaser from "@/components/PermitTeaser";
@@ -294,6 +294,36 @@ export default function ResultsPage() {
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [paymentSuccess, lookupId, fetchResults]);
+
+  // Auto-trigger summary generation if report exists but has no summary
+  const regenerateTriggered = useRef(false);
+
+  useEffect(() => {
+    if (!result) return;
+    if (result.payment_status !== "paid") return;
+    if (!result.permits) return;
+    const reportComplete = result.report?.summary || result.report?.risk_level;
+    if (reportComplete) return;
+    if (regenerateTriggered.current) return;
+
+    regenerateTriggered.current = true;
+    setListingAnalyzing(true);
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/lookup/${lookupId}/regenerate`, {
+          method: "POST",
+        });
+        if (res.ok) {
+          await fetchResults();
+        }
+      } catch {
+        // silent fail — user can use analyze-listing button manually
+      } finally {
+        setListingAnalyzing(false);
+      }
+    })();
+  }, [result, lookupId, fetchResults]);
 
   // Initial fetch (only if not waiting for payment)
   useEffect(() => {

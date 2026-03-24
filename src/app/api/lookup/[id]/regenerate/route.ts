@@ -130,7 +130,7 @@ export async function POST(
       permits,
       lookup.address_normalized,
       propertyData,
-      null, // listing_description not available on refresh
+      lookup.listing_description || null,
       lookup.is_unit ?? false,
       lookup.development_level_permits ?? false,
       lookup.permits_truncated ?? false,
