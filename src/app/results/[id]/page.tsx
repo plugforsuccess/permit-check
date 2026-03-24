@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import PermitTable from "@/components/PermitTable";
 import PermitTeaser from "@/components/PermitTeaser";
@@ -72,6 +72,7 @@ export default function ResultsPage() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [clipboardError, setClipboardError] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const handleFeedback = async (rating: 1 | -1) => {
     if (feedbackSubmitted) return;
@@ -264,6 +265,46 @@ export default function ResultsPage() {
       fetchResults();
     }
   }, [paymentSuccess, fetchResults]);
+
+  // Auto-trigger report regeneration after a data refresh:
+  // paid + permits loaded + no report = post-refresh state
+  const regenerateTriggered = useRef(false);
+
+  useEffect(() => {
+    if (!result) return;
+    if (result.payment_status !== "paid") return;
+    if (result.report) return;
+    if (!result.permits) return;
+    if (regenerateTriggered.current) return;
+
+    regenerateTriggered.current = true;
+    setRegenerating(true);
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/lookup/${lookupId}/regenerate`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          setRegenerating(false);
+          return;
+        }
+        // Regeneration complete on the server — refetch to get the new report
+        if (!cancelled) {
+          await fetchResults();
+          setRegenerating(false);
+        }
+      } catch {
+        if (!cancelled) setRegenerating(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [result, lookupId, fetchResults]);
 
   const handleCheckout = async () => {
     setCheckoutLoading(true);
@@ -516,14 +557,18 @@ export default function ResultsPage() {
                   />
                 </svg>
                 <p className="text-yellow-800 text-sm">
-                  Generating your report&hellip; This usually takes a few seconds.
+                  {regenerating
+                    ? "Regenerating AI analysis with updated permit data\u2026"
+                    : "Generating your report\u2026 This usually takes a few seconds."}
                 </p>
-                <button
-                  onClick={() => fetchResults()}
-                  className="ml-auto text-sm px-4 py-1.5 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors shrink-0"
-                >
-                  Refresh
-                </button>
+                {!regenerating && (
+                  <button
+                    onClick={() => fetchResults()}
+                    className="ml-auto text-sm px-4 py-1.5 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors shrink-0"
+                  >
+                    Refresh
+                  </button>
+                )}
               </div>
             )}
 
