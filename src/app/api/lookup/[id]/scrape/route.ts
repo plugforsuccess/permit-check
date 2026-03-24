@@ -60,6 +60,7 @@ export async function POST(
 
     let { permits } = result;
     let { truncated } = result;
+    let usedFuzzyMatch = result.usedFuzzyMatch;
 
     // Deduplicate permits by record_number — keep first occurrence
     const seen = new Set<string>();
@@ -100,6 +101,7 @@ export async function POST(
           });
           usedDevelopmentPermits = true;
           truncated = truncated || baseResult.truncated;
+          usedFuzzyMatch = usedFuzzyMatch || baseResult.usedFuzzyMatch;
           log.info("Found development-level permits at base address", {
             lookupId,
             baseAddress: lookup.base_address,
@@ -128,6 +130,7 @@ export async function POST(
         permit_count: validPermits.length,
         development_level_permits: usedDevelopmentPermits,
         permits_truncated: truncated,
+        used_fuzzy_match: usedFuzzyMatch,
       })
       .eq("id", lookupId);
 
@@ -153,6 +156,7 @@ export async function POST(
       count: validPermits.length,
       isUnit: lookup.is_unit,
       usedDevelopmentPermits,
+      usedFuzzyMatch,
       truncated,
     });
     return NextResponse.json({

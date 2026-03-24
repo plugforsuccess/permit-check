@@ -130,6 +130,7 @@ export async function POST(
       lookup.is_unit ?? false,
       lookup.development_level_permits ?? false,
       lookup.permits_truncated ?? false,
+      lookup.used_fuzzy_match ?? false,
     );
     aiSummary = JSON.stringify(summary);
     riskLevel = summary.riskLevel;

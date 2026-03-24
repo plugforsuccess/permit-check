@@ -84,6 +84,7 @@ export async function GET(
       is_unit: lookup.is_unit ?? false,
       development_level_permits: lookup.development_level_permits ?? false,
       permits_truncated: lookup.permits_truncated ?? false,
+      used_fuzzy_match: lookup.used_fuzzy_match ?? false,
       status_breakdown: statusBreakdown,
       has_complaints: hasComplaints,
       has_expired: hasExpired,
@@ -133,6 +134,7 @@ export async function GET(
     is_unit: lookup.is_unit ?? false,
     development_level_permits: lookup.development_level_permits ?? false,
     permits_truncated: lookup.permits_truncated ?? false,
+    used_fuzzy_match: lookup.used_fuzzy_match ?? false,
     permits,
     report: report
       ? {
