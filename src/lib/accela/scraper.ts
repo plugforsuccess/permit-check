@@ -272,7 +272,7 @@ async function scrapeModuleWithFallback(
   parsed: ReturnType<typeof parseAddressForPortal>,
   normalizedAddress: string,
   jurisdiction: JurisdictionConfig
-): Promise<{ permits: PermitRecord[]; usedFallback: boolean }> {
+): Promise<{ permits: PermitRecord[]; usedFallback: boolean; rawCountBeforeFilter?: number }> {
   // Primary search — exact match
   const primaryPermits = await scrapeModule(
     page, searchUrl, parsed, normalizedAddress, jurisdiction
@@ -303,18 +303,26 @@ async function scrapeModuleWithFallback(
       );
 
       if (loosePermits.length > 0) {
-        // Filter to results whose address contains the original street number
-        // at a word boundary — prevents "12" matching "123 GREENWICH"
+        // Filter to results whose address matches both street number (word boundary)
+        // and street name — prevents cross-street false positives
+        const upperStreetName = parsed.streetName.toUpperCase();
         const filtered = loosePermits.filter((p) => {
           if (!p.address) return false;
-          return addressMatchesStreetNumber(p.address, parsed.streetNumber);
+          return (
+            addressMatchesStreetNumber(p.address, parsed.streetNumber) &&
+            p.address.toUpperCase().includes(upperStreetName)
+          );
         });
 
         if (filtered.length > 0) {
           console.log(
-            `[accela-scraper] Street name fallback found ${filtered.length} permits`
+            `[accela-scraper] Street name fallback found ${filtered.length} permits (${loosePermits.length} before filter)`
           );
-          return { permits: filtered, usedFallback: true };
+          return {
+            permits: filtered,
+            usedFallback: true,
+            rawCountBeforeFilter: loosePermits.length,
+          };
         }
       }
     } catch (err) {
@@ -325,14 +333,17 @@ async function scrapeModuleWithFallback(
   // Fallback 2 — adjacent street numbers (±1)
   // Handles off-by-one addressing errors
   const streetNum = parseInt(parsed.streetNumber, 10);
-  if (!isNaN(streetNum) && parsed.streetName) {
+  if (!isNaN(streetNum) && streetNum > 1 && parsed.streetName) {
     for (const offset of [-1, 1]) {
-      const adjacentNum = String(streetNum + offset);
+      const adjacentNum = streetNum + offset;
+      if (adjacentNum <= 0) continue; // skip non-positive street numbers
+
+      const adjacentStr = String(adjacentNum);
       console.log(
-        `[accela-scraper] Zero results — trying adjacent number: "${adjacentNum} ${parsed.streetName}"`
+        `[accela-scraper] Zero results — trying adjacent number: "${adjacentStr} ${parsed.streetName}"`
       );
 
-      const adjacentParsed = { ...parsed, streetNumber: adjacentNum };
+      const adjacentParsed = { ...parsed, streetNumber: adjacentStr };
 
       await new Promise((r) => setTimeout(r, FALLBACK_PAUSE_MS));
 
@@ -346,21 +357,25 @@ async function scrapeModuleWithFallback(
           const verified = adjacentPermits.filter((p) => {
             if (!p.address) return false;
             return (
-              addressMatchesStreetNumber(p.address, adjacentNum) &&
+              addressMatchesStreetNumber(p.address, adjacentStr) &&
               p.address.toUpperCase().includes(parsed.streetName.toUpperCase())
             );
           });
 
           if (verified.length > 0) {
             console.log(
-              `[accela-scraper] Adjacent number fallback found ${verified.length} permits at ${adjacentNum}`
+              `[accela-scraper] Adjacent number fallback found ${verified.length} permits at ${adjacentStr}`
             );
-            return { permits: verified, usedFallback: true };
+            return {
+              permits: verified,
+              usedFallback: true,
+              rawCountBeforeFilter: adjacentPermits.length,
+            };
           }
         }
       } catch (err) {
         console.warn(
-          `[accela-scraper] Adjacent number fallback (${adjacentNum}) failed:`,
+          `[accela-scraper] Adjacent number fallback (${adjacentStr}) failed:`,
           err
         );
       }
@@ -409,7 +424,7 @@ export async function scrapeAccelaPermits(
       page.setDefaultTimeout(BROWSER_TIMEOUT);
 
       try {
-        const { permits: modulePermits, usedFallback } =
+        const { permits: modulePermits, usedFallback, rawCountBeforeFilter } =
           await scrapeModuleWithFallback(
             page,
             mod.searchUrl,
@@ -438,7 +453,10 @@ export async function scrapeAccelaPermits(
           }
         }
 
-        if (modulePermits.length >= 100) anyTruncated = true;
+        // Use raw count before filtering for truncation check — fallback
+        // filtering can reduce 150→3 results, masking truncation
+        const countForTruncation = rawCountBeforeFilter ?? modulePermits.length;
+        if (countForTruncation >= 100) anyTruncated = true;
 
         console.log(
           `[accela-scraper] Module ${mod.name}: ${modulePermits.length} records, ${newCount} new`
