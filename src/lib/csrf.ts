@@ -4,7 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
  * Paths that use their own authentication and don't need origin checks.
  * Webhooks verify signatures; cron endpoints require CRON_SECRET.
  */
-const ORIGIN_EXEMPT_PREFIXES = ["/api/webhooks/", "/api/cron/"];
+const ORIGIN_EXEMPT_PREFIXES = [
+  "/api/webhooks/",
+  "/api/cron/",
+  "/api/lookup/", // scrape, status, results all protected by lookupId UUID
+];
 
 /**
  * Validate Origin header on state-changing requests.
