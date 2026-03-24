@@ -149,6 +149,7 @@ export async function generatePermitSummary(
   isUnit?: boolean,
   isDevelopmentPermit?: boolean,
   permitsTruncated?: boolean,
+  usedFuzzyMatch?: boolean,
 ): Promise<PermitSummary> {
   // Sort permits chronologically (oldest first) so AI sees timeline
   const sortedPermits = [...permits].sort((a, b) => {
@@ -267,6 +268,13 @@ WARNING — INCOMPLETE RECORDS: The permit search returned the maximum number of
 `
     : "";
 
+  // Fuzzy match context
+  const fuzzyMatchNote = usedFuzzyMatch
+    ? `
+NOTE — APPROXIMATE ADDRESS MATCH: These permits were found via approximate address matching because the exact address returned no results. The address may be stored differently in the portal. Acknowledge this in your summary — the permit count may be slightly under or over the actual total.
+`
+    : "";
+
   // Pre-computed pattern analysis (Gap 6 + 7)
   const patternSignals = analyzePermitPatterns(permits);
   const patternSection = patternSignals.length > 0
@@ -316,6 +324,7 @@ ${commercialContext}
 ${unitContext}
 ${newConstructionContext}
 ${truncationWarning}
+${fuzzyMatchNote}
 Lookup date: ${new Date().toISOString().split("T")[0]}
 Total permits found: ${permits.length}
 ${listingSection}
