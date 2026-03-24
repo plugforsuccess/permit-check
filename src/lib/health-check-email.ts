@@ -1,6 +1,13 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendInstance: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 function escapeHtml(str: string): string {
   return str
@@ -85,7 +92,7 @@ export async function sendHealthCheckAlert(
 </html>
   `.trim();
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: process.env.EMAIL_FROM || "alerts@permitcheck.org",
     to: alertEmail,
     subject: `🚨 PermitCheck Scraper Alert — ${failures.length} jurisdiction(s) failing`,
