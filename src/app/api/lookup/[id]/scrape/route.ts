@@ -147,6 +147,9 @@ export async function POST(
           description: p.description,
           address: p.address,
           module: p.module ?? "Building",
+          inspection_history: p.inspections
+            ? JSON.stringify(p.inspections)
+            : null,
         }))
       );
     }
