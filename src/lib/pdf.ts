@@ -348,7 +348,7 @@ export function generateReportHtml(data: ReportData): string {
   }
 
   <div class="disclaimer">
-    ${DISCLAIMER}
+    ${escapeHtml(DISCLAIMER)}
   </div>
 
   <div class="footer">
