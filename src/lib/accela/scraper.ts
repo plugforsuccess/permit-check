@@ -50,7 +50,7 @@ export interface ScrapeResult {
 }
 
 const BROWSER_TIMEOUT = 20_000;
-const SELECTOR_TIMEOUT = 15_000;
+const SELECTOR_TIMEOUT = 25_000;
 
 // Confirmed field IDs (DevTools-verified 2026-03-20)
 const SELECTORS = {
@@ -158,6 +158,8 @@ async function scrapeModule(
     waitUntil: "networkidle",
     timeout: BROWSER_TIMEOUT,
   });
+
+  await page.waitForTimeout(2000);
 
   await page.waitForSelector(SELECTORS.streetNumberFrom, {
     timeout: SELECTOR_TIMEOUT,
@@ -483,7 +485,7 @@ export async function scrapeAccelaPermits(
 
       // Brief pause between modules to avoid rate limiting
       if (jurisdiction.modules.indexOf(mod) < jurisdiction.modules.length - 1) {
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 3000));
       }
     }
 
