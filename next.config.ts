@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'strict-dynamic' js.stripe.com maps.googleapis.com maps.gstatic.com *.googleapis.com plausible.io",
+              "script-src 'self' 'unsafe-inline' js.stripe.com maps.googleapis.com maps.gstatic.com *.googleapis.com plausible.io",
               "style-src 'self' 'unsafe-inline' fonts.googleapis.com maps.googleapis.com",
               "font-src 'self' fonts.gstatic.com",
               "frame-src js.stripe.com",
