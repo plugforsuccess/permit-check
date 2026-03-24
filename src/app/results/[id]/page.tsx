@@ -71,6 +71,7 @@ export default function ResultsPage() {
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [clipboardError, setClipboardError] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
@@ -99,6 +100,7 @@ export default function ResultsPage() {
   const handleRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
+    setRefreshError(null);
 
     try {
       const res = await fetch(`/api/lookup/${lookupId}/refresh`, {
@@ -106,6 +108,9 @@ export default function ResultsPage() {
       });
 
       if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setRefreshError(data?.error ?? "Unable to refresh. Please try again.");
+        setTimeout(() => setRefreshError(null), 5000);
         setRefreshing(false);
         return;
       }
@@ -526,6 +531,9 @@ export default function ResultsPage() {
                   </svg>
                   {refreshing ? "Refreshing..." : "Refresh Data"}
                 </button>
+                {refreshError && (
+                  <span className="text-xs text-red-600">{refreshError}</span>
+                )}
                 {shareUrl && !shareCopied && (
                   <input
                     readOnly

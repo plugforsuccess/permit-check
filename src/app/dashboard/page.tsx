@@ -22,7 +22,6 @@ interface LookupHistory {
     pdf_url: string;
     expires_at: string;
     risk_level: string | null;
-    ai_summary: string | null;
   }>;
 }
 

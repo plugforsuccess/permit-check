@@ -60,8 +60,7 @@ export async function GET(request: NextRequest) {
           id,
           pdf_url,
           expires_at,
-          risk_level,
-          ai_summary
+          risk_level
         )
       `
       )

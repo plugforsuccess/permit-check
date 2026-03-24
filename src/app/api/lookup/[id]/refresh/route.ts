@@ -42,6 +42,14 @@ export async function POST(
     );
   }
 
+  // Only allow refresh when scrape is complete — prevent mid-scrape data corruption
+  if (lookup.status !== "complete") {
+    return NextResponse.json(
+      { error: "Lookup is not yet complete" },
+      { status: 409 }
+    );
+  }
+
   // Check if within free refresh window
   const daysSincePaid = lookup.paid_at
     ? Math.floor(
