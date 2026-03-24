@@ -2,6 +2,15 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 interface FailedTest {
   jurisdiction: string;
   description: string;
@@ -23,10 +32,10 @@ export async function sendHealthCheckAlert(
     .map(
       (f) => `
       <tr>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2;">${f.jurisdiction}</td>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2;">${f.description}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2;">${escapeHtml(f.jurisdiction)}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2;">${escapeHtml(f.description)}</td>
         <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2;">${f.permitCount} permits found</td>
-        <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2; font-size: 12px; color: #dc2626;">${f.error ?? "Below expected minimum"}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #fee2e2; font-size: 12px; color: #dc2626;">${escapeHtml(f.error ?? "Below expected minimum")}</td>
       </tr>`
     )
     .join("");

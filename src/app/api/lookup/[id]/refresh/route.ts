@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { UUID_RE } from "@/lib/schemas";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 
 const REFRESH_FREE_DAYS = 30;
 
@@ -16,8 +16,7 @@ export async function POST(
   }
 
   // Rate limit by lookup ID — prevents repeated refresh abuse
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = extractClientIp(request);
   const allowed = await rateLimit(`refresh:${ip}:${lookupId}`);
   if (!allowed) {
     return NextResponse.json(
@@ -31,7 +30,7 @@ export async function POST(
   // Verify lookup exists and is paid
   const { data: lookup } = await supabase
     .from("lookups")
-    .select("id, payment_status, paid_at, address_normalized, status")
+    .select("id, payment_status, paid_at, address_normalized, status, initiator_ip")
     .eq("id", lookupId)
     .single();
 
@@ -40,6 +39,11 @@ export async function POST(
       { error: "Payment required" },
       { status: 402 }
     );
+  }
+
+  // Verify caller is the same IP that initiated the lookup
+  if (lookup.initiator_ip && ip !== lookup.initiator_ip) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   // Only allow refresh when scrape is complete — prevent mid-scrape data corruption

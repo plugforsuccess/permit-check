@@ -16,6 +16,15 @@ const CHROMIUM_REMOTE_URL =
 import type { Browser, Page } from "playwright-core";
 import { getJurisdiction, type JurisdictionConfig } from "./jurisdictions";
 
+export interface InspectionRecord {
+  inspectionType: string;
+  scheduledDate: string | null;
+  inspectedDate: string | null;
+  result: "Passed" | "Failed" | "Pending" | "Canceled" | "Unknown";
+  inspector: string | null;
+  comments: string | null;
+}
+
 export interface PermitRecord {
   recordNumber: string;
   type: string;
@@ -31,6 +40,7 @@ export interface PermitRecord {
   description: string;
   address: string;
   module?: string; // "Building", "Electrical", "Plumbing", etc.
+  inspections?: InspectionRecord[]; // populated only for high-signal permits
 }
 
 export interface ScrapeResult {
@@ -480,6 +490,62 @@ export async function scrapeAccelaPermits(
     console.log(
       `[accela-scraper] Total: ${allPermits.length} unique permit records across all modules`
     );
+
+    // Selectively fetch inspection history for high-signal permits
+    const HIGH_SIGNAL_STATUSES = new Set(["Expired", "In Review"]);
+    const COMPLAINT_TYPES = /complaint|violation|code/i;
+
+    // Sort by filed date descending to identify most recent
+    const sortedForRecency = [...allPermits].sort((a, b) => {
+      if (!a.filedDate && !b.filedDate) return 0;
+      if (!a.filedDate) return 1;
+      if (!b.filedDate) return -1;
+      return b.filedDate > a.filedDate ? 1 : -1;
+    });
+
+    const mostRecentRecord = sortedForRecency[0]?.recordNumber;
+
+    const permitsNeedingDetail = allPermits.filter((p) => {
+      if (HIGH_SIGNAL_STATUSES.has(p.status)) return true;
+      if (COMPLAINT_TYPES.test(p.type)) return true;
+      if (p.recordNumber === mostRecentRecord) return true;
+      return false;
+    });
+
+    // Cap at 5 detail page fetches to limit runtime
+    const detailFetchTargets = permitsNeedingDetail.slice(0, 5);
+
+    if (detailFetchTargets.length > 0) {
+      console.log(
+        `[accela-scraper] Fetching inspection history for ${detailFetchTargets.length} permits`
+      );
+
+      const detailPage = await context.newPage();
+      detailPage.setDefaultTimeout(15000);
+
+      for (const permit of detailFetchTargets) {
+        const inspections = await fetchInspectionHistory(
+          detailPage,
+          permit.recordNumber,
+          jurisdictionId,
+          permit.module ?? "Building"
+        );
+
+        permit.inspections = inspections;
+
+        if (inspections.length > 0) {
+          console.log(
+            `[accela-scraper] ${permit.recordNumber}: ${inspections.length} inspection records`
+          );
+        }
+
+        // Brief pause between detail page fetches
+        await detailPage.waitForTimeout(500);
+      }
+
+      await detailPage.close();
+    }
+
     return { permits: allPermits, truncated: anyTruncated, usedFuzzyMatch };
   } catch (error) {
     console.error("[accela-scraper] Scraping failed:", error);
@@ -584,4 +650,94 @@ async function parseResultsTable(
     },
     { tableSelector: resultsTableSelector, addr: address, cols: columnMap }
   );
+}
+
+/**
+ * Fetch inspection history from an Accela permit detail page.
+ * Only called for high-signal permits (expired, in-review, complaints, most recent).
+ * Returns empty array on failure — never throws.
+ */
+async function fetchInspectionHistory(
+  page: Page,
+  recordNumber: string,
+  jurisdictionId: string,
+  module: string = "Building"
+): Promise<InspectionRecord[]> {
+  const jurisdiction = getJurisdiction(jurisdictionId);
+  const detailUrl = `${jurisdiction.portalUrl}/Cap/CapDetail.aspx?altId=${encodeURIComponent(recordNumber)}&module=${module}`;
+
+  try {
+    await page.goto(detailUrl, {
+      waitUntil: "networkidle",
+      timeout: 15000,
+    });
+
+    // Wait for the page to load
+    await page.waitForTimeout(1000);
+
+    // Extract inspection records from the inspection history table
+    const inspections = await page.evaluate(() => {
+      // Accela inspection table selector — try common patterns
+      const table = document.querySelector(
+        "table[id*='Inspection'], table[id*='inspection'], #tblInspectionResult"
+      ) as HTMLTableElement | null;
+
+      if (!table) return [];
+
+      const records: Array<{
+        inspectionType: string;
+        scheduledDate: string | null;
+        inspectedDate: string | null;
+        result: string;
+        inspector: string | null;
+        comments: string | null;
+      }> = [];
+
+      const rows = table.querySelectorAll("tr");
+
+      // Skip header rows (first 1-2 rows)
+      for (let i = 1; i < rows.length; i++) {
+        const cells = rows[i].querySelectorAll("td");
+        if (cells.length < 3) continue;
+
+        const getText = (cell: Element | undefined) =>
+          (cell?.textContent || "").trim();
+
+        // Column order varies by portal — try common patterns
+        // Most Accela portals: [type, scheduled, inspected, result, inspector]
+        const inspectionType = getText(cells[0]);
+        if (!inspectionType) continue;
+
+        const result = getText(cells[3] ?? cells[2]);
+        const normalizedResult = (() => {
+          const r = result.toUpperCase();
+          if (r.includes("PASS")) return "Passed" as const;
+          if (r.includes("FAIL")) return "Failed" as const;
+          if (r.includes("CANCEL")) return "Canceled" as const;
+          if (r.includes("PEND") || r.includes("SCHEDUL")) return "Pending" as const;
+          return "Unknown" as const;
+        })();
+
+        records.push({
+          inspectionType,
+          scheduledDate: getText(cells[1]) || null,
+          inspectedDate: getText(cells[2]) || null,
+          result: normalizedResult,
+          inspector: cells[4] ? getText(cells[4]) : null,
+          comments: cells[5] ? getText(cells[5]) : null,
+        });
+      }
+
+      return records;
+    });
+
+    return inspections;
+  } catch (err) {
+    // Never fail the main scrape due to detail page errors
+    console.warn(
+      `[accela-scraper] Failed to fetch inspection history for ${recordNumber}:`,
+      err
+    );
+    return [];
+  }
 }

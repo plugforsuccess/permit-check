@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
 import { UUID_RE } from "@/lib/schemas";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { generatePermitSummary } from "@/lib/summary";
 import { fetchPropertyData } from "@/lib/property-data";
 import { generateReportHtml } from "@/lib/pdf";
@@ -30,8 +30,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
   }
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = extractClientIp(request);
   const allowed = await rateLimit(`regenerate:${ip}:${lookupId}`);
   if (!allowed) {
     return NextResponse.json(
@@ -58,6 +57,11 @@ export async function POST(
       { error: "Payment required" },
       { status: 402 }
     );
+  }
+
+  // Verify caller is the same IP that initiated the lookup
+  if (lookup.initiator_ip && ip !== lookup.initiator_ip) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   if (lookup.status !== "complete") {

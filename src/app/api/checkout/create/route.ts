@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase";
 import { createCheckoutSession } from "@/lib/stripe";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { config } from "@/lib/config";
 import { hasAgentAccess } from "@/lib/subscription";
 
@@ -19,9 +19,7 @@ const checkoutSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Rate limit by IP to prevent checkout spam
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      "unknown";
+    const ip = extractClientIp(request);
     const allowed = await rateLimit(`checkout:${ip}`);
     if (!allowed) {
       return NextResponse.json(
@@ -107,7 +105,9 @@ export async function POST(request: NextRequest) {
       listing_description
     );
 
-    return NextResponse.json({ checkout_url: session.url });
+    return NextResponse.json({ checkout_url: session.url }, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (error) {
     console.error("Checkout creation error:", error);
     return NextResponse.json(

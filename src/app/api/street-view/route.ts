@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
+
+// Only allow alphanumeric characters, spaces, commas, periods, hashes, and hyphens
+const SAFE_ADDRESS_RE = /^[a-zA-Z0-9\s,.\-#/]+$/;
 
 export async function GET(request: NextRequest) {
   const address = request.nextUrl.searchParams.get("address");
 
-  if (!address || address.length > 300) {
+  if (!address || address.length < 5 || address.length > 300 || !SAFE_ADDRESS_RE.test(address)) {
     return new NextResponse(null, { status: 400 });
   }
 
   // Rate limit by IP to protect Google Maps API quota
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = extractClientIp(request);
   const allowed = await rateLimit(`streetview:${ip}`);
   if (!allowed) {
     return new NextResponse(null, { status: 429 });

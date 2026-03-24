@@ -149,6 +149,7 @@ export async function GET(
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Content-Disposition": `inline; filename="permitcheck-${lookupId}.html"`,
+        "Referrer-Policy": "no-referrer",
       },
     });
   }
@@ -173,6 +174,7 @@ export async function GET(
             "Content-Type": "application/pdf",
             "Content-Disposition": `attachment; filename="permitcheck-attorney-report-${lookupId}.pdf"`,
             "Cache-Control": "private, max-age=3600",
+            "Referrer-Policy": "no-referrer",
           },
         });
       }
@@ -195,6 +197,7 @@ export async function GET(
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="permitcheck-attorney-report-${lookupId}.pdf"`,
       "Cache-Control": "private, no-store",
+      "Referrer-Policy": "no-referrer",
     },
   });
 }

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { scrapeAccelaPermits } from "@/lib/accela/index";
 import { scrapedPermitSchema, UUID_RE } from "@/lib/schemas";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
 
 export const maxDuration = 300;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: lookupId } = await params;
@@ -31,12 +31,18 @@ export async function POST(
   // Fetch the lookup row
   const { data: lookup } = await supabase
     .from("lookups")
-    .select("id, address_normalized, jurisdiction_id, status, is_unit, base_address")
+    .select("id, address_normalized, jurisdiction_id, status, is_unit, base_address, initiator_ip")
     .eq("id", lookupId)
     .single();
 
   if (!lookup) {
     return NextResponse.json({ error: "Lookup not found" }, { status: 404 });
+  }
+
+  // Verify caller is the same IP that initiated the lookup
+  const callerIp = extractClientIp(request);
+  if (lookup.initiator_ip && callerIp !== lookup.initiator_ip) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
   // Already complete — don't re-scrape
@@ -147,6 +153,9 @@ export async function POST(
           description: p.description,
           address: p.address,
           module: p.module ?? "Building",
+          inspection_history: p.inspections
+            ? JSON.stringify(p.inspections)
+            : null,
         }))
       );
     }

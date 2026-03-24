@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { UUID_RE } from "@/lib/schemas";
 
 /**
@@ -17,8 +17,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid lookup ID" }, { status: 400 });
   }
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = extractClientIp(request);
   const allowed = await rateLimit(`results:${ip}`);
   if (!allowed) {
     return NextResponse.json(

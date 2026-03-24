@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { Permit } from "@/types";
 
 interface PermitTableProps {
@@ -110,6 +110,48 @@ export default function PermitTable({
             <div className="text-xs text-gray-400">
               Filed: {permit.filed_date || "\u2014"}
             </div>
+            {permit.inspection_history &&
+              permit.inspection_history.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Inspections
+                  </div>
+                  <div className="space-y-1">
+                    {permit.inspection_history.map((insp, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            insp.result === "Passed"
+                              ? "bg-green-500"
+                              : insp.result === "Failed"
+                                ? "bg-red-500"
+                                : insp.result === "Canceled"
+                                  ? "bg-gray-400"
+                                  : "bg-yellow-400"
+                          }`}
+                        />
+                        <span className="text-gray-600">
+                          {insp.inspectionType}
+                        </span>
+                        <span
+                          className={`font-medium ${
+                            insp.result === "Passed"
+                              ? "text-green-700"
+                              : insp.result === "Failed"
+                                ? "text-red-700"
+                                : "text-gray-500"
+                          }`}
+                        >
+                          {insp.result}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         ))}
       </div>
@@ -138,46 +180,137 @@ export default function PermitTable({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {permits.map((permit, index) => (
-              <tr
-                key={permit.id || index}
-                className="hover:bg-gray-50 transition-colors"
-                style={{ animation: `fadeIn 0.2s ease both ${index * 0.05}s` }}
-              >
-                <td className="px-4 py-3 text-sm font-mono text-gray-900">
-                  {permit.record_number}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-700">
-                  {permit.type}
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
-                  {permit.module ?? "Building"}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex px-2.5 py-0.5 text-xs font-semibold ${statusStyles[permit.status] || statusStyles.Unknown}`}
+            {permits.map((permit, index) => {
+              const hasInspections =
+                permit.inspection_history &&
+                permit.inspection_history.length > 0;
+              const isExpanded = expanded.has(permit.record_number);
+              return (
+                <Fragment key={permit.id || index}>
+                  <tr
+                    className="hover:bg-gray-50 transition-colors"
+                    style={{
+                      animation: `fadeIn 0.2s ease both ${index * 0.05}s`,
+                    }}
                   >
-                    {permit.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {permit.filed_date || "\u2014"}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {permit.issued_date || "\u2014"}
-                </td>
-                <td
-                  className="px-4 py-3 text-sm text-gray-600 max-w-xs cursor-pointer hover:text-gray-900 transition-colors"
-                  onClick={() => toggleExpanded(permit.record_number)}
-                  title={permit.description ? "Click to expand" : undefined}
-                >
-                  {expanded.has(permit.record_number)
-                    ? permit.description || "\u2014"
-                    : (permit.description?.slice(0, 60) ?? "\u2014") +
-                      ((permit.description?.length ?? 0) > 60 ? "..." : "")}
-                </td>
-              </tr>
-            ))}
+                    <td className="px-4 py-3 text-sm font-mono text-gray-900">
+                      <span className="flex items-center gap-1.5">
+                        {permit.record_number}
+                        {hasInspections && (
+                          <button
+                            onClick={() =>
+                              toggleExpanded(permit.record_number)
+                            }
+                            className="text-gray-400 hover:text-gray-700 transition-colors"
+                            title="Toggle inspection history"
+                          >
+                            <svg
+                              className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5l7 7-7 7"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {permit.type}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {permit.module ?? "Building"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex px-2.5 py-0.5 text-xs font-semibold ${statusStyles[permit.status] || statusStyles.Unknown}`}
+                      >
+                        {permit.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {permit.filed_date || "\u2014"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {permit.issued_date || "\u2014"}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-sm text-gray-600 max-w-xs cursor-pointer hover:text-gray-900 transition-colors"
+                      onClick={() =>
+                        !hasInspections &&
+                        toggleExpanded(permit.record_number)
+                      }
+                      title={
+                        permit.description ? "Click to expand" : undefined
+                      }
+                    >
+                      {expanded.has(permit.record_number) || hasInspections
+                        ? permit.description || "\u2014"
+                        : (permit.description?.slice(0, 60) ?? "\u2014") +
+                          ((permit.description?.length ?? 0) > 60
+                            ? "..."
+                            : "")}
+                    </td>
+                  </tr>
+                  {hasInspections && isExpanded && (
+                    <tr>
+                      <td colSpan={7} className="px-4 pb-3 pt-0">
+                        <div className="ml-2 pl-3 border-l-2 border-gray-100">
+                          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Inspection History
+                          </div>
+                          <div className="space-y-1">
+                            {permit.inspection_history!.map((insp, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-3 text-xs"
+                              >
+                                <span
+                                  className={`w-2 h-2 rounded-full shrink-0 ${
+                                    insp.result === "Passed"
+                                      ? "bg-green-500"
+                                      : insp.result === "Failed"
+                                        ? "bg-red-500"
+                                        : insp.result === "Canceled"
+                                          ? "bg-gray-400"
+                                          : "bg-yellow-400"
+                                  }`}
+                                />
+                                <span className="text-gray-700 font-medium">
+                                  {insp.inspectionType}
+                                </span>
+                                <span
+                                  className={`font-semibold ${
+                                    insp.result === "Passed"
+                                      ? "text-green-700"
+                                      : insp.result === "Failed"
+                                        ? "text-red-700"
+                                        : "text-gray-500"
+                                  }`}
+                                >
+                                  {insp.result}
+                                </span>
+                                {insp.inspectedDate && (
+                                  <span className="text-gray-400">
+                                    {insp.inspectedDate}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

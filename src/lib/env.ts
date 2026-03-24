@@ -17,6 +17,7 @@ const required = [
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
   "ANTHROPIC_API_KEY",
+  "CRON_SECRET",
 ];
 
 let validated = false;

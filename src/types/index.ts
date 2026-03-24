@@ -1,3 +1,12 @@
+export interface InspectionRecord {
+  inspectionType: string;
+  scheduledDate: string | null;
+  inspectedDate: string | null;
+  result: "Passed" | "Failed" | "Pending" | "Canceled" | "Unknown";
+  inspector: string | null;
+  comments: string | null;
+}
+
 export interface Permit {
   id?: string;
   lookup_id: string;
@@ -9,6 +18,7 @@ export interface Permit {
   description: string;
   contractor: string | null;
   module?: string;
+  inspection_history?: InspectionRecord[] | null;
 }
 
 export type PermitStatus =

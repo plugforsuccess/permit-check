@@ -6,7 +6,7 @@ import {
 } from "@/lib/accela/index";
 import { normalizeAddress, validateAddress, detectUnitAddress } from "@/lib/address";
 import { lookupInitiateSchema } from "@/lib/schemas";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { log } from "@/lib/logger";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -14,9 +14,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export async function POST(request: NextRequest) {
   try {
     // Rate limit: 5 requests per minute per IP
-    const clientIp =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      "unknown";
+    const clientIp = extractClientIp(request);
     const allowed = await rateLimit(clientIp);
     if (!allowed) {
       return NextResponse.json(
@@ -96,6 +94,8 @@ export async function POST(request: NextRequest) {
         lookup_id: cachedLookup.id,
         cached: true,
         jurisdiction_id: cachedLookup.jurisdiction_id ?? jurisdictionId,
+      }, {
+        headers: { "Cache-Control": "private, no-store" },
       });
     }
 
@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
         jurisdiction_id: jurisdictionId,
         is_unit: isUnit,
         base_address: isUnit ? baseAddress : null,
+        initiator_ip: clientIp !== "unknown" ? clientIp : null,
       })
       .select("id")
       .single();
@@ -127,6 +128,8 @@ export async function POST(request: NextRequest) {
       lookup_id: lookup.id,
       cached: false,
       jurisdiction_id: jurisdictionId,
+    }, {
+      headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
     log.error("Lookup initiation error", { error: String(error) });
