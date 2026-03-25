@@ -1,7 +1,7 @@
 import type { Permit } from "@/types";
 import type { PropertyData } from "./property-data";
 import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
-import { extractListingClaims, formatClaimsForPrompt } from "./listing-parser";
+import { extractListingClaims, formatClaimsForPrompt, extractYearReferences } from "./listing-parser";
 import { permitSummarySchema } from "./schemas";
 
 /**
@@ -51,27 +51,17 @@ function analyzePermitPatterns(permits: Permit[]): string[] {
     statusCounts[p.status] = (statusCounts[p.status] ?? 0) + 1;
   }
 
-  // Stalled permits: "In Review" for 2+ years
+  // Stalled permits: "In Review" for 1+ years
   const stalledPermits = permits.filter((p) => {
     if (p.status !== "In Review" || !p.filed_date) return false;
     const filed = new Date(p.filed_date);
     if (isNaN(filed.getTime())) return false;
     const yearsStalled = (today.getTime() - filed.getTime()) / (1000 * 60 * 60 * 24 * 365);
-    return yearsStalled >= 2;
+    return yearsStalled >= 1; // Flag after 12 months, not 24
   });
   if (stalledPermits.length > 0) {
     signals.push(
-      `STALLED PERMITS: ${stalledPermits.length} permit(s) filed 2+ years ago still show "In Review" status — ${stalledPermits.map((p) => `${p.record_number} (filed ${p.filed_date})`).join(", ")}. This indicates abandoned applications or jurisdiction backlog.`
-    );
-  }
-
-  // Filed but never issued: has filed_date but no issued_date and not Finaled/Void
-  const neverIssued = permits.filter(
-    (p) => p.filed_date && !p.issued_date && !["Finaled", "Void"].includes(p.status)
-  );
-  if (neverIssued.length > 3) {
-    signals.push(
-      `UNISSUED PERMITS: ${neverIssued.length} permits were filed but never issued — work may have been started without final approval.`
+      `STALLED PERMITS: ${stalledPermits.length} permit(s) filed 1+ year ago still show "In Review" status — ${stalledPermits.map((p) => `${p.record_number} (filed ${p.filed_date})`).join(", ")}. This indicates abandoned applications or jurisdiction backlog.`
     );
   }
 
@@ -254,12 +244,19 @@ IMPORTANT — COMMERCIAL/MULTI-FAMILY PROPERTY: This property is classified as "
     const claims = extractListingClaims(truncatedListing);
     const permitData = permits.map((p) => ({ type: p.type, status: p.status }));
     const claimsCrossRef = formatClaimsForPrompt(claims, permitData);
+    const yearRefs = extractYearReferences(truncatedListing);
+    const yearContext = yearRefs.length > 0
+      ? `\nYEAR REFERENCES IN LISTING:\n${yearRefs
+          .map((r) => `- Year ${r.year} mentioned near renovation claim: "${r.context}"`)
+          .join("\n")}\n`
+      : "";
 
     listingSection = `
 <listing_description>
 ${truncatedListing}
 </listing_description>
 
+${yearContext}
 ${claimsCrossRef || "No specific renovation claims detected in listing text.\n"}
 `;
 
@@ -391,7 +388,7 @@ RULES:
 5. "Seller questions" must be specific and actionable — what should the buyer literally say to their agent or the seller?
 6. If permits.length === 0 and property was recently sold or is listed as renovated, that is HIGH risk — zero permits on a claimed renovation is the core red flag PermitCheck exists to catch.
 7. Duplicate permit records (same record number appearing multiple times) should be counted once.
-8. Check for STALLED permits: any permit with status "In Review" and a filed date 2+ years ago is a red flag — the application was either abandoned or stuck in bureaucracy. Flag it explicitly.
+8. Check for STALLED permits: any permit with status "In Review" and a filed date 1+ year ago is a red flag — the application was either abandoned or stuck in bureaucracy. Flag it explicitly.
 9. Check the "issued" date field: permits that were filed but never issued (issued = null) and are not Finaled or Void indicate work that was never formally approved.
 10. Look for PATTERNS across permits: same type filed multiple times in one year suggests repeated failures. Multiple different types in the same 90-day window suggests a coordinated renovation.
 11. If records were TRUNCATED (noted above), state this limitation clearly and recommend the buyer request full records from the jurisdiction.
@@ -414,7 +411,7 @@ Respond with a JSON object only, no markdown, no explanation:
 Risk level guide:
 - low: All permits finaled or issued, no complaints, no expired permits, records consistent with property age and condition
 - medium: 1-2 expired permits with no complaints, or minor issues that need follow-up but are not deal-breakers
-- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits, stalled permits 2+ years old`;
+- high: Any open building complaint, multiple expired permits, signs of unpermitted work, flip with no renovation permits, recent sale with major renovation claims but no permits, stalled permits 1+ year old`;
 
   const MAX_RETRIES = 2;
   let response: Response | null = null;
