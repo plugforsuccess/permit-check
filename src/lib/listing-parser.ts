@@ -116,6 +116,49 @@ export function extractListingClaims(text: string): ListingClaim[] {
  * Format extracted claims for inclusion in the AI prompt.
  * Creates a structured cross-reference table Claude can use directly.
  */
+export interface YearReference {
+  year: number;
+  context: string; // Surrounding text snippet
+}
+
+/**
+ * Extract year references near renovation-related keywords in listing text.
+ * Helps the AI cross-reference claimed renovation dates against permit timelines.
+ */
+export function extractYearReferences(text: string): YearReference[] {
+  if (!text || text.trim().length === 0) return [];
+
+  const refs: YearReference[] = [];
+  const seen = new Set<number>();
+  const currentYear = new Date().getFullYear();
+
+  // Match 4-digit years (1990–current) near renovation keywords
+  const yearRegex = /\b(19[9]\d|20[0-2]\d)\b/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = yearRegex.exec(text)) !== null) {
+    const year = parseInt(match[1], 10);
+    if (year > currentYear || seen.has(year)) continue;
+
+    // Get surrounding context (80 chars before and after)
+    const start = Math.max(0, match.index - 80);
+    const end = Math.min(text.length, match.index + match[0].length + 80);
+    const context = text.slice(start, end).replace(/\s+/g, " ").trim();
+
+    // Only include if context contains renovation-related language
+    if (/\b(renovat|remodel|updat|replac|new|built|construct|flip|redone|restor|gut|addition|convert)\b/i.test(context)) {
+      seen.add(year);
+      refs.push({ year, context });
+    }
+  }
+
+  return refs.sort((a, b) => a.year - b.year);
+}
+
+/**
+ * Format extracted claims for inclusion in the AI prompt.
+ * Creates a structured cross-reference table Claude can use directly.
+ */
 export function formatClaimsForPrompt(
   claims: ListingClaim[],
   permits: Array<{ type: string; status: string }>
