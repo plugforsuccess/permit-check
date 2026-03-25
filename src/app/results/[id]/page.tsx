@@ -221,12 +221,35 @@ export default function ResultsPage() {
       const data = await res.json();
       if (data.share_url) {
         setShareUrl(data.share_url);
+
+        // Use native share sheet on mobile (iOS Safari, Android Chrome)
+        // Falls back to clipboard copy on desktop
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: "PermitCheck Report",
+              text: `Permit history for ${result?.address_normalized ?? "this property"} — verified via official government records.`,
+              url: data.share_url,
+            });
+            // Native share sheet handled — no need to show the URL input
+            return;
+          } catch (err) {
+            // User dismissed the share sheet (AbortError) — fall through to clipboard
+            // Any other error — fall through to clipboard
+            if ((err as Error).name === "AbortError") {
+              // User cancelled — do nothing, don't show clipboard fallback
+              return;
+            }
+          }
+        }
+
+        // Desktop fallback — clipboard copy + show URL input
         try {
           await navigator.clipboard.writeText(data.share_url);
           setShareCopied(true);
           setTimeout(() => setShareCopied(false), 3000);
         } catch {
-          // Clipboard API unavailable (HTTP or denied) — URL shown via state
+          // Clipboard unavailable — URL is shown via shareUrl state below
         }
       }
     } catch {
@@ -560,12 +583,30 @@ export default function ResultsPage() {
                   <span className="text-xs text-red-600">{refreshError}</span>
                 )}
                 {shareUrl && !shareCopied && (
-                  <input
-                    readOnly
-                    value={shareUrl}
-                    onClick={(e) => (e.target as HTMLInputElement).select()}
-                    className="w-full sm:w-auto px-3 py-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg font-mono"
-                  />
+                  <div className="w-full sm:w-auto flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                    <a
+                      href={shareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 font-mono underline truncate flex-1 min-w-0"
+                    >
+                      {shareUrl}
+                    </a>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(shareUrl);
+                          setShareCopied(true);
+                          setTimeout(() => setShareCopied(false), 3000);
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700 shrink-0 font-medium"
+                    >
+                      Copy
+                    </button>
+                  </div>
                 )}
               </div>
             ) : listingAnalyzing ? (
