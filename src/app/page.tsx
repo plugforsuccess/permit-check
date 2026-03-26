@@ -88,35 +88,21 @@ function HomePageContent() {
   return (
     <div>
       {/* Hero — split layout */}
-      <section className="relative pt-16 pb-16 px-4 bg-[#0f1f3d] overflow-hidden">
-        {/* Subtle grid pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: `linear-gradient(#c9a84c 1px, transparent 1px), linear-gradient(90deg, #c9a84c 1px, transparent 1px)`,
-            backgroundSize: "48px 48px",
-          }}
-        />
-        {/* Gold radial glow — top left */}
-        <div
-          className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-10 blur-3xl"
-          style={{ background: "radial-gradient(circle, #c9a84c, transparent)" }}
-        />
-
-        <div className="relative max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+      <section className="pt-16 pb-12 px-4 bg-white">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
 
           {/* Left: CTA */}
           <div>
-            <div className="inline-flex flex-wrap items-center gap-2 bg-white/10 text-white/80 text-sm font-medium px-3 py-1.5 rounded-full mb-6 border border-white/10">
+            <div className="inline-flex flex-wrap items-center gap-2 bg-[#0f1f3d]/5 text-[#0f1f3d] text-sm font-medium px-3 py-1.5 rounded-full mb-6 border border-[#0f1f3d]/10">
               <span className="w-2 h-2 bg-[#c9a84c] rounded-full animate-pulse" />
               Now covering Atlanta Metro + Gwinnett County
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-5 leading-tight tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
               Verify permits before
               <br />
               <span style={{ color: "#c9a84c" }}>you close.</span>
             </h1>
-            <p className="text-lg text-white/60 mb-8 leading-relaxed">
+            <p className="text-lg text-gray-500 mb-8 leading-relaxed">
               Unpermitted work costs buyers tens of thousands. Search the
               official government permit database for any supported metro area
               property in seconds.
@@ -133,7 +119,7 @@ function HomePageContent() {
               </div>
             )}
             {/* Trust signals */}
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/50">
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
               <span>&#10003; Official government data</span>
               <span>&#10003; Results in ~20 seconds</span>
               <span>&#10003; $9.99 one-time</span>
@@ -142,7 +128,7 @@ function HomePageContent() {
 
           {/* Right: Product preview */}
           <div className="hidden lg:block relative">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl shadow-black/20 overflow-hidden ring-1 ring-white/10">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
               {/* Mock results header */}
               <div className="px-6 py-4 border-b border-gray-100">
                 <div className="text-sm text-gray-500 mb-1">55 Trinity Ave SW, Atlanta, GA</div>
@@ -182,19 +168,12 @@ function HomePageContent() {
               </div>
             </div>
             {/* Decorative elements */}
-            <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/5 rounded-full -z-10" />
-            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/5 rounded-full -z-10" />
+            <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-50 rounded-full -z-10" />
+            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-green-50 rounded-full -z-10" />
           </div>
 
         </div>
       </section>
-
-      {/* Wave divider */}
-      <div className="relative bg-[#0f1f3d] -mb-1">
-        <svg viewBox="0 0 1440 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
-          <path d="M0 40L1440 40L1440 20C1200 0 720 40 0 20L0 40Z" fill="#f9fafb"/>
-        </svg>
-      </div>
 
       {/* Below the fold explainer */}
       <section className="py-16 bg-gray-50">
