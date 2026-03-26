@@ -310,7 +310,7 @@ export default function AddressAutocomplete({
             aria-activedescendant={
               activeIndex >= 0 ? `address-option-${activeIndex}` : undefined
             }
-            className="w-full px-4 sm:px-6 py-3.5 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none focus:border-blue-400 transition-colors disabled:text-gray-400 disabled:placeholder-gray-400"
+            className="w-full px-4 sm:px-6 py-3.5 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none focus:border-[#0f1f3d] transition-colors disabled:text-gray-400 disabled:placeholder-gray-400"
           />
 
           {/* Custom dropdown */}
@@ -412,28 +412,28 @@ export default function AddressAutocomplete({
 
       {/* Report type selector */}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-3 justify-center">
-        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "standard" ? "border-blue-300 bg-blue-50" : "border-transparent hover:bg-gray-50"}`}>
+        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "standard" ? "border-[#0f1f3d] bg-[#0f1f3d]/5" : "border-transparent hover:bg-gray-50"}`}>
           <input
             type="radio"
             name="reportType"
             value="standard"
             checked={reportType === "standard"}
             onChange={() => setReportType("standard")}
-            className="text-blue-600 focus:ring-blue-500"
+            className="text-[#0f1f3d] focus:ring-[#0f1f3d]"
           />
           <span className="text-sm text-gray-700">
             Standard Report{" "}
             <span className="font-semibold text-gray-900">$9.99</span>
           </span>
         </label>
-        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "attorney" ? "border-blue-300 bg-blue-50" : "border-transparent hover:bg-gray-50"}`}>
+        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "attorney" ? "border-[#0f1f3d] bg-[#0f1f3d]/5" : "border-transparent hover:bg-gray-50"}`}>
           <input
             type="radio"
             name="reportType"
             value="attorney"
             checked={reportType === "attorney"}
             onChange={() => setReportType("attorney")}
-            className="text-blue-600 focus:ring-blue-500"
+            className="text-[#0f1f3d] focus:ring-[#0f1f3d]"
           />
           <span className="text-sm text-gray-700">
             Attorney Report{" "}
