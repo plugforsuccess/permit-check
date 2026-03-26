@@ -9,23 +9,30 @@ interface PermitTableProps {
 }
 
 const statusStyles: Record<string, string> = {
-  Issued: "border-l-2 border-green-500 bg-green-50 text-green-800",
-  Expired: "border-l-2 border-red-400 bg-red-50 text-red-700",
-  "In Review": "border-l-2 border-yellow-400 bg-yellow-50 text-yellow-800",
-  Finaled: "border-l-2 border-blue-400 bg-blue-50 text-blue-800",
-  Void: "border-l-2 border-gray-300 bg-gray-50 text-gray-500",
-  Pending: "border-l-2 border-yellow-400 bg-yellow-50 text-yellow-800",
-  Unknown: "border-l-2 border-gray-200 bg-gray-50 text-gray-400",
+  Issued:
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200",
+  Expired:
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800 ring-1 ring-red-200",
+  "In Review":
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200",
+  Finaled:
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 ring-1 ring-blue-200",
+  Void:
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-500 ring-1 ring-gray-200",
+  Pending:
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200",
+  Unknown:
+    "inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-400 ring-1 ring-gray-200",
 };
 
 const mobileStatusStyles: Record<string, string> = {
-  Issued: "bg-green-100 text-green-800",
-  Expired: "bg-red-100 text-red-700",
-  "In Review": "bg-yellow-100 text-yellow-800",
-  Finaled: "bg-blue-100 text-blue-800",
-  Void: "bg-gray-100 text-gray-500",
-  Pending: "bg-yellow-100 text-yellow-800",
-  Unknown: "bg-gray-100 text-gray-400",
+  Issued: "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200",
+  Expired: "bg-red-100 text-red-800 ring-1 ring-red-200",
+  "In Review": "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
+  Finaled: "bg-blue-100 text-blue-800 ring-1 ring-blue-200",
+  Void: "bg-gray-100 text-gray-500 ring-1 ring-gray-200",
+  Pending: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
+  Unknown: "bg-gray-100 text-gray-400 ring-1 ring-gray-200",
 };
 
 export default function PermitTable({
@@ -83,8 +90,8 @@ export default function PermitTable({
         {permits.map((permit, index) => (
           <div
             key={permit.id || index}
-            className="bg-white border border-gray-200 rounded-xl p-4"
-            style={{ animation: `fadeIn 0.2s ease both ${index * 0.05}s` }}
+            className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-150"
+            style={{ animation: `fadeInUp 0.3s ease both ${index * 0.04}s` }}
           >
             <div className="flex items-start justify-between mb-2">
               <span className="font-mono text-sm font-medium text-gray-900">
@@ -159,20 +166,12 @@ export default function PermitTable({
       {/* Desktop table — hidden on small screens */}
       <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-[#0f1f3d] sticky top-0 z-10">
+          <thead className="bg-[#0f1f3d]">
             <tr>
-              {[
-                "Record #",
-                "Type",
-                "Module",
-                "Status",
-                "Filed Date",
-                "Issued Date",
-                "Description",
-              ].map((header) => (
+              {["Record #", "Type", "Module", "Status", "Filed Date", "Issued Date", "Description"].map((header) => (
                 <th
                   key={header}
-                  className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider"
+                  className="px-4 py-3.5 text-left text-xs font-semibold text-white/70 uppercase tracking-wider first:rounded-tl-xl last:rounded-tr-xl"
                 >
                   {header}
                 </th>
@@ -188,9 +187,9 @@ export default function PermitTable({
               return (
                 <Fragment key={permit.id || index}>
                   <tr
-                    className="hover:bg-gray-50 transition-colors"
+                    className="hover:bg-[#0f1f3d]/[0.02] transition-colors duration-150 cursor-default"
                     style={{
-                      animation: `fadeIn 0.2s ease both ${index * 0.05}s`,
+                      animation: `fadeInUp 0.3s ease both ${index * 0.04}s`,
                     }}
                   >
                     <td className="px-4 py-3 text-sm font-mono text-gray-900">
@@ -228,9 +227,14 @@ export default function PermitTable({
                       {permit.module ?? "Building"}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 text-xs font-semibold ${statusStyles[permit.status] || statusStyles.Unknown}`}
-                      >
+                      <span className={statusStyles[permit.status] || statusStyles.Unknown}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          permit.status === "Issued" ? "bg-emerald-500" :
+                          permit.status === "Finaled" ? "bg-blue-500" :
+                          permit.status === "Expired" ? "bg-red-500" :
+                          permit.status === "In Review" || permit.status === "Pending" ? "bg-amber-500" :
+                          "bg-gray-400"
+                        }`} />
                         {permit.status}
                       </span>
                     </td>

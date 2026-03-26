@@ -77,13 +77,17 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <nav className="border-b border-gray-100 bg-white" aria-label="Main navigation">
+        <nav
+          className="sticky top-0 z-50 border-b border-white/10 bg-white/80 backdrop-blur-md"
+          style={{ WebkitBackdropFilter: "blur(12px)" }}
+          aria-label="Main navigation"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <a href="/" className="flex items-center">
+              <a href="/" className="flex items-center group">
                 <Logo size="md" variant="light" />
               </a>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
                 <a
                   href="/#pricing"
                   className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-50"
@@ -92,13 +96,13 @@ export default function RootLayout({
                 </a>
                 <a
                   href="/subscribe"
-                  className="hidden sm:block text-sm font-semibold text-[#c9a84c] hover:text-[#b8973d] transition-colors"
+                  className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-[#0f1f3d] bg-[#c9a84c]/10 hover:bg-[#c9a84c]/20 px-3 py-2 rounded-lg transition-colors"
                 >
                   Agent Plan
                 </a>
                 <a
                   href="/dashboard"
-                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  className="text-sm font-medium text-white bg-[#0f1f3d] hover:bg-[#1a3560] px-4 py-2 rounded-lg transition-colors ml-1"
                 >
                   Sign In
                 </a>
@@ -111,15 +115,75 @@ export default function RootLayout({
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
         </GoogleMapsProvider>
-        <footer className="border-t border-gray-100 py-8">
-          <div className="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500">
-            <p>
-              &copy; {new Date().getFullYear()} PermitCheck. All rights
-              reserved.
-            </p>
-            <p className="mt-1">
-              Data sourced from official government permit databases. Not legal advice.
-            </p>
+        <footer className="bg-[#0f1f3d] text-white mt-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="grid sm:grid-cols-3 gap-8 mb-10">
+
+              {/* Brand column */}
+              <div>
+                <Logo size="md" variant="dark" className="mb-3" />
+                <p className="text-sm text-white/50 leading-relaxed">
+                  Official permit verification for Atlanta Metro properties.
+                  Know before you close.
+                </p>
+              </div>
+
+              {/* Product column */}
+              <div>
+                <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
+                  Product
+                </div>
+                <ul className="space-y-2">
+                  <li>
+                    <a href="/#pricing" className="text-sm text-white/60 hover:text-white transition-colors">
+                      Pricing
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/subscribe" className="text-sm text-white/60 hover:text-white transition-colors">
+                      Agent Plan
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/dashboard" className="text-sm text-white/60 hover:text-white transition-colors">
+                      Sign In
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Trust column */}
+              <div>
+                <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
+                  Data & Trust
+                </div>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2 text-sm text-white/60">
+                    <span className="text-[#c9a84c] mt-0.5 shrink-0">&#10003;</span>
+                    Official Accela government database
+                  </li>
+                  <li className="flex items-start gap-2 text-sm text-white/60">
+                    <span className="text-[#c9a84c] mt-0.5 shrink-0">&#10003;</span>
+                    City of Atlanta &amp; Gwinnett County
+                  </li>
+                  <li className="flex items-start gap-2 text-sm text-white/60">
+                    <span className="text-[#c9a84c] mt-0.5 shrink-0">&#10003;</span>
+                    Records updated in real time
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+
+            {/* Bottom bar */}
+            <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-white/30">
+                &copy; {new Date().getFullYear()} PermitCheck. All rights reserved.
+              </p>
+              <p className="text-xs text-white/30 text-center">
+                Data sourced from official government permit databases. Not legal advice.
+              </p>
+            </div>
           </div>
         </footer>
       </body>

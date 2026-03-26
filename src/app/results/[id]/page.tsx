@@ -542,7 +542,7 @@ export default function ResultsPage() {
                       setShowListingModal(true);
                     }
                   }}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors active:scale-[0.98]"
                 >
                   <svg
                     className="w-5 h-5"
@@ -562,7 +562,7 @@ export default function ResultsPage() {
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-[#0f1f3d] text-sm font-medium rounded-lg border border-[#0f1f3d] hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-[#0f1f3d] text-sm font-medium rounded-lg border border-[#0f1f3d] hover:bg-gray-50 transition-colors disabled:opacity-50 active:scale-[0.98]"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -745,47 +745,61 @@ export default function ResultsPage() {
 
             {/* AI Permit Summary */}
             {result.report?.summary && (
-              <div className={`mb-6 rounded-xl border-2 p-5 ${
+              <div className={`mb-6 rounded-2xl overflow-hidden border ${
                 result.report.summary.riskLevel === "high"
-                  ? "border-red-200 bg-red-50"
+                  ? "border-red-200 shadow-lg shadow-red-100"
                   : result.report.summary.riskLevel === "medium"
-                  ? "border-yellow-200 bg-yellow-50"
-                  : "border-green-200 bg-green-50"
+                  ? "border-amber-200 shadow-lg shadow-amber-100"
+                  : "border-emerald-200 shadow-lg shadow-emerald-100"
               }`}>
-                {/* Risk badge */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                    result.report.summary.riskLevel === "high"
-                      ? "bg-red-100 text-red-800"
-                      : result.report.summary.riskLevel === "medium"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-green-100 text-green-800"
-                  }`}>
-                    <span className={`w-2 h-2 rounded-full ${
-                      result.report.summary.riskLevel === "high"
-                        ? "bg-red-500"
-                        : result.report.summary.riskLevel === "medium"
-                        ? "bg-yellow-500"
-                        : "bg-green-500"
-                    }`} />
-                    {result.report.summary.riskLevel === "high"
-                      ? "High Risk"
-                      : result.report.summary.riskLevel === "medium"
-                      ? "Medium Risk"
-                      : "Low Risk"}
-                  </span>
-                  <span className="text-xs text-gray-500 font-medium">
-                    AI Due Diligence Analysis
-                  </span>
+
+                {/* Colored header bar */}
+                <div className={`px-5 py-3 flex items-center justify-between ${
+                  result.report.summary.riskLevel === "high"
+                    ? "bg-red-600"
+                    : result.report.summary.riskLevel === "medium"
+                    ? "bg-amber-500"
+                    : "bg-emerald-600"
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {result.report.summary.riskLevel === "high" && (
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                    {result.report.summary.riskLevel === "medium" && (
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                    {result.report.summary.riskLevel === "low" && (
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                    <span className="text-sm font-bold text-white uppercase tracking-wide">
+                      {result.report.summary.riskLevel === "high" ? "High Risk"
+                        : result.report.summary.riskLevel === "medium" ? "Medium Risk"
+                        : "Low Risk"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-white/70 font-medium">AI Due Diligence Analysis</span>
                 </div>
 
-                {/* Verdict — bold, direct */}
-                <p className={`text-base font-bold leading-snug mb-2 ${
+                {/* Card body */}
+                <div className={`p-5 ${
                   result.report.summary.riskLevel === "high"
-                    ? "text-red-900"
+                    ? "bg-red-50"
                     : result.report.summary.riskLevel === "medium"
-                    ? "text-yellow-900"
-                    : "text-green-900"
+                    ? "bg-amber-50"
+                    : "bg-emerald-50"
+                }`}>
+
+                {/* Verdict — bold, direct */}
+                <p className={`text-base font-bold leading-snug mb-3 ${
+                  result.report.summary.riskLevel === "high" ? "text-red-900"
+                    : result.report.summary.riskLevel === "medium" ? "text-amber-900"
+                    : "text-emerald-900"
                 }`}>
                   {result.report.summary.verdict ?? result.report.summary.summary}
                 </p>
@@ -926,6 +940,7 @@ export default function ResultsPage() {
                   )}
                   </div>
                 </div>
+                </div>
               </div>
             )}
 
@@ -986,7 +1001,7 @@ export default function ResultsPage() {
                 <button
                   onClick={handleAnalyzeListing}
                   disabled={!listingText.trim() || listingAnalyzing}
-                  className="px-4 py-2 bg-[#0f1f3d] text-white text-sm font-semibold rounded-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-[#0f1f3d] text-white text-sm font-semibold rounded-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 active:scale-[0.98]"
                 >
                   {listingAnalyzing ? (
                     <>
@@ -1223,7 +1238,7 @@ export default function ResultsPage() {
                 <button
                   onClick={handleCheckout}
                   disabled={checkoutLoading}
-                  className="w-full sm:w-auto px-8 py-4 bg-[#0f1f3d] text-white rounded-xl font-bold text-base sm:text-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                  className="btn-shimmer w-full sm:w-auto px-8 py-4 text-white rounded-xl font-bold text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg active:scale-[0.98]"
                 >
                   {checkoutLoading ? (
                     <span className="flex items-center justify-center gap-2">
