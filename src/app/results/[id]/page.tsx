@@ -281,6 +281,9 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!paymentSuccess) return;
 
+    // Scroll to top so user sees the payment confirmation banner
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
     setPollingForPayment(true);
     let attempts = 0;
     const maxAttempts = 6;
@@ -485,17 +488,19 @@ export default function ResultsPage() {
 
         {/* Street View */}
         <div className="mb-6 street-view-wrapper">
-          <div className="h-32 sm:h-48">
+          <div className="h-44 sm:h-56 rounded-2xl overflow-hidden">
             <PropertyStreetView address={result.address_normalized || result.address} />
           </div>
         </div>
 
         {/* Address Header */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1">
             Permit History
           </h1>
-          <p className="text-base sm:text-lg text-gray-600">{result.address}</p>
+          <p className="text-sm sm:text-base text-gray-600 truncate sm:whitespace-normal">
+            {result.address}
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {isPaid && (
               <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
@@ -533,7 +538,8 @@ export default function ResultsPage() {
           <>
             {/* Download button */}
             {result.report && (result.report.summary || result.report.risk_level) ? (
-              <div className="mb-6 flex flex-wrap items-center gap-4">
+              <div className="mb-6 grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-3">
+                {/* Download — spans full width on mobile */}
                 <button
                   onClick={() => {
                     if (listingAnalyzed || (result.report?.summary?.listingNotes?.length ?? 0) > 0) {
@@ -542,7 +548,7 @@ export default function ResultsPage() {
                       setShowListingModal(true);
                     }
                   }}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors active:scale-[0.98]"
+                  className="col-span-2 sm:col-span-1 sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0f1f3d] text-white text-sm font-medium rounded-xl hover:bg-[#1a3560] transition-colors active:scale-[0.98]"
                 >
                   <svg
                     className="w-5 h-5"
@@ -559,20 +565,22 @@ export default function ResultsPage() {
                   </svg>
                   Download PDF Report
                 </button>
+                {/* Share */}
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-[#0f1f3d] text-sm font-medium rounded-lg border border-[#0f1f3d] hover:bg-gray-50 transition-colors disabled:opacity-50 active:scale-[0.98]"
+                  className="sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-[#0f1f3d] text-sm font-medium rounded-xl border border-[#0f1f3d] hover:bg-gray-50 transition-colors disabled:opacity-50 active:scale-[0.98]"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                   {shareCopied ? "Link copied!" : shareLoading ? "Generating..." : "Share Report"}
                 </button>
+                {/* Refresh — smaller, secondary */}
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white text-gray-500 text-xs font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -891,7 +899,7 @@ export default function ResultsPage() {
                             .getElementById("listing-panel")
                             ?.scrollIntoView({ behavior: "smooth", block: "center" });
                         }}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors py-2 -my-2"
                       >
                         Have the listing? Cross-reference renovation claims against permits →
                       </button>
@@ -910,7 +918,7 @@ export default function ResultsPage() {
                       <span className="text-xs text-gray-400 mr-1">Helpful?</span>
                       <button
                         onClick={() => handleFeedback(1)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-2.5 rounded-lg transition-colors ${
                           feedbackRating === 1
                             ? "bg-green-100 text-green-700"
                             : "text-gray-400 hover:text-green-600 hover:bg-green-50"
@@ -923,7 +931,7 @@ export default function ResultsPage() {
                       </button>
                       <button
                         onClick={() => handleFeedback(-1)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-2.5 rounded-lg transition-colors ${
                           feedbackRating === -1
                             ? "bg-red-100 text-red-700"
                             : "text-gray-400 hover:text-red-600 hover:bg-red-50"
@@ -1233,8 +1241,13 @@ export default function ResultsPage() {
             </div>
 
             {/* Payment CTA — sticky on mobile for visibility */}
-            <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:backdrop-blur-none mt-8">
+            <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/98 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:shadow-none sm:backdrop-blur-none mt-8">
               <div className="text-center">
+                {permitCount > 0 && (
+                  <p className="text-xs text-center text-gray-500 mb-2 sm:hidden">
+                    {permitCount} permit record{permitCount !== 1 ? "s" : ""} found · unlock to see all
+                  </p>
+                )}
                 <button
                   onClick={handleCheckout}
                   disabled={checkoutLoading}

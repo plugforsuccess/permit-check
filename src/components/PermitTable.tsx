@@ -90,25 +90,30 @@ export default function PermitTable({
         {permits.map((permit, index) => (
           <div
             key={permit.id || index}
-            className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-150"
+            className={`bg-white rounded-xl p-4 border-l-4 border border-gray-100 hover:shadow-sm transition-all duration-150 ${
+              permit.status === "Expired" ? "border-l-red-400" :
+              permit.status === "Issued" ? "border-l-emerald-400" :
+              permit.status === "Finaled" ? "border-l-blue-400" :
+              permit.status === "In Review" || permit.status === "Pending" ? "border-l-amber-400" :
+              "border-l-gray-200"
+            }`}
             style={{ animation: `fadeInUp 0.3s ease both ${index * 0.04}s` }}
           >
-            <div className="flex items-start justify-between mb-2">
-              <span className="font-mono text-sm font-medium text-gray-900">
-                {permit.record_number}
+            {/* Row 1: Type + Status */}
+            <div className="flex items-start justify-between mb-1.5">
+              <span className="text-sm font-semibold text-gray-900 leading-tight flex-1 mr-2">
+                {permit.type}
               </span>
               <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${mobileStatusStyles[permit.status] || mobileStatusStyles.Unknown}`}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${mobileStatusStyles[permit.status] || mobileStatusStyles.Unknown}`}
               >
                 {permit.status}
               </span>
             </div>
-            <div className="text-sm text-gray-700 mb-1">{permit.type}</div>
-            {permit.module && permit.module !== "Building" && (
-              <span className="inline-block text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full mb-1">
-                {permit.module}
-              </span>
-            )}
+            {/* Row 2: Record number */}
+            <span className="font-mono text-xs text-gray-400 block mb-1">
+              {permit.record_number}
+            </span>
             {permit.description && (
               <div className="text-xs text-gray-500 mb-2 leading-relaxed line-clamp-2">
                 {permit.description}

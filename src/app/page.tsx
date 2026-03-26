@@ -227,10 +227,10 @@ function HomePageContent() {
           <p className="text-gray-500 mb-10 text-sm">
             Pay once per report, or subscribe for unlimited searches.
           </p>
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="flex sm:grid sm:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto pb-4 sm:pb-0 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
 
             {/* Standard */}
-            <div className="border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
+            <div className="snap-start shrink-0 w-72 sm:w-auto border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
               <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
               <div className="text-sm text-gray-500 mb-6">one-time · instant access</div>
               <ul className="space-y-3 text-sm text-gray-700">
@@ -244,7 +244,7 @@ function HomePageContent() {
             </div>
 
             {/* Attorney */}
-            <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
+            <div className="snap-start shrink-0 w-72 sm:w-auto border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-[#0f1f3d] text-white text-xs font-semibold rounded-full">
                 For legal use
               </div>
@@ -260,7 +260,7 @@ function HomePageContent() {
             </div>
 
             {/* Agent Plan */}
-            <div className="border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
+            <div className="snap-start shrink-0 w-72 sm:w-auto border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-[#c9a84c] text-[#0f1f3d] text-xs font-semibold rounded-full">
                 For agents
               </div>

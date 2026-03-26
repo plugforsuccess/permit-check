@@ -160,7 +160,7 @@ export default function SearchingPage() {
 
       {/* Address pill */}
       {address && (
-        <div className="bg-[#0f1f3d]/5 border border-[#0f1f3d]/20 rounded-xl px-4 py-3 mb-8 flex items-start gap-2 max-w-sm w-full">
+        <div className="bg-[#0f1f3d]/5 border border-[#0f1f3d]/20 rounded-xl px-4 py-3 mb-6 sm:mb-8 flex items-start gap-2 max-w-sm w-full">
           <svg className="w-4 h-4 text-[#0f1f3d] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -170,7 +170,7 @@ export default function SearchingPage() {
       )}
 
       {/* Progress bar */}
-      <div className="w-full max-w-sm h-1 bg-gray-100 rounded-full overflow-hidden mb-8">
+      <div className="w-full max-w-sm h-1 bg-gray-100 rounded-full overflow-hidden mb-5 sm:mb-8">
         <div
           className="h-full bg-[#c9a84c] rounded-full transition-all duration-700 ease-out"
           style={{ width: `${progress}%` }}
@@ -178,7 +178,7 @@ export default function SearchingPage() {
       </div>
 
       {/* Steps */}
-      <div className="flex flex-col gap-4 w-full max-w-sm mb-6" aria-live="polite" role="status">
+      <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-sm mb-5 sm:mb-6" aria-live="polite" role="status">
         {STEPS.map((step, i) => {
           const status = stepStatuses[step.id];
           const sublabel =
@@ -202,19 +202,19 @@ export default function SearchingPage() {
               {/* Icon */}
               <div className="shrink-0">
                 {status === "done" ? (
-                  <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
                     <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                 ) : status === "active" ? (
-                  <div className="w-7 h-7 rounded-full bg-[#0f1f3d]/10 border-2 border-[#0f1f3d]/30 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-[#0f1f3d]/10 border-2 border-[#0f1f3d]/30 flex items-center justify-center">
                     <svg className="w-3.5 h-3.5 text-[#0f1f3d] animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} strokeLinecap="round">
                       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                     </svg>
                   </div>
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
                     {i === 3 ? (
                       <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -242,7 +242,7 @@ export default function SearchingPage() {
       {/* Rotating message card — only during searching */}
       {isSearching && (
         <div
-          className="w-full max-w-sm bg-[#0f1f3d]/3 border border-[#0f1f3d]/10 rounded-xl px-4 py-3 mb-4 transition-all duration-400"
+          className="w-full max-w-sm bg-[#0f1f3d]/3 border border-[#0f1f3d]/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 mb-3 sm:mb-4 transition-all duration-400"
           style={{
             opacity: messageVisible ? 1 : 0,
             transform: messageVisible ? "translateY(0)" : "translateY(4px)",
