@@ -88,21 +88,35 @@ function HomePageContent() {
   return (
     <div>
       {/* Hero — split layout */}
-      <section className="pt-16 pb-12 px-4">
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+      <section className="relative pt-16 pb-16 px-4 bg-[#0f1f3d] overflow-hidden">
+        {/* Subtle grid pattern overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: `linear-gradient(#c9a84c 1px, transparent 1px), linear-gradient(90deg, #c9a84c 1px, transparent 1px)`,
+            backgroundSize: "48px 48px",
+          }}
+        />
+        {/* Gold radial glow — top left */}
+        <div
+          className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-10 blur-3xl"
+          style={{ background: "radial-gradient(circle, #c9a84c, transparent)" }}
+        />
+
+        <div className="relative max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
 
           {/* Left: CTA */}
           <div>
-            <div className="inline-flex flex-wrap items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <div className="inline-flex flex-wrap items-center gap-2 bg-white/10 text-white/80 text-sm font-medium px-3 py-1.5 rounded-full mb-6 border border-white/10">
+              <span className="w-2 h-2 bg-[#c9a84c] rounded-full animate-pulse" />
               Now covering Atlanta Metro + Gwinnett County
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-5 leading-tight tracking-tight">
               Verify permits before
               <br />
               <span style={{ color: "#c9a84c" }}>you close.</span>
             </h1>
-            <p className="text-lg text-gray-500 mb-8 leading-relaxed">
+            <p className="text-lg text-white/60 mb-8 leading-relaxed">
               Unpermitted work costs buyers tens of thousands. Search the
               official government permit database for any supported metro area
               property in seconds.
@@ -119,7 +133,7 @@ function HomePageContent() {
               </div>
             )}
             {/* Trust signals */}
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/50">
               <span>&#10003; Official government data</span>
               <span>&#10003; Results in ~20 seconds</span>
               <span>&#10003; $9.99 one-time</span>
@@ -128,7 +142,7 @@ function HomePageContent() {
 
           {/* Right: Product preview */}
           <div className="hidden lg:block relative">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl shadow-black/20 overflow-hidden ring-1 ring-white/10">
               {/* Mock results header */}
               <div className="px-6 py-4 border-b border-gray-100">
                 <div className="text-sm text-gray-500 mb-1">55 Trinity Ave SW, Atlanta, GA</div>
@@ -168,12 +182,19 @@ function HomePageContent() {
               </div>
             </div>
             {/* Decorative elements */}
-            <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-50 rounded-full -z-10" />
-            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-green-50 rounded-full -z-10" />
+            <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/5 rounded-full -z-10" />
+            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/5 rounded-full -z-10" />
           </div>
 
         </div>
       </section>
+
+      {/* Wave divider */}
+      <div className="relative bg-[#0f1f3d] -mb-1">
+        <svg viewBox="0 0 1440 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+          <path d="M0 40L1440 40L1440 20C1200 0 720 40 0 20L0 40Z" fill="#f9fafb"/>
+        </svg>
+      </div>
 
       {/* Below the fold explainer */}
       <section className="py-16 bg-gray-50">
@@ -206,10 +227,10 @@ function HomePageContent() {
           <p className="text-gray-500 mb-10 text-sm">
             Pay once per report, or subscribe for unlimited searches.
           </p>
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="flex sm:grid sm:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto pb-4 sm:pb-0 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
 
             {/* Standard */}
-            <div className="border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
+            <div className="snap-start shrink-0 w-72 sm:w-auto border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
               <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
               <div className="text-sm text-gray-500 mb-6">one-time · instant access</div>
               <ul className="space-y-3 text-sm text-gray-700">
@@ -223,7 +244,7 @@ function HomePageContent() {
             </div>
 
             {/* Attorney */}
-            <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
+            <div className="snap-start shrink-0 w-72 sm:w-auto border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-[#0f1f3d] text-white text-xs font-semibold rounded-full">
                 For legal use
               </div>
@@ -239,7 +260,7 @@ function HomePageContent() {
             </div>
 
             {/* Agent Plan */}
-            <div className="border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
+            <div className="snap-start shrink-0 w-72 sm:w-auto border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-[#c9a84c] text-[#0f1f3d] text-xs font-semibold rounded-full">
                 For agents
               </div>

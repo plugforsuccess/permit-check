@@ -283,7 +283,7 @@ export default function AddressAutocomplete({
     <div className="w-full max-w-2xl mx-auto">
 
       {/* Search input row */}
-      <div className="flex items-stretch gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch gap-3">
 
         {/* Input + dropdown container */}
         <div className="flex-1 min-w-0 relative">
@@ -310,7 +310,7 @@ export default function AddressAutocomplete({
             aria-activedescendant={
               activeIndex >= 0 ? `address-option-${activeIndex}` : undefined
             }
-            className="w-full px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none focus:border-blue-400 transition-colors disabled:text-gray-400 disabled:placeholder-gray-400"
+            className="w-full px-4 sm:px-6 py-3.5 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-xl outline-none focus:border-blue-400 transition-colors disabled:text-gray-400 disabled:placeholder-gray-400"
           />
 
           {/* Custom dropdown */}
@@ -365,7 +365,7 @@ export default function AddressAutocomplete({
           type="button"
           onClick={() => geocodeAndSubmit(inputValue)}
           disabled={busy || !inputValue.trim()}
-          className="px-5 sm:px-6 py-3 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center"
+          className="w-full sm:w-auto px-5 sm:px-6 py-3.5 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center gap-2"
           aria-label="Search"
         >
           {isGeocoding ? (

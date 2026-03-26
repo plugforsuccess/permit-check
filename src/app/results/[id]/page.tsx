@@ -281,6 +281,9 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!paymentSuccess) return;
 
+    // Scroll to top so user sees the payment confirmation banner
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
     setPollingForPayment(true);
     let attempts = 0;
     const maxAttempts = 6;
@@ -485,17 +488,19 @@ export default function ResultsPage() {
 
         {/* Street View */}
         <div className="mb-6 street-view-wrapper">
-          <div className="h-32 sm:h-48">
+          <div className="h-44 sm:h-56 rounded-2xl overflow-hidden">
             <PropertyStreetView address={result.address_normalized || result.address} />
           </div>
         </div>
 
         {/* Address Header */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1">
             Permit History
           </h1>
-          <p className="text-base sm:text-lg text-gray-600">{result.address}</p>
+          <p className="text-sm sm:text-base text-gray-600 truncate sm:whitespace-normal">
+            {result.address}
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {isPaid && (
               <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
@@ -533,7 +538,8 @@ export default function ResultsPage() {
           <>
             {/* Download button */}
             {result.report && (result.report.summary || result.report.risk_level) ? (
-              <div className="mb-6 flex flex-wrap items-center gap-4">
+              <div className="mb-6 grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-3">
+                {/* Download — spans full width on mobile */}
                 <button
                   onClick={() => {
                     if (listingAnalyzed || (result.report?.summary?.listingNotes?.length ?? 0) > 0) {
@@ -542,7 +548,7 @@ export default function ResultsPage() {
                       setShowListingModal(true);
                     }
                   }}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#0f1f3d] text-white text-sm font-medium rounded-lg hover:bg-[#1a3560] transition-colors"
+                  className="col-span-2 sm:col-span-1 sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0f1f3d] text-white text-sm font-medium rounded-xl hover:bg-[#1a3560] transition-colors active:scale-[0.98]"
                 >
                   <svg
                     className="w-5 h-5"
@@ -559,20 +565,22 @@ export default function ResultsPage() {
                   </svg>
                   Download PDF Report
                 </button>
+                {/* Share */}
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-[#0f1f3d] text-sm font-medium rounded-lg border border-[#0f1f3d] hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-[#0f1f3d] text-sm font-medium rounded-xl border border-[#0f1f3d] hover:bg-gray-50 transition-colors disabled:opacity-50 active:scale-[0.98]"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                   {shareCopied ? "Link copied!" : shareLoading ? "Generating..." : "Share Report"}
                 </button>
+                {/* Refresh — smaller, secondary */}
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white text-gray-600 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white text-gray-500 text-xs font-medium rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -745,47 +753,61 @@ export default function ResultsPage() {
 
             {/* AI Permit Summary */}
             {result.report?.summary && (
-              <div className={`mb-6 rounded-xl border-2 p-5 ${
+              <div className={`mb-6 rounded-2xl overflow-hidden border ${
                 result.report.summary.riskLevel === "high"
-                  ? "border-red-200 bg-red-50"
+                  ? "border-red-200 shadow-lg shadow-red-100"
                   : result.report.summary.riskLevel === "medium"
-                  ? "border-yellow-200 bg-yellow-50"
-                  : "border-green-200 bg-green-50"
+                  ? "border-amber-200 shadow-lg shadow-amber-100"
+                  : "border-emerald-200 shadow-lg shadow-emerald-100"
               }`}>
-                {/* Risk badge */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                    result.report.summary.riskLevel === "high"
-                      ? "bg-red-100 text-red-800"
-                      : result.report.summary.riskLevel === "medium"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-green-100 text-green-800"
-                  }`}>
-                    <span className={`w-2 h-2 rounded-full ${
-                      result.report.summary.riskLevel === "high"
-                        ? "bg-red-500"
-                        : result.report.summary.riskLevel === "medium"
-                        ? "bg-yellow-500"
-                        : "bg-green-500"
-                    }`} />
-                    {result.report.summary.riskLevel === "high"
-                      ? "High Risk"
-                      : result.report.summary.riskLevel === "medium"
-                      ? "Medium Risk"
-                      : "Low Risk"}
-                  </span>
-                  <span className="text-xs text-gray-500 font-medium">
-                    AI Due Diligence Analysis
-                  </span>
+
+                {/* Colored header bar */}
+                <div className={`px-5 py-3 flex items-center justify-between ${
+                  result.report.summary.riskLevel === "high"
+                    ? "bg-red-600"
+                    : result.report.summary.riskLevel === "medium"
+                    ? "bg-amber-500"
+                    : "bg-emerald-600"
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {result.report.summary.riskLevel === "high" && (
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                    {result.report.summary.riskLevel === "medium" && (
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                    {result.report.summary.riskLevel === "low" && (
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                      </svg>
+                    )}
+                    <span className="text-sm font-bold text-white uppercase tracking-wide">
+                      {result.report.summary.riskLevel === "high" ? "High Risk"
+                        : result.report.summary.riskLevel === "medium" ? "Medium Risk"
+                        : "Low Risk"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-white/70 font-medium">AI Due Diligence Analysis</span>
                 </div>
 
-                {/* Verdict — bold, direct */}
-                <p className={`text-base font-bold leading-snug mb-2 ${
+                {/* Card body */}
+                <div className={`p-5 ${
                   result.report.summary.riskLevel === "high"
-                    ? "text-red-900"
+                    ? "bg-red-50"
                     : result.report.summary.riskLevel === "medium"
-                    ? "text-yellow-900"
-                    : "text-green-900"
+                    ? "bg-amber-50"
+                    : "bg-emerald-50"
+                }`}>
+
+                {/* Verdict — bold, direct */}
+                <p className={`text-base font-bold leading-snug mb-3 ${
+                  result.report.summary.riskLevel === "high" ? "text-red-900"
+                    : result.report.summary.riskLevel === "medium" ? "text-amber-900"
+                    : "text-emerald-900"
                 }`}>
                   {result.report.summary.verdict ?? result.report.summary.summary}
                 </p>
@@ -877,7 +899,7 @@ export default function ResultsPage() {
                             .getElementById("listing-panel")
                             ?.scrollIntoView({ behavior: "smooth", block: "center" });
                         }}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors py-2 -my-2"
                       >
                         Have the listing? Cross-reference renovation claims against permits →
                       </button>
@@ -896,7 +918,7 @@ export default function ResultsPage() {
                       <span className="text-xs text-gray-400 mr-1">Helpful?</span>
                       <button
                         onClick={() => handleFeedback(1)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-2.5 rounded-lg transition-colors ${
                           feedbackRating === 1
                             ? "bg-green-100 text-green-700"
                             : "text-gray-400 hover:text-green-600 hover:bg-green-50"
@@ -909,7 +931,7 @@ export default function ResultsPage() {
                       </button>
                       <button
                         onClick={() => handleFeedback(-1)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-2.5 rounded-lg transition-colors ${
                           feedbackRating === -1
                             ? "bg-red-100 text-red-700"
                             : "text-gray-400 hover:text-red-600 hover:bg-red-50"
@@ -925,6 +947,7 @@ export default function ResultsPage() {
                     <span className="text-xs text-gray-400">Thanks for your feedback</span>
                   )}
                   </div>
+                </div>
                 </div>
               </div>
             )}
@@ -986,7 +1009,7 @@ export default function ResultsPage() {
                 <button
                   onClick={handleAnalyzeListing}
                   disabled={!listingText.trim() || listingAnalyzing}
-                  className="px-4 py-2 bg-[#0f1f3d] text-white text-sm font-semibold rounded-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-[#0f1f3d] text-white text-sm font-semibold rounded-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 active:scale-[0.98]"
                 >
                   {listingAnalyzing ? (
                     <>
@@ -1218,12 +1241,17 @@ export default function ResultsPage() {
             </div>
 
             {/* Payment CTA — sticky on mobile for visibility */}
-            <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:backdrop-blur-none mt-8">
+            <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/98 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:shadow-none sm:backdrop-blur-none mt-8">
               <div className="text-center">
+                {permitCount > 0 && (
+                  <p className="text-xs text-center text-gray-500 mb-2 sm:hidden">
+                    {permitCount} permit record{permitCount !== 1 ? "s" : ""} found · unlock to see all
+                  </p>
+                )}
                 <button
                   onClick={handleCheckout}
                   disabled={checkoutLoading}
-                  className="w-full sm:w-auto px-8 py-4 bg-[#0f1f3d] text-white rounded-xl font-bold text-base sm:text-lg hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                  className="btn-shimmer w-full sm:w-auto px-8 py-4 text-white rounded-xl font-bold text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg active:scale-[0.98]"
                 >
                   {checkoutLoading ? (
                     <span className="flex items-center justify-center gap-2">
