@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     "pre-closing due diligence",
   ],
   openGraph: {
-    title: "PermitCheck — Property Permit Verification",
+    title: "PermitCheck — Where Serious Money Does Its Homework",
     description: "Where serious money does its homework. Instant permit intelligence before you commit capital.",
     type: "website",
     url: "https://permitcheck.org",
@@ -98,12 +98,6 @@ export default function RootLayout({
                   Pricing
                 </a>
                 <a
-                  href="/subscribe"
-                  className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-[#0f1f3d] bg-[#c9a84c]/10 hover:bg-[#c9a84c]/20 px-3 py-2 rounded-lg transition-colors"
-                >
-                  Agent Plan
-                </a>
-                <a
                   href="/dashboard"
                   className="text-sm font-medium text-white bg-[#0f1f3d] hover:bg-[#1a3560] px-4 py-2 rounded-lg transition-colors ml-1"
                 >
@@ -140,11 +134,6 @@ export default function RootLayout({
                   <li>
                     <a href="/#pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                       Pricing
-                    </a>
-                  </li>
-                  <li>
-                    <a href="/subscribe" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                      Agent Plan
                     </a>
                   </li>
                   <li>

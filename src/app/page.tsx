@@ -8,7 +8,6 @@ import AddressAutocomplete, {
 import Disclaimer from "@/components/Disclaimer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { JURISDICTIONS } from "@/lib/accela/jurisdictions";
-import Logo from "@/components/Logo";
 
 export default function HomePage() {
   return (
@@ -98,14 +97,13 @@ function HomePageContent() {
               Now covering Atlanta Metro + Gwinnett County
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
-              Know what you&apos;re buying
+              Where Serious Money
               <br />
-              <span style={{ color: "#c9a84c" }}>before you commit.</span>
+              <span style={{ color: "#c9a84c" }}>Does Its Homework.</span>
             </h1>
             <p className="text-lg text-gray-500 mb-8 leading-relaxed">
-              Serious investors run permits before they run numbers.
-              PermitCheck searches the official government database instantly —
-              so you know what you&apos;re inheriting before you commit capital.
+              Instant permit intelligence on any property address —
+              before you commit capital.
             </p>
             {scraperError && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
@@ -124,6 +122,9 @@ function HomePageContent() {
               <span>&#10003; Instant — results in seconds</span>
               <span>&#10003; $9.99 per address</span>
             </div>
+            <p className="mt-4 text-sm font-semibold text-[#0f1f3d]">
+              The Carfax of real estate investing.
+            </p>
           </div>
 
           {/* Right: Product preview */}
@@ -175,43 +176,71 @@ function HomePageContent() {
         </div>
       </section>
 
-      {/* Below the fold explainer */}
+      {/* Value props */}
       <section className="py-16 bg-gray-50">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center justify-center gap-2">
-            Why investors use <Logo size="lg" showIcon={false} />
-          </h2>
-          <p className="text-gray-600 leading-relaxed mb-4">
-            PermitCheck is the Carfax of real estate investing. Nobody buys a
-            used car without running the vehicle history. The moment skipping
-            PermitCheck feels as reckless as skipping Carfax — you own the deal.
+        <div className="max-w-5xl mx-auto px-4">
+          <p className="text-center text-lg text-gray-700 leading-relaxed mb-10 max-w-2xl mx-auto">
+            Before you commit capital, know exactly what you&apos;re buying.
+            PermitCheck surfaces open permits, expired inspections, and
+            unpermitted work — instantly.
           </p>
-          <p className="text-gray-600 leading-relaxed mb-4">
-            Unpermitted work is the most common — and most expensive — hidden
-            liability in residential deals. A renovation done without permits can
-            cost a new owner tens of thousands to remediate, kill a future sale,
-            or expose the buyer to code enforcement action.
-          </p>
-          <p className="text-gray-600 leading-relaxed">
-            For $9.99, you get the complete permit intelligence on any supported
-            address — instantly, before you make an offer or commit capital.
+          <div className="grid sm:grid-cols-3 gap-6">
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <div className="text-3xl mb-3">⚡</div>
+              <h3 className="text-base font-bold text-gray-900 mb-2">
+                Instant Results
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Search any property address and get a full permit history in
+                seconds, not days.
+              </p>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <div className="text-3xl mb-3">🎯</div>
+              <h3 className="text-base font-bold text-gray-900 mb-2">
+                Flagged Issues
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Open, expired, and unpermitted work clearly identified. No data
+                mining required.
+              </p>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <div className="text-3xl mb-3">🏆</div>
+              <h3 className="text-base font-bold text-gray-900 mb-2">
+                Built for Investors
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Designed for the deal-stage workflow of wholesalers, flippers,
+                and acquisition teams.
+              </p>
+            </div>
+          </div>
+          <p className="mt-10 text-center text-sm text-gray-500 italic">
+            Built for the investor who does their homework before every deal.
           </p>
         </div>
       </section>
 
       {/* Pricing */}
       <section id="pricing" className="py-16">
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Pricing</h2>
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            Pay for What You Need. Nothing More.
+          </h2>
           <p className="text-gray-500 mb-10 text-sm">
-            One report or unlimited deal flow — your call.
+            No subscriptions. No commitments. Serious investors search when
+            the deal demands it.
           </p>
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 gap-6">
 
-            {/* Standard */}
+            {/* Permit Intelligence Report */}
             <div className="border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
+              <div className="text-sm font-semibold text-[#0f1f3d] uppercase tracking-wide mb-2">
+                Permit Intelligence Report
+              </div>
               <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
-              <div className="text-sm text-gray-500 mb-6">one-time · instant access</div>
+              <div className="text-sm text-gray-500 mb-6">per address · instant access</div>
               <ul className="space-y-3 text-sm text-gray-700">
                 <li>✓ Full permit intelligence for one address</li>
                 <li>✓ Building, electrical, plumbing, HVAC — all types</li>
@@ -222,42 +251,20 @@ function HomePageContent() {
               </ul>
             </div>
 
-            {/* Attorney */}
-            <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
-              <div className="absolute -top-3 left-6 px-3 py-1 bg-[#0f1f3d] text-white text-xs font-semibold rounded-full">
-                For attorneys
+            {/* Attorney Litigation-Grade Report */}
+            <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left">
+              <div className="text-sm font-semibold text-[#0f1f3d] uppercase tracking-wide mb-2">
+                Attorney Litigation-Grade Report
               </div>
               <div className="text-2xl font-bold text-gray-900 mb-1">$199</div>
-              <div className="text-sm text-gray-500 mb-6">one-time · litigation-grade</div>
+              <div className="text-sm text-gray-500 mb-6">per address · litigation-grade</div>
               <ul className="space-y-3 text-sm text-gray-700">
-                <li>✓ Everything in Standard</li>
+                <li>✓ Everything in the Permit Intelligence Report</li>
                 <li>✓ Formal cover page with chain of custody</li>
                 <li>✓ Report ID for evidentiary use</li>
                 <li>✓ Suitable for real estate litigation</li>
                 <li>✓ Matter reference field</li>
               </ul>
-            </div>
-
-            {/* Agent Plan */}
-            <div className="border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
-              <div className="absolute -top-3 left-6 px-3 py-1 bg-[#c9a84c] text-[#0f1f3d] text-xs font-semibold rounded-full">
-                For deal flow
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">$99</div>
-              <div className="text-sm text-gray-500 mb-6">per month · unlimited</div>
-              <ul className="space-y-3 text-sm text-gray-700 mb-8">
-                <li>✓ Unlimited searches — run every deal</li>
-                <li>✓ Your name and brokerage on every report</li>
-                <li>✓ Full lookup history and re-downloads</li>
-                <li>✓ AI risk analysis on every search</li>
-                <li>✓ Cancel anytime</li>
-              </ul>
-              <a
-                href="/subscribe"
-                className="block w-full text-center px-5 py-3 bg-[#c9a84c] text-[#0f1f3d] rounded-xl font-bold text-sm hover:bg-[#b8973d] transition-colors"
-              >
-                Get unlimited access
-              </a>
             </div>
 
           </div>
