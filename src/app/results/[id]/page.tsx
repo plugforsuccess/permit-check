@@ -496,7 +496,7 @@ export default function ResultsPage() {
         {/* Address Header */}
         <div className="mb-8">
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1">
-            Permit History
+            Permit Intelligence
           </h1>
           <p className="text-sm sm:text-base text-gray-600 truncate sm:whitespace-normal">
             {result.address}
@@ -791,7 +791,7 @@ export default function ResultsPage() {
                         : "Low Risk"}
                     </span>
                   </div>
-                  <span className="text-xs text-white/70 font-medium">AI Due Diligence Analysis</span>
+                  <span className="text-xs text-white/70 font-medium">AI Risk Analysis</span>
                 </div>
 
                 {/* Card body */}
@@ -823,7 +823,7 @@ export default function ResultsPage() {
                 {result.report.summary.listingNotes.length > 0 && (
                   <div className="mb-4 p-3 bg-white/60 rounded-lg border border-gray-200">
                     <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-                      Listing vs. Permit Records
+                      Listing Claims vs. Permit Records
                     </div>
                     <ul className="space-y-1">
                       {result.report.summary.listingNotes.map((note, i) => (
@@ -874,7 +874,7 @@ export default function ResultsPage() {
                 {result.report.summary.sellerQuestions.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                      What to ask the seller
+                      Questions to put to the seller
                     </div>
                     <ul className="space-y-2">
                       {result.report.summary.sellerQuestions.map((q, i) => (
@@ -971,11 +971,11 @@ export default function ResultsPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">
-                      Cross-reference with listing
+                      Cross-reference the listing
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Paste the property listing and our AI will flag renovation
-                      claims that have no permits on file.
+                      Paste the listing description. Our AI will flag every renovation
+                      claim that has no supporting permit on file.
                     </p>
                   </div>
                 </div>
@@ -1047,12 +1047,12 @@ export default function ResultsPage() {
                   </svg>
                   <div>
                     <div className="text-sm font-semibold text-gray-900 mb-1">
-                      Monitor this address for free
+                      Track this address
                     </div>
                     <p className="text-xs text-gray-500">
-                      Get email alerts if new permits are filed at this address over
-                      the next 30 days. Useful if you&apos;re under contract or still
-                      deciding.
+                      Get notified if new permits are filed at this address over the
+                      next 30 days — useful if you&apos;re under contract or running
+                      multiple deals simultaneously.
                     </p>
                   </div>
                 </div>
@@ -1207,7 +1207,7 @@ export default function ResultsPage() {
             <div className="mb-5 p-4 bg-blue-50 border border-blue-100 rounded-xl">
               <div className="mb-2 flex items-center justify-between">
                 <label className="text-sm font-semibold text-gray-800">
-                  Enhance your AI analysis{" "}
+                  Add the listing for deeper analysis{" "}
                   <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <button
@@ -1222,8 +1222,9 @@ export default function ResultsPage() {
                 </button>
               </div>
               <p className="text-xs text-gray-500 mb-3">
-                Paste the property listing description below. Our AI will cross-reference
-                the seller&apos;s renovation claims against the official permit records.
+                Paste the listing description. Our AI will cross-reference every
+                renovation claim against the official permit records before you
+                commit capital.
               </p>
               <textarea
                 value={listingText}
