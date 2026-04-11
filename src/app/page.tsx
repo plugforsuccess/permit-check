@@ -98,14 +98,14 @@ function HomePageContent() {
               Now covering Atlanta Metro + Gwinnett County
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-5 leading-tight tracking-tight">
-              Verify permits before
+              Know what you&apos;re buying
               <br />
-              <span style={{ color: "#c9a84c" }}>you close.</span>
+              <span style={{ color: "#c9a84c" }}>before you commit.</span>
             </h1>
             <p className="text-lg text-gray-500 mb-8 leading-relaxed">
-              Unpermitted work costs buyers tens of thousands. Search the
-              official government permit database for any supported metro area
-              property in seconds.
+              Serious investors run permits before they run numbers.
+              PermitCheck searches the official government database instantly —
+              so you know what you&apos;re inheriting before you commit capital.
             </p>
             {scraperError && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
@@ -120,9 +120,9 @@ function HomePageContent() {
             )}
             {/* Trust signals */}
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
-              <span>&#10003; Official government data</span>
-              <span>&#10003; Results in ~20 seconds</span>
-              <span>&#10003; $9.99 one-time</span>
+              <span>&#10003; Official government database</span>
+              <span>&#10003; Instant — results in seconds</span>
+              <span>&#10003; $9.99 per address</span>
             </div>
           </div>
 
@@ -179,22 +179,22 @@ function HomePageContent() {
       <section className="py-16 bg-gray-50">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center justify-center gap-2">
-            What is <Logo size="lg" showIcon={false} />?
+            Why investors use <Logo size="lg" showIcon={false} />
           </h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            PermitCheck searches official government permit databases across
-            supported jurisdictions — currently covering Atlanta and Gwinnett
-            County, with more coming soon.
+            PermitCheck is the Carfax of real estate investing. Nobody buys a
+            used car without running the vehicle history. The moment skipping
+            PermitCheck feels as reckless as skipping Carfax — you own the deal.
           </p>
           <p className="text-gray-600 leading-relaxed mb-4">
-            Unpermitted work is one of the most common — and most expensive —
-            surprises in real estate transactions. A $50,000 kitchen renovation
-            done without permits can cost a new owner tens of thousands to bring
-            up to code, or worse, become a liability in a future sale.
+            Unpermitted work is the most common — and most expensive — hidden
+            liability in residential deals. A renovation done without permits can
+            cost a new owner tens of thousands to remediate, kill a future sale,
+            or expose the buyer to code enforcement action.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            For $9.99, you get the full permit history for any supported property
-            — searchable in seconds, not days.
+            For $9.99, you get the complete permit intelligence on any supported
+            address — instantly, before you make an offer or commit capital.
           </p>
         </div>
       </section>
@@ -204,7 +204,7 @@ function HomePageContent() {
         <div className="max-w-5xl mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-3">Pricing</h2>
           <p className="text-gray-500 mb-10 text-sm">
-            Pay once per report, or subscribe for unlimited searches.
+            One report or unlimited deal flow — your call.
           </p>
           <div className="grid sm:grid-cols-3 gap-6">
 
@@ -213,19 +213,19 @@ function HomePageContent() {
               <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
               <div className="text-sm text-gray-500 mb-6">one-time · instant access</div>
               <ul className="space-y-3 text-sm text-gray-700">
-                <li>✓ Full permit history for one address</li>
-                <li>✓ All permit types — building, electrical, plumbing, HVAC</li>
-                <li>✓ Filed date, issued date, and status for every permit</li>
-                <li>✓ AI due diligence analysis</li>
+                <li>✓ Full permit intelligence for one address</li>
+                <li>✓ Building, electrical, plumbing, HVAC — all types</li>
+                <li>✓ Filed date, status, and description for every permit</li>
+                <li>✓ AI risk analysis with red flags and seller questions</li>
                 <li>✓ Downloadable PDF report</li>
-                <li>✓ Official government data</li>
+                <li>✓ Official government database</li>
               </ul>
             </div>
 
             {/* Attorney */}
             <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-[#0f1f3d] text-white text-xs font-semibold rounded-full">
-                For legal use
+                For attorneys
               </div>
               <div className="text-2xl font-bold text-gray-900 mb-1">$199</div>
               <div className="text-sm text-gray-500 mb-6">one-time · litigation-grade</div>
@@ -241,22 +241,22 @@ function HomePageContent() {
             {/* Agent Plan */}
             <div className="border-2 border-[#c9a84c] rounded-2xl p-5 sm:p-8 text-left relative">
               <div className="absolute -top-3 left-6 px-3 py-1 bg-[#c9a84c] text-[#0f1f3d] text-xs font-semibold rounded-full">
-                For agents
+                For deal flow
               </div>
               <div className="text-2xl font-bold text-gray-900 mb-1">$99</div>
               <div className="text-sm text-gray-500 mb-6">per month · unlimited</div>
               <ul className="space-y-3 text-sm text-gray-700 mb-8">
-                <li>✓ Unlimited property searches</li>
-                <li>✓ Your name on every report</li>
-                <li>✓ Full lookup history + re-downloads</li>
-                <li>✓ AI analysis on every search</li>
+                <li>✓ Unlimited searches — run every deal</li>
+                <li>✓ Your name and brokerage on every report</li>
+                <li>✓ Full lookup history and re-downloads</li>
+                <li>✓ AI risk analysis on every search</li>
                 <li>✓ Cancel anytime</li>
               </ul>
               <a
                 href="/subscribe"
                 className="block w-full text-center px-5 py-3 bg-[#c9a84c] text-[#0f1f3d] rounded-xl font-bold text-sm hover:bg-[#b8973d] transition-colors"
               >
-                Subscribe as Agent
+                Get unlimited access
               </a>
             </div>
 

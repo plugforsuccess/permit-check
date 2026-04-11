@@ -5,21 +5,24 @@ import Logo from "@/components/Logo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PermitCheck — Property Permit Verification",
+  title: "PermitCheck — Where Serious Money Does Its Homework",
   description:
-    "Instantly verify the permit history of any property. Search official government permit databases before you buy.",
+    "The permit intelligence platform for serious real estate investors. Instant address-level permit history before you commit capital.",
   keywords: [
-    "property permits",
-    "building permits",
     "permit check",
-    "permit history",
     "real estate due diligence",
+    "property permit history",
+    "investor due diligence",
+    "building permits Atlanta",
     "unpermitted work",
     "permit verification",
+    "real estate investing",
+    "permit intelligence",
+    "pre-closing due diligence",
   ],
   openGraph: {
     title: "PermitCheck — Property Permit Verification",
-    description: "Verify permit history for any property before you buy.",
+    description: "Where serious money does its homework. Instant permit intelligence before you commit capital.",
     type: "website",
     url: "https://permitcheck.org",
   },
@@ -34,7 +37,7 @@ const jsonLd = {
   name: "PermitCheck",
   url: "https://permitcheck.org",
   description:
-    "Instantly verify the permit history of any property. Search official government permit databases before you buy.",
+    "The permit intelligence platform for serious real estate investors. Instant address-level permit history before you commit capital.",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   offers: {
@@ -123,8 +126,8 @@ export default function RootLayout({
               <div>
                 <Logo size="md" variant="light" className="mb-3" />
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  Official permit verification for Atlanta Metro properties.
-                  Know before you close.
+                  Where serious money does its homework.
+                  Atlanta Metro · Gwinnett County · expanding.
                 </p>
               </div>
 
@@ -181,7 +184,7 @@ export default function RootLayout({
                 &copy; {new Date().getFullYear()} PermitCheck. All rights reserved.
               </p>
               <p className="text-xs text-gray-400 text-center">
-                Data sourced from official government permit databases. Not legal advice.
+                Data sourced from official government Accela databases. Not a substitute for professional inspection or legal advice.
               </p>
             </div>
           </div>

@@ -22,7 +22,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
     category: "Legal",
     headline: "Speak with a real estate attorney",
     description:
-      "Permit issues can affect your contract rights and negotiating position. Get a free 15-minute consultation.",
+      "Permit violations can affect contract rights, title, and your negotiating position. Know your exposure before closing.",
     ctaText: "Find an attorney \u2192",
     ctaUrl:
       process.env.NEXT_PUBLIC_AFFILIATE_ATTORNEY ||
@@ -33,9 +33,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
   {
     id: "inspector",
     category: "Inspection",
-    headline: "Schedule a licensed home inspection",
+    headline: "Schedule a licensed inspection",
     description:
-      "Verify what work was actually done and whether it meets code \u2014 regardless of permits on file.",
+      "Verify what work was actually completed and whether it meets code \u2014 independent of what the permits say.",
     ctaText: "Find an inspector \u2192",
     ctaUrl:
       process.env.NEXT_PUBLIC_AFFILIATE_INSPECTOR ||
@@ -48,7 +48,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
     category: "Remediation",
     headline: "Get a remediation estimate",
     description:
-      "Expired permits may require re-inspection or corrective work. Get a free estimate before closing.",
+      "Expired or open permits may require corrective work before close. Know the cost before you negotiate.",
     ctaText: "Find a contractor \u2192",
     ctaUrl:
       process.env.NEXT_PUBLIC_AFFILIATE_CONTRACTOR ||
@@ -59,9 +59,9 @@ const REFERRAL_CARDS: ReferralCard[] = [
   {
     id: "mortgage",
     category: "Financing",
-    headline: "Compare mortgage rates",
+    headline: "Compare financing rates",
     description:
-      "Clean permit history means a smoother appraisal. Lock in your rate while due diligence is complete.",
+      "A clean permit history supports a cleaner appraisal. Lock in your rate while due diligence is complete.",
     ctaText: "Compare rates \u2192",
     ctaUrl:
       process.env.NEXT_PUBLIC_AFFILIATE_MORTGAGE ||
@@ -71,10 +71,10 @@ const REFERRAL_CARDS: ReferralCard[] = [
   },
   {
     id: "agent",
-    category: "Buyer's Agent",
-    headline: "Connect with a buyer's agent",
+    category: "Representation",
+    headline: "Get experienced representation",
     description:
-      "An experienced agent can help you negotiate permit issues into the purchase price or contract terms.",
+      "A strong buyer's agent can turn permit issues into negotiating leverage — use this data in your offer.",
     ctaText: "Find an agent \u2192",
     ctaUrl:
       process.env.NEXT_PUBLIC_AFFILIATE_AGENT ||
@@ -95,7 +95,7 @@ export default function ReferralCTAs({ riskLevel }: ReferralCTAsProps) {
     <div className="mt-8 mb-6">
       <div className="flex items-center gap-2 mb-4">
         <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          Recommended next steps
+          Your next moves
         </h3>
         <div className="flex-1 h-px bg-gray-100" />
       </div>
