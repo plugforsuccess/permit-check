@@ -117,12 +117,12 @@ function HomePageContent() {
               </div>
             )}
             {/* Trust signals */}
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500">
+            <div className="mt-8 flex flex-wrap justify-center lg:justify-start items-center gap-x-6 gap-y-2 text-sm text-gray-500">
               <span>&#10003; Official government database</span>
               <span>&#10003; Instant — results in seconds</span>
               <span>&#10003; $9.99 per address</span>
             </div>
-            <p className="mt-4 text-sm font-semibold text-[#0f1f3d]">
+            <p className="mt-3 text-sm font-semibold text-[#0f1f3d] text-center lg:text-left">
               The Carfax of real estate investing.
             </p>
           </div>
@@ -229,45 +229,78 @@ function HomePageContent() {
             Pay for What You Need. Nothing More.
           </h2>
           <p className="text-gray-500 mb-10 text-sm">
-            No subscriptions. No commitments. Serious investors search when
-            the deal demands it.
+            Run one deal or a hundred — we have you covered.
           </p>
-          <div className="grid sm:grid-cols-2 gap-6">
 
-            {/* Permit Intelligence Report */}
-            <div className="border-2 border-gray-200 rounded-2xl p-5 sm:p-8 text-left">
-              <div className="text-sm font-semibold text-[#0f1f3d] uppercase tracking-wide mb-2">
-                Permit Intelligence Report
+          {/* Two primary cards */}
+          <div className="grid sm:grid-cols-2 gap-6 mb-8">
+
+            {/* Permit Intelligence Report — primary */}
+            <div className="border-2 border-gray-200 rounded-2xl p-6 sm:p-8 text-left">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Per Report
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">$9.99</div>
-              <div className="text-sm text-gray-500 mb-6">per address · instant access</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">$9.99</div>
+              <div className="text-sm text-gray-500 mb-6">per address · instant results</div>
               <ul className="space-y-3 text-sm text-gray-700">
-                <li>✓ Full permit intelligence for one address</li>
+                <li>✓ Full permit history for one address</li>
                 <li>✓ Building, electrical, plumbing, HVAC — all types</li>
-                <li>✓ Filed date, status, and description for every permit</li>
+                <li>✓ Filed date, status, and description for every record</li>
                 <li>✓ AI risk analysis with red flags and seller questions</li>
                 <li>✓ Downloadable PDF report</li>
                 <li>✓ Official government database</li>
               </ul>
             </div>
 
-            {/* Attorney Litigation-Grade Report */}
-            <div className="border-2 border-[#0f1f3d] rounded-2xl p-5 sm:p-8 text-left">
-              <div className="text-sm font-semibold text-[#0f1f3d] uppercase tracking-wide mb-2">
-                Attorney Litigation-Grade Report
+            {/* Investor Plan — subscription */}
+            <div className="border-2 border-[#c9a84c] rounded-2xl p-6 sm:p-8 text-left relative">
+              <div className="absolute -top-3 left-6 px-3 py-1 bg-[#c9a84c] text-[#0f1f3d] text-xs font-bold rounded-full">
+                For active investors
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">$199</div>
-              <div className="text-sm text-gray-500 mb-6">per address · litigation-grade</div>
-              <ul className="space-y-3 text-sm text-gray-700">
-                <li>✓ Everything in the Permit Intelligence Report</li>
-                <li>✓ Formal cover page with chain of custody</li>
-                <li>✓ Report ID for evidentiary use</li>
-                <li>✓ Suitable for real estate litigation</li>
-                <li>✓ Matter reference field</li>
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-1">
+                Unlimited
+              </div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">$99</div>
+              <div className="text-sm text-gray-500 mb-6">per month · unlimited searches</div>
+              <ul className="space-y-3 text-sm text-gray-700 mb-8">
+                <li>✓ Unlimited searches — run every deal</li>
+                <li>✓ Full permit history on every address</li>
+                <li>✓ AI risk analysis on every search</li>
+                <li>✓ Full lookup history and re-downloads</li>
+                <li>✓ Cancel anytime</li>
               </ul>
+              <a
+                href="/subscribe"
+                className="block w-full text-center px-5 py-3 bg-[#c9a84c] text-[#0f1f3d] rounded-xl font-bold text-sm hover:bg-[#b8973d] transition-colors active:scale-[0.98]"
+              >
+                Get unlimited access
+              </a>
             </div>
 
           </div>
+
+          {/* Attorney report — secondary, demoted */}
+          <div className="border border-gray-200 rounded-xl px-6 py-5 text-left sm:flex sm:items-start sm:gap-8 bg-gray-50">
+            <div className="sm:flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-lg font-bold text-gray-900">$199</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Attorney Litigation-Grade Report
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">
+                Everything in the standard report plus a formal cover page,
+                chain of custody, Report ID for evidentiary use, and matter
+                reference field. Suitable for real estate litigation.
+              </p>
+            </div>
+            <div className="mt-4 sm:mt-0 sm:shrink-0">
+              <span className="inline-block text-xs text-gray-400 font-medium">
+                Selected at checkout →
+              </span>
+            </div>
+          </div>
+
         </div>
       </section>
 

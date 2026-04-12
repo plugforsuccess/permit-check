@@ -365,7 +365,7 @@ export default function AddressAutocomplete({
           type="button"
           onClick={() => geocodeAndSubmit(inputValue)}
           disabled={busy || !inputValue.trim()}
-          className="w-full sm:w-auto px-5 sm:px-6 py-3.5 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center gap-2"
+          className="w-full sm:w-auto px-5 sm:px-6 py-3.5 sm:py-4 bg-[#0f1f3d] text-white font-semibold rounded-xl hover:bg-[#1a3560] disabled:bg-[#0f1f3d]/60 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center gap-2 active:scale-[0.98]"
           aria-label="Search"
         >
           {isGeocoding ? (
