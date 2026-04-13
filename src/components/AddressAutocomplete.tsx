@@ -15,7 +15,7 @@ export interface StructuredAddress {
 }
 
 interface AddressAutocompleteProps {
-  onSelect: (address: StructuredAddress, reportType: "standard" | "attorney") => void;
+  onSelect: (address: StructuredAddress) => void;
   isLoading: boolean;
 }
 
@@ -41,10 +41,8 @@ export default function AddressAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const reportTypeRef = useRef<"standard" | "attorney">("standard");
   const onSelectRef = useRef(onSelect);
 
-  const [reportType, setReportType] = useState<"standard" | "attorney">("standard");
   const [inputValue, setInputValue] = useState("");
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -52,7 +50,6 @@ export default function AddressAutocomplete({
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { reportTypeRef.current = reportType; }, [reportType]);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
   // Create session token when Places library loads
@@ -172,8 +169,7 @@ export default function AddressAutocomplete({
           zip: get("postal_code")?.longText ?? "",
           lat: place.location?.lat() ?? 0,
           lng: place.location?.lng() ?? 0,
-        },
-        reportTypeRef.current
+        }
       );
     } catch (err) {
       console.error("[autocomplete] place.fetchFields failed:", err);
@@ -229,8 +225,7 @@ export default function AddressAutocomplete({
           zip: get("postal_code"),
           lat: r.geometry.location.lat(),
           lng: r.geometry.location.lng(),
-        },
-        reportTypeRef.current
+        }
       );
     } catch (err) {
       console.error("[autocomplete] geocode failed:", err);
@@ -409,43 +404,6 @@ export default function AddressAutocomplete({
       {error && (
         <p className="mt-2 text-sm text-red-600">{error}</p>
       )}
-
-      {/* Report type selector */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-3 justify-center">
-        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "standard" ? "border-[#0f1f3d] bg-[#0f1f3d]/5" : "border-transparent hover:bg-gray-50"}`}>
-          <input
-            type="radio"
-            name="reportType"
-            value="standard"
-            checked={reportType === "standard"}
-            onChange={() => setReportType("standard")}
-            className="text-[#0f1f3d] focus:ring-[#0f1f3d]"
-          />
-          <span className="text-sm text-gray-700">
-            Standard Report{" "}
-            <span className="font-semibold text-gray-900">$9.99</span>
-          </span>
-        </label>
-        <label className={`flex items-center gap-2.5 cursor-pointer px-4 py-2.5 rounded-lg border transition-colors ${reportType === "attorney" ? "border-[#0f1f3d] bg-[#0f1f3d]/5" : "border-transparent hover:bg-gray-50"}`}>
-          <input
-            type="radio"
-            name="reportType"
-            value="attorney"
-            checked={reportType === "attorney"}
-            onChange={() => setReportType("attorney")}
-            className="text-[#0f1f3d] focus:ring-[#0f1f3d]"
-          />
-          <span className="text-sm text-gray-700">
-            Attorney Report{" "}
-            <span className="font-semibold text-gray-900">$199</span>
-            <span className="text-xs text-gray-400 ml-1">(litigation-grade)</span>
-          </span>
-        </label>
-      </div>
-
-      <p className="mt-4 text-sm text-gray-400 text-center">
-        Searching official permit databases across supported jurisdictions
-      </p>
     </div>
   );
 }

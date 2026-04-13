@@ -78,6 +78,26 @@ export default function ResultsPage() {
   const [listingAnalyzed, setListingAnalyzed] = useState(false);
   const [listingError, setListingError] = useState<string | null>(null);
   const [showListingModal, setShowListingModal] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState<"standard" | "attorney">(
+    result?.report_type ?? "standard"
+  );
+  const selectedReportTypeRef = useRef<"standard" | "attorney">("standard");
+  useEffect(() => {
+    selectedReportTypeRef.current = selectedReportType;
+  }, [selectedReportType]);
+
+  const handleReportTypeChange = async (type: "standard" | "attorney") => {
+    setSelectedReportType(type);
+    try {
+      await fetch(`/api/lookup/${lookupId}/report-type`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ report_type: type }),
+      });
+    } catch {
+      // Non-critical — checkout API reads from DB anyway
+    }
+  };
 
   const handleFeedback = async (rating: 1 | -1) => {
     if (feedbackSubmitted) return;
@@ -1184,7 +1204,7 @@ export default function ResultsPage() {
             />
 
             {/* Matter Reference — attorney reports only */}
-            {result.report_type === "attorney" && (
+            {selectedReportType === "attorney" && (
               <div className="mt-8 max-w-md mx-auto">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Matter Reference <span className="text-gray-400 font-normal">(optional)</span>
@@ -1241,6 +1261,57 @@ export default function ResultsPage() {
               )}
             </div>
 
+            {/* Report type selector — shown only on unpaid results */}
+            <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Select report type
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                {/* Standard */}
+                <button
+                  onClick={() => handleReportTypeChange("standard")}
+                  className={`text-left p-4 rounded-xl border-2 transition-all ${
+                    selectedReportType === "standard"
+                      ? "border-[#0f1f3d] bg-white shadow-sm"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-gray-900">
+                      Permit Intelligence Report
+                    </span>
+                    <span className="text-sm font-bold text-gray-900">$9.99</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Full permit history, AI risk analysis, downloadable PDF
+                  </p>
+                </button>
+
+                {/* Attorney */}
+                <button
+                  onClick={() => handleReportTypeChange("attorney")}
+                  className={`text-left p-4 rounded-xl border-2 transition-all ${
+                    selectedReportType === "attorney"
+                      ? "border-[#0f1f3d] bg-white shadow-sm"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-gray-900">
+                      Attorney Litigation-Grade
+                    </span>
+                    <span className="text-sm font-bold text-gray-900">$199</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Everything above plus formal cover page, chain of custody,
+                    Report ID, and matter reference for evidentiary use
+                  </p>
+                </button>
+
+              </div>
+            </div>
+
             {/* Payment CTA — sticky on mobile for visibility */}
             <div className="sticky bottom-0 z-20 -mx-4 px-4 py-4 bg-white/98 backdrop-blur-lg border-t border-gray-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] sm:relative sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent sm:border-0 sm:shadow-none sm:backdrop-blur-none mt-8">
               <div className="text-center">
@@ -1278,7 +1349,7 @@ export default function ResultsPage() {
                       Redirecting to payment...
                     </span>
                   ) : (
-                    `Unlock full report for ${result.report_type === "attorney" ? "$199" : "$9.99"}`
+                    `Unlock for ${selectedReportType === "attorney" ? "$199" : "$9.99"}`
                   )}
                 </button>
                 <p className="mt-2 text-xs text-gray-500">

@@ -26,7 +26,6 @@ function HomePageContent() {
 
   const handleSubmit = async (
     address: StructuredAddress,
-    reportType: "standard" | "attorney"
   ) => {
     setError(null);
     setIsLoading(true);
@@ -42,7 +41,7 @@ function HomePageContent() {
         },
         body: JSON.stringify({
           address: address.raw,
-          report_type: reportType,
+          report_type: "standard",
           address_components: {
             streetNumber: address.streetNumber,
             streetName: address.streetName,
