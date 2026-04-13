@@ -11,13 +11,13 @@ export function getSubscriptionMessage(
 ): string {
   switch (subscriptionStatus) {
     case "canceled":
-      return "Your Agent Plan subscription has been canceled.";
+      return "Your Investor Plan subscription has been canceled.";
     case "past_due":
       return "Your subscription payment failed — update your billing to restore access.";
     case "unpaid":
       return "Your subscription payment is overdue — update your billing to restore access.";
     default:
-      return "Subscribe to the Agent Plan for unlimited searches.";
+      return "Get unlimited searches with the Investor Plan.";
   }
 }
 
@@ -28,5 +28,5 @@ export function getSubscriptionCTA(
     subscriptionStatus === "past_due" ||
     subscriptionStatus === "unpaid"
     ? "Resubscribe →"
-    : "Subscribe as Agent →";
+    : "Get unlimited access →";
 }
