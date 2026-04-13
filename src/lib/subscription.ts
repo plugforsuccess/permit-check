@@ -6,6 +6,16 @@ export function hasAgentAccess(
   );
 }
 
+/**
+ * Returns true if the user has admin privileges.
+ * Admin users bypass payment on all lookups.
+ */
+export function isAdmin(
+  isAdminFlag: boolean | null | undefined
+): boolean {
+  return isAdminFlag === true;
+}
+
 export function getSubscriptionMessage(
   subscriptionStatus: string | null | undefined
 ): string {
