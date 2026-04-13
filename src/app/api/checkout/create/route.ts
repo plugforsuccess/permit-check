@@ -79,13 +79,20 @@ export async function POST(request: NextRequest) {
       if (user) {
         const { data: profile } = await supabase
           .from("users")
-          .select("subscription_status")
+          .select("subscription_status, is_admin")
           .eq("id", user.id)
           .single();
 
+        if (profile?.is_admin === true) {
+          return NextResponse.json(
+            { error: "Admin accounts have free access — no payment needed." },
+            { status: 400 }
+          );
+        }
+
         if (profile && hasAgentAccess(profile.subscription_status)) {
           return NextResponse.json(
-            { error: "Your Agent Plan includes unlimited searches — no per-lookup payment needed." },
+            { error: "Your Investor Plan includes unlimited searches — no per-lookup payment needed." },
             { status: 400 }
           );
         }

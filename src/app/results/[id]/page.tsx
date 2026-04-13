@@ -8,6 +8,7 @@ import PropertyStreetView from "@/components/PropertyStreetView";
 import ReferralCTAs from "@/components/ReferralCTAs";
 import Disclaimer from "@/components/Disclaimer";
 import type { Permit } from "@/types";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 interface LookupResult {
   lookup_id: string;
@@ -281,7 +282,14 @@ export default function ResultsPage() {
 
   const fetchResults = useCallback(async () => {
     try {
-      const response = await fetch(`/api/lookup/${lookupId}/results`);
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(`/api/lookup/${lookupId}/results`, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      });
       const data = await response.json();
 
       if (!response.ok) {

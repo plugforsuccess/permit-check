@@ -42,8 +42,24 @@ export async function GET(
     );
   }
 
-  // Check payment status
-  if (lookup.payment_status !== "paid") {
+  // Check if request is from an admin user
+  let adminBypass = false;
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (user) {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+      if (profile?.is_admin === true) adminBypass = true;
+    }
+  }
+
+  // Check payment status — admin users bypass
+  if (lookup.payment_status !== "paid" && !adminBypass) {
     // Fetch only status and type — no record numbers or details
     const { data: teaserPermits } = await supabase
       .from("permits")
@@ -91,6 +107,9 @@ export async function GET(
     });
   }
 
+  // If admin bypass — treat as paid for response construction
+  const effectivePaid = lookup.payment_status === "paid" || adminBypass;
+
   // Fetch full permit data
   const { data: permits, error: permitError } = await supabase
     .from("permits")
@@ -128,7 +147,7 @@ export async function GET(
     address: lookup.address_raw || lookup.address_normalized,
     address_normalized: lookup.address_normalized,
     permit_count: lookup.permit_count,
-    payment_status: lookup.payment_status,
+    payment_status: effectivePaid ? "paid" : lookup.payment_status,
     report_type: lookup.report_type || "standard",
     is_unit: lookup.is_unit ?? false,
     development_level_permits: lookup.development_level_permits ?? false,
