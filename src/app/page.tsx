@@ -115,18 +115,9 @@ function HomePageContent() {
                 {error}
               </div>
             )}
-            {/* Trust signals */}
-            <div className="mt-8 flex flex-wrap justify-center lg:justify-start items-center gap-x-6 gap-y-2 text-sm text-gray-500">
-              <span>&#10003; Official government database</span>
-              <span>&#10003; Instant — results in seconds</span>
-              <span>&#10003; $9.99 per address</span>
-            </div>
-            <div className="mt-8 flex justify-center lg:justify-start">
-              <p className="inline-flex items-center gap-2.5 text-base font-semibold text-[#0f1f3d]">
-                <span className="w-0.5 h-5 bg-[#c9a84c] rounded-full shrink-0" />
-                The Carfax of real estate investing.
-              </p>
-            </div>
+            <p className="mt-8 text-sm font-semibold text-[#0f1f3d] text-center lg:text-left">
+              The Carfax of real estate investing.
+            </p>
           </div>
 
           {/* Right: Product preview */}
