@@ -115,9 +115,12 @@ function HomePageContent() {
                 {error}
               </div>
             )}
-            <p className="mt-8 text-sm font-semibold text-[#0f1f3d] text-center lg:text-left">
-              The Carfax of real estate investing.
-            </p>
+            <div className="mt-8 flex justify-center lg:justify-start">
+              <p className="inline-flex items-center gap-2.5 text-base font-semibold text-[#0f1f3d]">
+                <span className="w-0.5 h-5 bg-[#c9a84c] rounded-full shrink-0" />
+                The Carfax of real estate investing.
+              </p>
+            </div>
           </div>
 
           {/* Right: Product preview */}
