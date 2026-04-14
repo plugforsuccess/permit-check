@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import Disclaimer from "@/components/Disclaimer";
 import Logo from "@/components/Logo";
+import OnboardingModal from "@/components/OnboardingModal";
 import {
   hasAgentAccess,
   getSubscriptionMessage,
@@ -45,7 +46,9 @@ export default function DashboardPage() {
     brokerage: string | null;
     subscription_status: string | null;
     stripe_customer_id: string | null;
+    onboarding_completed: boolean;
   } | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [session, setSession] = useState<{ user: { id: string; email?: string }; access_token: string } | null>(null);
 
   const toggleCompare = (lookupId: string) => {
@@ -135,13 +138,27 @@ export default function DashboardPage() {
 
   const fetchProfile = async (userId: string) => {
     const supabase = getSupabaseClient();
-    const { data: profile } = await supabase
+    const { data } = await supabase
       .from("users")
-      .select("agent_name, brokerage, subscription_status, stripe_customer_id")
+      .select("agent_name, brokerage, subscription_status, stripe_customer_id, onboarding_completed")
       .eq("id", userId)
       .single();
 
-    if (profile) setUserProfile(profile);
+    const profile = data as {
+      agent_name: string | null;
+      brokerage: string | null;
+      subscription_status: string | null;
+      stripe_customer_id: string | null;
+      onboarding_completed: boolean;
+    } | null;
+
+    if (profile) {
+      setUserProfile(profile);
+      // Show onboarding modal for new users who haven't completed it
+      if (!profile.onboarding_completed) {
+        setShowOnboarding(true);
+      }
+    }
   };
 
   const handleManageSubscription = async () => {
@@ -365,6 +382,28 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen py-12 px-4">
+
+      {/* Onboarding modal — shown once for new users */}
+      {showOnboarding && session && (
+        <OnboardingModal
+          session={session}
+          onComplete={(data) => {
+            setShowOnboarding(false);
+            // Update local profile state with submitted data
+            setUserProfile((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    agent_name: data.agent_name || prev.agent_name,
+                    brokerage: data.brokerage || prev.brokerage,
+                  }
+                : prev
+            );
+          }}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
+
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-gray-900">
