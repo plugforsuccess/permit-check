@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import Disclaimer from "@/components/Disclaimer";
+import Logo from "@/components/Logo";
 import {
   hasAgentAccess,
   getSubscriptionMessage,
@@ -148,94 +149,121 @@ export default function DashboardPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
-          <h1 className="text-2xl font-bold text-gray-900 text-center mb-8">
-            {authMode === "login" ? "Sign In" : "Create Account"}
-          </h1>
 
-          <form
-            onSubmit={handleAuth}
-            className="bg-white p-8 rounded-xl shadow-sm border border-gray-200"
-          >
-            <div className="mb-4">
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-gray-900"
-                required
-              />
-            </div>
-            <div className="mb-6">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-gray-900"
-                required
-                minLength={8}
-              />
-              {password.length > 0 && password.length < 8 && (
-                <p className="mt-1.5 text-xs text-amber-600">
-                  Password must be at least 8 characters
-                </p>
-              )}
-            </div>
-
-            {authError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {authError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-[#0f1f3d] text-white rounded-lg font-semibold hover:bg-[#1a3560] transition-colors"
-            >
-              {authMode === "login" ? "Sign In" : "Create Account"}
-            </button>
-
-            <p className="mt-4 text-center text-sm text-gray-600">
-              {authMode === "login" ? (
-                <>
-                  Don&apos;t have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode("register")}
-                    className="text-blue-600 font-semibold hover:underline"
-                  >
-                    Sign up
-                  </button>
-                </>
-              ) : (
-                <>
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode("login")}
-                    className="text-blue-600 font-semibold hover:underline"
-                  >
-                    Sign in
-                  </button>
-                </>
-              )}
+          {/* Logo + context */}
+          <div className="text-center mb-8">
+            <a href="/" className="inline-block mb-5">
+              <Logo size="lg" variant="light" />
+            </a>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              {authMode === "login" ? "Welcome back." : "Create your account."}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {authMode === "login"
+                ? "Sign in to access your permit history and reports."
+                : "Start running permit checks on any address."}
             </p>
-          </form>
+          </div>
+
+          {/* Form card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+            <form onSubmit={handleAuth}>
+              <div className="mb-4">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-[#0f1f3d] focus:ring-1 focus:ring-[#0f1f3d] outline-none text-gray-900"
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="mb-6">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:border-[#0f1f3d] focus:ring-1 focus:ring-[#0f1f3d] outline-none text-gray-900"
+                  required
+                  minLength={8}
+                  autoComplete={authMode === "login" ? "current-password" : "new-password"}
+                />
+                {password.length > 0 && password.length < 8 && (
+                  <p className="mt-1.5 text-xs text-amber-600">
+                    Password must be at least 8 characters
+                  </p>
+                )}
+              </div>
+
+              {authError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!email || password.length < 8}
+                className="w-full py-3 bg-[#0f1f3d] text-white rounded-xl font-bold text-sm hover:bg-[#1a3560] disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
+              >
+                {authMode === "login" ? "Sign In" : "Create Account"}
+              </button>
+
+              <p className="mt-4 text-center text-sm text-gray-500">
+                {authMode === "login" ? (
+                  <>
+                    Don&apos;t have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                      className="text-[#0f1f3d] font-semibold hover:underline"
+                    >
+                      Sign up
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                      className="text-[#0f1f3d] font-semibold hover:underline"
+                    >
+                      Sign in
+                    </button>
+                  </>
+                )}
+              </p>
+            </form>
+          </div>
+
+          {/* Back to home */}
+          <p className="text-center mt-6">
+            <a
+              href="/"
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              ← Back to home
+            </a>
+          </p>
+
         </div>
       </div>
     );
