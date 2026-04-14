@@ -38,6 +38,8 @@ export default function DashboardPage() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
   const [userProfile, setUserProfile] = useState<{
     agent_name: string | null;
     brokerage: string | null;
@@ -66,16 +68,40 @@ export default function DashboardPage() {
       const supabase = getSupabaseClient();
 
       if (authMode === "register") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+          },
+        });
         if (error) {
           setAuthError(error.message);
           return;
         }
+        // Registration succeeded — show confirmation state
+        // Do NOT attempt sign-in — Supabase requires email confirmation first
+        setRegisteredEmail(email);
+        setAwaitingConfirmation(true);
+        return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
       if (error) {
-        setAuthError(error.message);
+        // Provide a clearer message than Supabase's default
+        if (error.message.toLowerCase().includes("email not confirmed")) {
+          setAuthError(
+            "Please confirm your email before signing in. Check your inbox for a confirmation link."
+          );
+        } else if (error.message.toLowerCase().includes("invalid login")) {
+          setAuthError("Incorrect email or password. Please try again.");
+        } else {
+          setAuthError(error.message);
+        }
         return;
       }
 
@@ -148,6 +174,74 @@ export default function DashboardPage() {
   }, []);
 
   if (!isAuthenticated) {
+
+    // Email confirmation pending state
+    if (awaitingConfirmation) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4">
+          <div className="max-w-md w-full text-center">
+            <a href="/" className="inline-block mb-6">
+              <Logo size="lg" variant="light" />
+            </a>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+              <div className="w-14 h-14 bg-[#0f1f3d]/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-[#0f1f3d]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </div>
+
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                Check your email
+              </h2>
+              <p className="text-sm text-gray-500 mb-1">
+                We sent a confirmation link to
+              </p>
+              <p className="text-sm font-semibold text-[#0f1f3d] mb-6">
+                {registeredEmail}
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Click the link in the email to activate your account.
+                Then come back here to sign in.
+              </p>
+
+              <button
+                onClick={() => {
+                  setAwaitingConfirmation(false);
+                  setAuthMode("login");
+                  setPassword("");
+                }}
+                className="w-full py-3 bg-[#0f1f3d] text-white rounded-xl font-bold text-sm hover:bg-[#1a3560] transition-colors active:scale-[0.98]"
+              >
+                I confirmed my email — Sign in
+              </button>
+
+              <p className="mt-4 text-xs text-gray-400">
+                Didn&apos;t receive it? Check your spam folder, or{" "}
+                <button
+                  onClick={() => {
+                    setAwaitingConfirmation(false);
+                    setAuthMode("register");
+                    setEmail(registeredEmail);
+                  }}
+                  className="text-[#0f1f3d] font-semibold hover:underline"
+                >
+                  try again
+                </button>
+                .
+              </p>
+            </div>
+
+            <p className="text-center mt-6">
+              <a href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                ← Back to home
+              </a>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
