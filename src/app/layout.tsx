@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import GoogleMapsProvider from "@/components/GoogleMapsProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Logo from "@/components/Logo";
+import SiteNav from "@/components/SiteNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -80,33 +81,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <nav
-          className="sticky top-0 z-50 border-b border-white/10 bg-white/80 backdrop-blur-md"
-          style={{ WebkitBackdropFilter: "blur(12px)" }}
-          aria-label="Main navigation"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <a href="/" className="flex items-center group">
-                <Logo size="md" variant="light" />
-              </a>
-              <div className="flex items-center gap-1">
-                <a
-                  href="/#pricing"
-                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-50"
-                >
-                  Pricing
-                </a>
-                <a
-                  href="/dashboard"
-                  className="text-sm font-medium text-white bg-[#0f1f3d] hover:bg-[#1a3560] px-4 py-2 rounded-lg transition-colors ml-1"
-                >
-                  Sign In
-                </a>
-              </div>
-            </div>
-          </div>
-        </nav>
+        <SiteNav />
         <GoogleMapsProvider>
           <main id="main-content" className="flex-1">
             <ErrorBoundary>{children}</ErrorBoundary>
