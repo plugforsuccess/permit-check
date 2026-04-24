@@ -1,0 +1,90 @@
+{
+  "id": "greenwich-st-sw",
+  "label": "1278 Greenwich St SW — litigation quadruplex",
+  "address": "1278 Greenwich St SW, Atlanta, GA 30310",
+  "intent": "flip",
+  "notes": "Golden set property #1 from the MVP spec. Older multi-unit in SW Atlanta with issues tied to ongoing litigation. The replay permits below are a representative subset reflecting the spec's expected issue pattern: an expired building permit, an open 'Issued' electrical permit that was never finaled, and a failed inspection. Swap with real scraped data once available.",
+  "replay": {
+    "permits": {
+      "truncated": false,
+      "usedFuzzyMatch": false,
+      "permits": [
+        {
+          "recordNumber": "BLD-2019-00842",
+          "type": "Building Permit",
+          "status": "Expired",
+          "filedDate": "2019-04-12",
+          "issuedDate": "2019-05-01",
+          "description": "Interior renovation — kitchen and bath remodel unit A",
+          "address": "1278 GREENWICH ST SW",
+          "module": "Building",
+          "inspections": [
+            {
+              "inspectionType": "Rough Framing",
+              "scheduledDate": "2019-08-15",
+              "inspectedDate": "2019-08-15",
+              "result": "Failed",
+              "inspector": null,
+              "comments": null
+            }
+          ]
+        },
+        {
+          "recordNumber": "ELE-2020-01134",
+          "type": "Electrical Permit",
+          "status": "Issued",
+          "filedDate": "2020-02-03",
+          "issuedDate": "2020-02-10",
+          "description": "Service upgrade 200A, unit B",
+          "address": "1278 GREENWICH ST SW",
+          "module": "Electrical"
+        },
+        {
+          "recordNumber": "BLD-2022-00317",
+          "type": "Building Permit",
+          "status": "Finaled",
+          "filedDate": "2022-01-09",
+          "issuedDate": "2022-02-14",
+          "description": "Reroof — asphalt shingle",
+          "address": "1278 GREENWICH ST SW",
+          "module": "Building"
+        },
+        {
+          "recordNumber": "CE-2023-00912",
+          "type": "Code Enforcement Complaint",
+          "status": "Issued",
+          "filedDate": "2023-06-22",
+          "issuedDate": null,
+          "description": "Complaint: unpermitted basement finish, unit C",
+          "address": "1278 GREENWICH ST SW",
+          "module": "Code Enforcement"
+        }
+      ]
+    },
+    "property": {
+      "beds": 8,
+      "baths": 4,
+      "sqft": 3200,
+      "yearBuilt": 1928,
+      "propertyType": "Quadruplex",
+      "lastSalePrice": 285000,
+      "lastSaleDate": "2021-08-17",
+      "assessedValue": 310000,
+      "ownerOccupied": false,
+      "ownerName": "Greenwich Holdings LLC",
+      "isInvestorOwned": true
+    }
+  },
+  "expected": {
+    "risk_level": "high",
+    "risk_level_tolerance": ["medium", "high"],
+    "required_red_flag_categories": [
+      "expired_permit",
+      "open_permit"
+    ],
+    "forbidden_red_flag_categories": [],
+    "min_red_flags": 2,
+    "min_questions_for_seller": 2,
+    "require_non_empty_next_steps": true
+  }
+}

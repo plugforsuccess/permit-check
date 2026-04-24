@@ -1,0 +1,63 @@
+{
+  "id": "clean-sfh-atlanta",
+  "label": "Clean single-family Atlanta — negative control",
+  "address": "842 Linwood Ave NE, Atlanta, GA 30306",
+  "intent": "primary_residence",
+  "notes": "Negative control: a recently-reroofed single family home with a fully finaled permit history and no open items. The agent should NOT invent red flags here. Risk level must be low or medium — anything high is over-flagging.",
+  "replay": {
+    "permits": {
+      "truncated": false,
+      "usedFuzzyMatch": false,
+      "permits": [
+        {
+          "recordNumber": "BLD-2024-00521",
+          "type": "Building Permit",
+          "status": "Finaled",
+          "filedDate": "2024-03-04",
+          "issuedDate": "2024-03-18",
+          "description": "Reroof — architectural shingle, tear-off",
+          "address": "842 LINWOOD AVE NE",
+          "module": "Building"
+        },
+        {
+          "recordNumber": "MEC-2023-00214",
+          "type": "Mechanical Permit",
+          "status": "Finaled",
+          "filedDate": "2023-05-12",
+          "issuedDate": "2023-05-15",
+          "description": "HVAC replacement, 3-ton condenser and air handler",
+          "address": "842 LINWOOD AVE NE",
+          "module": "Mechanical"
+        }
+      ]
+    },
+    "property": {
+      "beds": 3,
+      "baths": 2,
+      "sqft": 1820,
+      "yearBuilt": 2005,
+      "propertyType": "Single Family",
+      "lastSalePrice": 615000,
+      "lastSaleDate": "2022-06-14",
+      "assessedValue": 580000,
+      "ownerOccupied": true,
+      "ownerName": "Rivera, Maria",
+      "isInvestorOwned": false
+    }
+  },
+  "expected": {
+    "risk_level": "low",
+    "risk_level_tolerance": ["low", "medium"],
+    "required_red_flag_categories": [],
+    "forbidden_red_flag_categories": [
+      "unpermitted_work",
+      "expired_permit",
+      "open_permit",
+      "code_violation"
+    ],
+    "min_red_flags": 0,
+    "max_red_flags": 2,
+    "min_questions_for_seller": 1,
+    "require_non_empty_next_steps": true
+  }
+}
