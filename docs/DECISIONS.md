@@ -11,7 +11,7 @@ rather than editing it in place.
 
 -----
 
-## 2026-04-29 — Week 1 audit findings (open)
+## 2026-04-29 — Week 1 audit findings
 
 ### D19. Live pricing in code vs. MVP scope
 - **Conflict:** `src/lib/config.ts:20–25` ships `singleLookup: 999` ($9.99),
@@ -21,9 +21,30 @@ rather than editing it in place.
   surface: `migrations/001_initial_schema.sql:27` (`report_type` column),
   `migrations/008_agent_subscription.sql`, `src/app/api/subscription/*`,
   `README.md:24`.
-- **Resolution:** Pending Cameron. Options: (a) flip `singleLookup` to $29 and
-  remove the other three SKUs for MVP, (b) keep them dormant behind a feature
-  flag, or (c) revise D8. No code change until resolved.
+- **Resolution:** Rip out the three non-$29 SKUs as a deliberate v1.0 scope
+  cut. The $199 attorney report and the $29/mo buyer plan and $99/mo agent
+  plan are different products and will get their own design pass when their
+  time comes — not carried dormant. Dead code rots and gets cargo-culted.
+
+  Concretely:
+  - `src/lib/config.ts:20–25`: delete `attorneyReport`, `buyerPlan`,
+    `agentPlan`. Flip `singleLookup` to `2900` ($29.00).
+  - Delete `src/app/api/subscription/create/route.ts` and
+    `src/app/api/subscription/portal/route.ts`.
+  - Add `supabase/migrations/017_drop_unused_pricing.sql` dropping the
+    unused subscription tables/columns and the `report_type` column.
+  - **Do not edit `migrations/008_agent_subscription.sql`** — migrations are
+    immutable after merge (CLAUDE.md §4); the file stays even though the
+    tables it created are gone. Same rule for `006_matter_reference.sql`.
+  - `README.md:24, 137`: update copy to $29-only and drop the attorney
+    tier from feature lists.
+  - `src/app/api/checkout/create/route.ts:102–106`: drop the `report_type`
+    branching and the agent-subscriber bypass at lines 75–100.
+
+  Schedule as **PR9**. No dependency on the agent rebuild — touches no
+  agent code, so it can land in parallel with PR3–PR7. Recommend shipping
+  before PR3 (Inngest swap) so the new agent path doesn't run on stale
+  prices.
 
 ### D20. Attorney-grade report SKU undocumented
 - **Conflict:** `report_type: 'standard' | 'attorney'` runs through the schema
@@ -32,8 +53,13 @@ rather than editing it in place.
   (`src/app/api/webhooks/stripe/route.ts:199–253`), and
   `migrations/006_matter_reference.sql`. Neither `SPEC.md` nor `CLAUDE.md`
   mentions an attorney-grade tier.
-- **Resolution:** Pending Cameron. Either fold under the $29 MVP and drop, or
-  write the SKU into SPEC §1 / §11. Tied to D19.
+- **Resolution:** Drop under the D19 cut. The `report_type` column, the
+  `matter_reference` column, the `'attorney'` branches in
+  `src/app/api/checkout/create/route.ts:102–106`, and the attorney PDF
+  pre-generation block in `src/app/api/webhooks/stripe/route.ts:199–253`
+  all go in PR9 alongside D19. Attorney-grade reports remain a deliberate
+  v1.1+ product — designed properly when their time comes, not carried
+  as dead code.
 
 ### D21. Auth uses passwords, not magic-link
 - **Conflict:** SPEC §3 ("email + magic link, no password") and §5
@@ -41,8 +67,22 @@ rather than editing it in place.
   calls `supabase.auth.signUp({ email, password })` and
   `signInWithPassword`. Recent commit `eacd9ef` added a show/hide password
   toggle — the codebase is moving *toward* passwords, not away.
-- **Resolution:** Pending Cameron. Switch to magic-link before launch (and
-  remove the password UI), or amend SPEC §3/§5 to allow passwords for v0.
+- **Resolution:** Switch to magic-link before launch. SPEC §3 and §5 stand
+  as written — passwords add friction at the moment of payment ("create an
+  account, set a password, verify email, come back, pay") that the spec
+  specifically optimized away.
+
+  Schedule as **PR8**, after PR7 (Greenwich fixture). Scope:
+  - Replace `signUp({ email, password })` and `signInWithPassword` in
+    `src/app/dashboard/page.tsx:75–95` with `signInWithOtp`.
+  - Remove the password UI (input, show/hide toggle from `eacd9ef`,
+    length validation). The toggle is wasted work but small — don't dwell
+    on the sunk cost.
+  - Wire the magic-link email template through Resend; reuse the existing
+    `lib/email.ts` plumbing.
+  - No DB changes — Supabase Auth handles the OTP flow. Existing users
+    keep working (Supabase issues OTPs against the same `auth.users`
+    rows; passwords just become unused).
 
 ### D22. Vitest path alias is broken
 - **Conflict:** `vitest.config.ts:4` defines the alias key as `"@/"` (trailing
