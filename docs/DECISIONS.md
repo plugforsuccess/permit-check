@@ -11,6 +11,42 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-29 — Q6 resolution: legacy summary.ts lifecycle
+
+### D27. Leave `src/lib/summary.ts` on legacy path until cutover, then delete
+- **Context:** `src/lib/summary.ts` (≈500 LOC) is the existing single-Sonnet
+  summary called from the legacy `$9.99` webhook path
+  (`src/app/api/webhooks/stripe/route.ts:169–185`). It violates several
+  rules from `CLAUDE.md`: no streaming (§3), no prompt caching (§3), no
+  Zod-validated tool I/O (§3), no Anthropic SDK — raw `fetch` to
+  `api.anthropic.com` (§3), inline model id `claude-sonnet-4-20250514` at
+  line 433 (D9 says env-pinned), and `console.log`/`console.warn` at
+  lines 278 and 454 (§4: never in committed app code).
+- **Resolution:** Option (a) — leave it untouched. Don't wrap in PR2's
+  redaction/env work, don't migrate to the Anthropic SDK, don't add
+  streaming or caching, don't move the model id behind the env pin. It's
+  code on its way out; polishing it is throwaway effort.
+
+  Deletion lands in a follow-up PR after `USE_INNGEST_REPORTS` is stable
+  in production (per D6 timeline: production within 48h of PR5 merge).
+  Same PR also drops the legacy webhook side-effect chain (D24) and the
+  routes/columns rendered dead by the cutover.
+
+  Accepted risk: between now and cutover, `summary.ts` keeps logging
+  full addresses via raw `console.*`, calls Sonnet against a hardcoded
+  model id, and uses no prompt caching. Acceptable at current volume
+  (effectively zero `$9.99` reports per day) and timeline (weeks).
+
+  **Logger-shim caveat:** if PR2 changes the signature of the structured
+  logger (`src/lib/logger.ts`), any legacy file that imports `log` needs
+  a one-line shim with a `// TODO: delete with legacy path` comment.
+  Audit confirms `summary.ts` does **not** import `log` (`grep` returns
+  nothing) — it uses `console.*` directly, so no shim is needed there.
+  The caveat still applies to other legacy files that do import `log`
+  (e.g. the Stripe webhook itself).
+
+-----
+
 ## 2026-04-29 — Q5 resolution: Google Places API naming
 
 ### D26. Google Places API key naming
