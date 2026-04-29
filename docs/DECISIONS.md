@@ -11,6 +11,35 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-29 — Q5 resolution: Google Places API naming
+
+### D26. Google Places API key naming
+- **Context:** SPEC.md §10 (line ~789) lists `GOOGLE_PLACES_API_KEY`. The
+  repo ships `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (frontend autocomplete) and
+  `GOOGLE_MAPS_SERVER_KEY` (server-side). The spec name doesn't exist
+  anywhere in the codebase.
+- **Resolution:** Same Google Cloud project, two SKUs — don't split
+  billing across projects. Enable **Places API (New)** on the existing
+  project; existing env var names are correct; SPEC's name is outdated.
+
+  - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — frontend autocomplete. Must be
+    domain-restricted in the GCP console.
+  - `GOOGLE_MAPS_SERVER_KEY` — server-side, used by the agent's address
+    normalization step (Places API New Text Search).
+  - **PR2 renames in docs only.** Update SPEC.md §10's env var table to
+    use the two real names; remove `GOOGLE_PLACES_API_KEY`. **Do not
+    rename in code.** PR2's Zod env schema validates the existing names
+    (both promoted to required) — it does NOT add a
+    `GOOGLE_PLACES_API_KEY`.
+
+  **Action item for Cameron, not the dev:** verify
+  `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is actually domain-restricted in the
+  GCP console (HTTP referrer restriction → permitcheck.org + the Vercel
+  preview domain). An unrestricted client key is a billing-bomb risk.
+  Out of scope for PR2.
+
+-----
+
 ## 2026-04-29 — Q3 resolution: admin review gate scope
 
 ### D25. Admin review gate applies to Inngest path only (refines D11)
