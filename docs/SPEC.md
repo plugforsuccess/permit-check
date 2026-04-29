@@ -1,106 +1,513 @@
-# PermitCheck — Diligence Agent MVP
+# SPEC.md — PermitCheck Diligence Agent MVP
 
-**Engineering Specification & Build Prompt**
+> Stack: Next.js 16 (App Router) · Supabase (Postgres + Auth + Storage) · Claude Sonnet 4.5 (orchestration) · Claude Opus 4.7 (report generation) · Vercel Pro · Inngest · Playwright · Stripe · Resend · npm. Target: 90-second end-to-end report generation for any Atlanta-metro residential property.
 
-> Stack: Next.js 14 (App Router), Supabase (Postgres + Auth + Storage), Claude Sonnet 4.5 (orchestration), Claude Opus (report generation), Vercel (hosting). Target: 90-second end-to-end report generation for any Atlanta residential property.
+Prepared by Cameron Wiley, Founder & CEO. This document is the source of truth for *what* the MVP does. `/CLAUDE.md` is the source of truth for *how* the code is written. `/docs/DECISIONS.md` records resolutions to design contradictions surfaced during the build.
 
-Prepared by Cameron Wiley, Founder & CEO. This document is the single source of truth for the MVP build. The dev should read it end-to-end before writing code, reference it during the build, and treat acceptance criteria as binding.
+The first half of this document is the product summary — read end-to-end every session. The second half (§9 onward) is the implementation reference — pull in only when working on the specific area covered.
 
 -----
 
-## 1. Context & Objectives
+## PART I — PRODUCT SUMMARY
 
-### What we’re building
+## 1. What we’re building
 
 A web application where a real estate investor enters a property address, pays $29, and receives a due diligence report within 90 seconds. The report analyzes permit history, detects unpermitted work, surfaces open code violations and inspection failures, scores contractor quality, and produces a list of questions the investor should ask the seller.
 
 The product category is workflow automation powered by proprietary permit data — not a data dashboard. The agent IS the product. A pretty UI on top of raw permit data would not justify $29. An AI that produces underwriting-grade analysis on any Atlanta property in 90 seconds justifies $29 easily.
 
-### Why this matters
+This is PermitCheck’s first revenue product. The thesis: AI agents layered over proprietary permit data are more valuable than the data alone. The next 24 months of company strategy depends on this MVP working well — we will show it to customers, investors, and the incoming Co-Founder & President.
 
-This is PermitCheck’s first revenue product and the proof-of-concept for the broader thesis: that AI agents layered over proprietary permit data are more valuable than the data alone. Everything the company does for the next 24 months depends on this MVP working well. We will show it to prospective customers, prospective investors, and most importantly to the incoming Co-Founder & President.
+-----
 
-### Constraints
+## 2. Constraints
 
-- Atlanta jurisdictions only. City of Atlanta permit scraping infrastructure already exists in the Next.js codebase; extend to DeKalb, Fulton (unincorporated), and Cobb if time allows, otherwise ship Atlanta-only.
-- 90-second report target. Longer than 2 minutes is unacceptable. Must feel fast.
-- LLM variable cost per report must stay under $2. The $29 unit price requires 85%+ gross margin.
-- Single-developer build. No team; no complex infrastructure we can’t debug alone.
-- Ship in 6 weeks (42 calendar days). Scope everything against that timeline.
+- **Jurisdictions:** Atlanta + Gwinnett (already implemented). Extend to DeKalb, Fulton (unincorporated), and Cobb if time allows.
+- **Latency:** 90-second target. Longer than 2 minutes is unacceptable.
+- **Cost:** LLM variable cost <$2 per report. $29 unit price requires 85%+ gross margin.
+- **Team:** Single-developer build. No infrastructure we can’t debug alone.
+- **Timeline:** 6 weeks (42 calendar days). Scope ruthlessly.
 
 ### Out of scope for MVP
 
-- Multi-state coverage (Atlanta only)
+- Multi-state coverage (Atlanta-metro only)
 - Mobile app (web-responsive only)
 - Agency/B2B dashboard (consumer flow first)
 - AMS integrations (post-MVP)
-- Policy capture and insurance cross-sell (added in v1.1)
-- White-label / co-branded reports
+- Policy capture and insurance cross-sell (v1.1)
+- White-label reports
+- $99/mo subscription (v1.1; ship $29 one-time only for MVP)
+- $199 attorney report and $29/mo buyer plan (delete from `config.pricing`; never carried forward dormant)
 
 -----
 
-## 2. Architecture Overview
-
-### High-level flow
+## 3. Architecture overview
 
 ```
-User submits address via web form
+User submits address
         ↓
-[Next.js API route — /api/reports/create]
+[Next.js: /api/reports/create]
         ↓
-Authentication (Supabase Auth)
-Payment capture (Stripe Checkout)
+Auth (Supabase magic link) + Payment (Stripe Checkout)
         ↓
-Enqueue job to background worker (Supabase Edge Function or Inngest)
+Inngest event → background agent runs
         ↓
-[Agent Orchestrator — runs in background]
-  │
-  ├── 1. Address normalization (Google Places API)
+[Agent Orchestrator]
+  ├── 1. Address normalization (Google Places)
   ├── 2. Parcel resolution (county assessor)
-  ├── 3. Agent planning step (Claude Sonnet)
+  ├── 3. Planning (Sonnet 4.5)
   ├── 4. Parallel tool calls (data gathering)
-  ├── 5. Analysis step (Claude Sonnet)
-  ├── 6. Depth decision: pull additional records?
-  ├── 7. Report generation (Claude Opus)
-  └── 8. Persist to Postgres + generate PDF
+  ├── 5. Analysis (Sonnet 4.5)
+  ├── 6. Depth decision (max 2 extra calls)
+  ├── 7. Report generation (Opus 4.7)
+  └── 8. Persist + deliver (PDF + email)
         ↓
-Real-time status updates via Supabase Realtime
+Supabase Realtime → status page
         ↓
-Final report renders in web app + emailed PDF
+Report renders in app + PDF emailed
 ```
 
-### Stack decisions & justifications
-
-**Next.js 14 (App Router)**
-Cameron’s existing PermitCheck codebase is Next.js. Use the App Router for all new routes. Server Components for static content, Server Actions for form submissions, Client Components only where interactivity is required (report status polling, map display).
-
-**Supabase (Postgres + Auth + Storage)**
-Single source of truth for data, auth, and file storage. Use Row Level Security (RLS) policies from day one — do not skip this. Auth uses email + magic link (no password) for friction reduction. Storage for PDF reports.
-
-**Claude Sonnet 4.5 for orchestration, Claude Opus for report generation**
-Sonnet handles the agent loop (planning, tool calls, analysis) — fast and cheap enough to iterate. Opus handles final report composition because report quality is what customers pay for; the $0.50-1 per-report cost difference is justified. Use the Anthropic SDK’s native tool use — do not use LangChain or LangGraph for MVP; the added abstraction slows debugging.
-
-**Inngest for background jobs**
-Reports take 60-90 seconds; do not run them in Next.js API routes (Vercel timeout is 60s on Pro, and we need reliability). Inngest is the cleanest option — free tier covers MVP volume, built-in retries, visual debugging. Alternative: Supabase Edge Functions (cheaper but harder to debug).
-
-**Stripe Checkout**
-Don’t build custom payment UI. Stripe Checkout hosted page handles PCI compliance, card validation, Apple Pay, all of it. Webhook to Supabase to confirm payment before enqueueing the report job.
-
-**Vercel for hosting**
-Standard for Next.js. Pro plan ($20/mo). Do not use Edge Functions for the agent — they have limits that will bite us. Run the agent in Inngest with Node.js runtime.
+Step-by-step prompts, tool definitions, and analysis guidelines are in §10.
 
 -----
 
-## 3. Database Schema
+## 4. Database schema
 
-Use Supabase migrations (SQL files in `/supabase/migrations/`). Do not use Prisma — Supabase’s generated TypeScript types are sufficient and Prisma adds complexity we don’t need.
+Full DDL in §11. Key tables:
 
-### Tables
+- **`profiles`** — extends Supabase Auth users with billing/contact fields
+- **`properties`** — shared, property-level cache (one row per parcel, 30-day TTL)
+- **`permits`** — shared, joined to `properties` (not to user searches)
+- **`reports`** — per-user report records, includes `stripe_payment_intent_id` (UNIQUE), `report_json`, `llm_cost_usd`, `duration_seconds`, `status`
+- **`report_events`** — append-only audit log of every agent step
+
+Two non-obvious rules:
+
+**`properties` and `permits` are shared infrastructure.** Cached at the property level, not the user level. The 2nd, 3rd, 4th investors looking at the same address share the same cache row. Don’t add `user_id` to these tables — the unit economics depend on this.
+
+**Only the service role writes to `properties`, `permits`, `reports`, and `report_events`.** Clients read their own `reports` rows via RLS. Everything else goes through Server Actions or Inngest.
+
+RLS is on for every table holding user data, default deny, policies in the same migration as the table.
+
+**Migration strategy.** Parallel tables. The legacy `lookups` / `permits` (with `lookup_id`) stay alive with `USE_INNGEST_REPORTS=false` as the gate. New code writes to `properties` / `permits_v2` (with `property_id`) / `reports_v2` / `report_events`. After 30 days of clean production runs on the new path, deprecate legacy tables in a separate PR. Never edit migrations that have already run — drop columns and tables in new migrations.
+
+-----
+
+## 5. User experience
+
+### Happy path
+
+1. Land on permitcheck.org. Hero: “Know what you’re buying. AI-powered permit due diligence in 90 seconds.”
+1. Type address. Google Places autocomplete limits to Atlanta metro.
+1. Click “Get Report — $29.”
+1. Magic-link auth if not signed in.
+1. Stripe Checkout. Pay $29.
+1. Redirect to `/reports/[id]` status page.
+1. Live progress via Supabase Realtime: “Pulling permits → Analyzing → Writing report.”
+1. At ~90s: report renders in-page. Download PDF, share link.
+1. Email arrives with PDF attached.
+
+**First 100 reports go to `pending_review`** — Cameron reviews before auto-delivery. Status page copy reflects this: “Your report is being finalized — you’ll receive it within an hour.” Auto-deliver is gated by `AUTO_DELIVER_REPORTS=true`, removed once 100 reports show consistent quality. Applies to the new Inngest path only; legacy `$9.99` path is unchanged until deleted.
+
+### Error paths
+
+- **Payment fails:** standard Stripe retry flow.
+- **Agent fails mid-run:** auto-refund (programmatic Stripe API call from the Inngest failure handler), Slack/email alert to Cameron, error stored in `reports.error_message`.
+- **Data insufficient:** report delivers with a “limited data” caveat; user offered 50% refund.
+- **Property outside Atlanta metro:** rejected before payment, waitlist signup offered.
+
+Status page copy with timing breakdown: §10 Step 8.
+
+-----
+
+## 6. Evaluation
+
+`/evals/golden-set/` holds JSON fixtures with ground-truth reports. `npm run eval` runs the harness; CI runs it on every PR touching `/lib/agent/**` or `/lib/scraping/**`.
+
+**Thresholds (merge gate):**
+
+- Critical red flag recall: ≥90%
+- Hallucinations (uncited claims): 0
+- p95 duration: ≤120s
+- Cost per report: ≤$2.00
+- Completeness: 100% of report sections populated
+
+**Hallucination detection is structural, not semantic.** Red flags are emitted with required `evidence_refs: string[]`; every entry must resolve to an ID present in the gathered data. Set membership, not NLP.
+
+**Greenwich St SW quadruplex is golden set #1.** Cameron has ground-truth knowledge from active litigation. If the agent’s output contradicts what Cameron knows to be true, the agent is not ready to ship and no other eval result matters. **Cameron authors this fixture himself** — PR7 is blocked on it.
+
+Eval harness implementation in §13.
+
+-----
+
+## 7. Acceptance criteria
+
+The MVP is shipped when ALL of the following are true.
+
+### Functional
+
+- User can submit any Atlanta-metro residential address and receive a report in <120s p95
+- Stripe $29 one-time flow works end-to-end
+- PDF report delivers via email within 2 minutes of completion
+- Status page updates in real-time via Supabase Realtime
+- Failed reports auto-refund programmatically
+- Admin dashboard shows all reports with status, duration, cost
+
+### Quality
+
+- Golden set: ≥90% recall on critical red flags, 0 hallucinations
+- Greenwich St SW property correctly identifies known issues from litigation
+- First 10 production reports personally reviewed and approved by Cameron
+- No report contains a claim without cited evidence
+
+### Performance
+
+- p50 end-to-end: <80s
+- p95 end-to-end: <120s
+- LLM cost per report: <$2.00
+- All-in unit economics: <$5.00 per report (incl. infra + data APIs)
+
+### Reliability
+
+- 99%+ report completion rate (failures auto-refund)
+- Scraping circuit breakers prevent agent hang when portals are down
+- Sentry receiving errors; Axiom logging every agent step
+
+### Compliance
+
+- Privacy policy at `/privacy`, Terms at `/terms`
+- ToS includes disclaimers about data accuracy and explicitly states no legal advice
+- Supabase RLS enforced on all user-data tables (verified by `017_rls_hardening.sql` audit)
+- No PII in LLM logs (addresses redacted to ZIP+street-name at info level, full address only at debug behind `LOG_FULL_ADDRESS=true`)
+- Stripe PCI handled entirely by Checkout
+
+-----
+
+## 8. Open questions for Cameron
+
+Resolved:
+
+- ✅ Existing Atlanta scraper: in current `permit-check` Next.js codebase
+- ✅ Domain: `permitcheck.org` — replace existing pages
+- ✅ Supabase: existing project, parallel-table migration strategy
+- ✅ Pricing: $29 one-time only for MVP
+- ✅ Scope: Atlanta + Gwinnett (already done) + DeKalb if time permits
+- ✅ Branding: existing PermitCheck assets
+- ✅ Auth: switch to magic-link before launch as PR8 (passwords are v0 reality)
+- ✅ Inngest tier: free through soft launch, Pro before public launch
+
+Still open:
+
+- On-call for first 30 days post-launch: Cameron alone, or shared rotation once Alan joins?
+
+-----
+
+## PART II — IMPLEMENTATION REFERENCE
+
+The remainder of this document is the build reference. Pull in §9–§14 when working on the specific area each covers. None of this should be loaded by Claude Code on every turn — only when the task is in scope.
+
+-----
+
+## 9. Stack decisions & justifications
+
+**Next.js 16 (App Router).** The existing `permit-check` codebase. App Router for all new routes. Server Components for static content, Server Actions for new mutations, Client Components only where interactivity is required (status polling, address autocomplete, map display).
+
+**Supabase (Postgres + Auth + Storage).** Single source of truth for data, auth, and file storage. RLS from day one. Magic-link auth (no passwords) for friction reduction — PR8 migrates from current password auth. Storage for PDF reports.
+
+**Claude Sonnet 4.5 for orchestration, Claude Opus 4.7 for report generation.** Sonnet handles planning, tool calls, and analysis — fast and cheap enough to iterate. Opus handles final report composition; report quality is what customers pay for, so the cost difference is justified. Pin model IDs in `lib/env.ts` as `ANTHROPIC_MODEL_ORCHESTRATOR` and `ANTHROPIC_MODEL_REPORTER`. Anthropic SDK native tool use only — no LangChain, no LangGraph, no MCP.
+
+**Inngest for background jobs.** Reports take 60-90s; Vercel API routes time out at 60s on Pro and we need reliability. Inngest gives free-tier coverage for MVP, built-in retries, visual debugging. Free tier through soft launch. Upgrade to Pro before public launch — wire PR3 against free-tier limits (24h retention, lower concurrency) but plan for the upgrade.
+
+**Stripe Checkout (hosted).** Don’t build custom payment UI. Stripe Checkout handles PCI compliance, card validation, Apple Pay. Webhook to Supabase confirms payment before enqueueing the report job. $29 one-time only for MVP — the $99/mo subscription is v1.1.
+
+**Vercel Pro hosting.** Standard for Next.js. Do not use Edge Functions for the agent — they have limits that bite. Run the agent in Inngest with Node runtime.
+
+**Playwright for scraping.** The `permit-check` codebase already uses Playwright via `playwright-core` against Accela. Don’t migrate to Puppeteer.
+
+**`@sparticuz/chromium-min` for serverless PDF.** Already a dep. Budget extra time for PDF reliability. Browserless or Documint are acceptable hosted fallbacks if reliability becomes an issue.
+
+**Google Places API.** Same GCP project as the existing maps key. Enable the “Places API (New)” SKU. `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is the autocomplete-on-frontend key (must be domain-restricted in GCP console). `GOOGLE_MAPS_SERVER_KEY` is the server-side key for Text Search calls in the agent’s normalize step.
+
+-----
+
+## 10. The eight steps in detail
+
+### Step 1 — Address normalization (deterministic, no LLM)
+
+Input: raw address string. Output: normalized address, lat/long, Google Place ID. Google Places API (New) Text Search endpoint. Cache results in Postgres.
+
+Failure modes:
+
+- Ambiguous address → return top 3 candidates, ask user to confirm
+- Outside Atlanta metro → reject with waitlist signup
+- Commercial property → flag as out-of-scope (residential only)
+
+### Step 2 — Parcel resolution (deterministic)
+
+Input: normalized address. Output: parcel ID + property facts (year built, square feet, type). Use existing Fulton County assessor scraper; extend pattern to DeKalb/Cobb if time allows.
+
+### Step 3 — Agent planning (Sonnet 4.5, ~2-3s)
+
+The agent receives normalized address, parcel data, and the user’s stated intent (flip / rental / primary residence / portfolio_hold). It produces an investigation plan customized to the property’s characteristics — a 1920s quadruplex in Grove Park has different risk signals than a 2015 single-family in Virginia-Highland.
+
+**System prompt:**
+
+```
+You are the planning module of PermitCheck's Diligence Agent. Your
+job is to produce an investigation plan for a residential property
+based on its characteristics and the user's stated investment intent.
+
+You will receive:
+- Normalized address, lat/long, parcel ID
+- Year built, square feet, property type
+- User intent: flip | rental | primary_residence | portfolio_hold
+
+Produce a JSON investigation plan with:
+{
+  "priority_checks": [...],
+  "risk_signals_to_watch": [...],
+  "minimum_permit_lookback_years": number,
+  "require_contractor_verification": boolean,
+  "require_violation_check": boolean,
+  "require_aerial_comparison": boolean,
+  "estimated_complexity": "low" | "medium" | "high"
+}
+
+Guidance:
+- Properties built before 1978 → check lead disclosure signals and
+  major system permits (electrical, plumbing)
+- Properties built before 1950 → extend permit lookback to 50 years
+- Multi-unit (duplex/triplex/quadruplex) → check change-of-use
+  permits and fire system compliance
+- Flip intent → prioritize unpermitted work detection and open
+  permit inheritance
+- Rental intent → prioritize code violation history and habitability
+- Recent sale (<3 years) → focus on seller's ownership period only
+```
+
+### Step 4 — Parallel tool calls (10-20s budget)
+
+Tools are TypeScript async functions exposed via Anthropic SDK’s `tools` parameter. Run concurrently with `Promise.all`.
+
+#### Tool: `search_permits`
+
+```typescript
+{
+  name: "search_permits",
+  description: "Search permit records for a specific property by\
+    parcel ID or address. Returns structured permit records including\
+    permit type, work description, contractor, issue date, final\
+    date, status, and valuation.",
+  input_schema: {
+    type: "object",
+    properties: {
+      parcel_id: { type: "string" },
+      address: { type: "string" },
+      jurisdiction: {
+        type: "string",
+        enum: ["atlanta", "gwinnett", "dekalb", "fulton", "cobb"]
+      },
+      lookback_years: { type: "integer", default: 25 }
+    },
+    required: ["jurisdiction"]
+  }
+}
+
+// Implementation:
+// 1. Check Postgres cache (permits joined to properties)
+// 2. If cache miss OR cache >30 days old: trigger live scrape
+// 3. Return structured array, sorted by issue date desc
+```
+
+#### Tool: `get_property_records`
+
+```typescript
+{
+  name: "get_property_records",
+  description: "Fetches property records from the county assessor:\
+    ownership history, sale prices, assessed values, recorded square\
+    footage, room count, property classification.",
+  input_schema: {
+    type: "object",
+    properties: {
+      parcel_id: { type: "string" },
+      jurisdiction: { type: "string" }
+    },
+    required: ["parcel_id", "jurisdiction"]
+  }
+}
+```
+
+#### Tool: `get_contractor_record`
+
+```typescript
+{
+  name: "get_contractor_record",
+  description: "Looks up a contractor by Georgia license number or\
+    business name. Returns license status, expiration, disciplinary\
+    actions, complaint history from GA Secretary of State licensing\
+    database.",
+  input_schema: {
+    type: "object",
+    properties: {
+      license_number: { type: "string" },
+      business_name: { type: "string" }
+    }
+  }
+}
+```
+
+#### Tool: `get_code_violations`
+
+```typescript
+{
+  name: "get_code_violations",
+  description: "Searches code enforcement and housing violation\
+    records for the property. Returns violations with date,\
+    description, resolution status, associated fines.",
+  input_schema: {
+    type: "object",
+    properties: {
+      address: { type: "string" },
+      jurisdiction: { type: "string" }
+    },
+    required: ["address", "jurisdiction"]
+  }
+}
+```
+
+#### Tool: `compare_footprint_to_permits`
+
+```typescript
+{
+  name: "compare_footprint_to_permits",
+  description: "Compares current recorded square footage and room\
+    count against permitted changes in the permit history. Flags\
+    additions, remodels, or converted spaces that don't appear in\
+    the permit record — potential unpermitted work.",
+  input_schema: {
+    type: "object",
+    properties: {
+      parcel_id: { type: "string" },
+      jurisdiction: { type: "string" }
+    },
+    required: ["parcel_id", "jurisdiction"]
+  }
+}
+```
+
+#### Tool: `get_permit_document` (called selectively)
+
+```typescript
+{
+  name: "get_permit_document",
+  description: "Retrieves and extracts text from the full permit\
+    application PDF. Use only when a permit appears suspicious or\
+    incomplete from the structured record — this is expensive\
+    (vision model call).",
+  input_schema: {
+    type: "object",
+    properties: { permit_id: { type: "string" } },
+    required: ["permit_id"]
+  }
+}
+```
+
+### Step 5 — Analysis (Sonnet 4.5, ~3-5s)
+
+The core analysis call. Cameron writes v1; Alan refines once he joins.
+
+**Output schema:**
+
+```typescript
+{
+  executive_summary: string,            // 2-3 sentences, plain English
+  risk_level: "low" | "medium" | "high",
+  permit_timeline: Array<{ year: number, summary: string }>,
+  red_flags: Array<{
+    category: "unpermitted_work" | "open_permit" | "expired_permit"
+            | "code_violation" | "contractor_quality"
+            | "ownership_pattern",
+    severity: "critical" | "major" | "minor",
+    finding: string,
+    why_it_matters: string,
+    evidence_refs: string[]              // permit_ids, violation_ids
+  }>,
+  green_signals: string[],
+  unpermitted_work_assessment: {
+    likelihood: "high" | "medium" | "low" | "none_detected",
+    suspected_categories: string[],
+    evidence_refs: string[]
+  },
+  contractor_quality_score: number,     // 1-10
+  questions_for_seller: string[],
+  recommended_next_steps: string[]
+}
+```
+
+**Analysis guidelines (excerpt — full prompt lives in `lib/agent/prompts/analyze.ts`):**
+
+1. **Unpermitted work detection.** Assessor sqft >15% above permitted footprint = CRITICAL. Room count increased without permit = MAJOR. Missing finaled dates on major work = MAJOR. Finished basements without matching permit = always flag (top-5 claim driver).
+1. **Open/expired permits.** `status='issued'` with no finaled date >12mo old = MAJOR (new owner inherits liability). Expired permits for apparently-complete work = MAJOR.
+1. **Code violations.** Open = CRITICAL. Resolved <24mo = MAJOR context. Historical >5yr = MINOR context.
+1. **Contractor quality.** License expired at time of permit = MAJOR. >3 disciplinary actions = MAJOR. Repeated low-quality contractor = pattern.
+1. **Ownership patterns.** Multiple sales <24mo with permit gaps = investigate cosmetic-flip hiding structural issues.
+1. **Insurance implications.** Unpermitted electrical = likely electrical-fire denial. Unpermitted plumbing = water-damage at risk. Roof permits >15yr = underwriting concern.
+
+**Critical rule:** Every red_flag must have populated `evidence_refs`. If you cannot cite evidence, do not make the claim. If data is incomplete, mark as `incomplete_data` rather than guessing. **Do not include legal conclusions** — surface facts and risks; do not advise on permit compliance or what the buyer “should” do legally.
+
+### Step 6 — Depth decision
+
+After initial analysis, decide whether to pull additional records. Triggers: ambiguous permit status, failed contractor lookup, suspected unpermitted addition where the full permit PDF might clarify. **Budget: max 2 additional tool calls.** Without this guardrail, the agent over-investigates and blows the latency budget.
+
+### Step 7 — Report generation (Opus 4.7, ~10-15s)
+
+Opus receives the structured analysis JSON and produces the final report in two formats: HTML for web display, Markdown for PDF generation. **Use structured outputs (JSON mode)** — do not let the LLM generate free-form HTML.
+
+Report sections:
+
+- Header (address, report date, branding)
+- Executive Summary (3-4 sentences)
+- Risk Assessment (color-coded)
+- Permit Timeline (chronological)
+- Red Flags (severity, finding, why it matters, evidence)
+- Green Signals
+- Unpermitted Work Assessment
+- Contractor Quality
+- Questions for the Seller (copy-paste-ready)
+- Recommended Next Steps
+- Data Sources & Disclaimers
+
+### Step 8 — Persistence & delivery
+
+- Save JSON to `reports.report_json`
+- Render HTML via Server Component
+- Generate PDF via Playwright + `@sparticuz/chromium-min`; store in Supabase Storage
+- Send email via Resend (link + PDF attached)
+- Push Supabase Realtime event to flip status from `generating` to `complete` (or `pending_review` for first 100 reports)
+
+**Status page copy (user-facing):**
+
+```
+Step 1: "Looking up the property..."          (5s)
+Step 2: "Pulling permit records..."           (15s)
+Step 3: "Cross-referencing property records." (10s)
+Step 4: "Checking contractor licenses..."     (10s)
+Step 5: "Scanning for code violations..."     (8s)
+Step 6: "Analyzing findings..."               (15s)
+Step 7: "Writing your report..."              (15s)
+
+Total: ~78s typical, 90s ceiling
+```
+
+For first 100 reports (admin review gate): final state copy reads “Your report is being finalized — you’ll receive it within an hour” rather than auto-rendering inline.
+
+-----
+
+## 11. Database schema (full DDL)
 
 ```sql
--- Users: managed by Supabase Auth. No custom user table needed,
--- but extend with a profile table for billing/preferences.
-
+-- Profiles extend Supabase Auth users
 CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
@@ -159,7 +566,8 @@ CREATE TABLE reports (
   property_id UUID REFERENCES properties(id),
   raw_address TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
-    -- pending | normalizing | gathering | analyzing | generating | complete | failed
+    -- pending | normalizing | gathering | analyzing | generating
+    -- | pending_review | complete | failed
   stripe_payment_intent_id TEXT UNIQUE,
   paid_at TIMESTAMPTZ,
   started_at TIMESTAMPTZ,
@@ -187,7 +595,7 @@ CREATE TABLE report_events (
 
 CREATE INDEX idx_events_report ON report_events(report_id);
 
--- Enable RLS on all tables
+-- RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 
@@ -197,403 +605,74 @@ CREATE POLICY "Users read own profile" ON profiles
 CREATE POLICY "Users read own reports" ON reports
   FOR SELECT USING (auth.uid() = user_id);
 
--- properties and permits are shared infrastructure — readable by all authenticated users.
--- Do NOT allow direct writes from clients; only service role writes.
+-- properties and permits are shared infrastructure.
+-- Authenticated users can read; only service role writes.
 ```
 
-> **Why cache permits and properties globally**
-> A single property may be evaluated by multiple investors. Caching permit records and parcel data at the property level (not the user level) means the 2nd, 3rd, 4th investors looking at the same property get faster, cheaper reports — and we avoid hammering jurisdiction portals with duplicate requests. Set a 30-day TTL on permit data before re-scraping.
+**Migration strategy for the existing repo:** parallel tables, `USE_INNGEST_REPORTS` flag gates the cutover. Legacy `lookups` / `permits` (with `lookup_id`) stay alive. New code writes to `properties` / `permits_v2` (with `property_id`) / `reports_v2` / `report_events`. Once the new path runs cleanly in production for 30 days, deprecate legacy tables in a separate PR. **Never edit migrations that have already run** — drop columns and tables in new sequentially-numbered migrations.
 
 -----
 
-## 4. The Agent Loop
+## 12. 6-week build plan
 
-The agent is the heart of the product. Use Anthropic’s native tool use API — do not wrap it in LangChain. The loop is a state machine that runs in Inngest with checkpointing between steps so we can debug and resume on failure.
+### Week 1 — Foundations
 
-### Step 1 — Address Normalization (deterministic, no LLM)
+- **PR1**: Docs reconciliation — `/CLAUDE.md`, `/docs/CLAUDE-deep.md`, `/docs/SPEC.md`, `/docs/DECISIONS.md`
+- **PR1.5**: Push `CLAUDE-deep.md` if not already in repo
+- **PR1.6**: Delete unused pricing SKUs (`attorney_report`, `agent_plan`), `src/app/api/subscription/*`, drop unused columns via new migration
+- **PR2.5**: RLS audit — read `010_fix_rls_policies.sql`, document effective policies on every user-data table, propose `017_rls_hardening.sql` if any `FOR ALL USING (true)` survives for non-service roles
+- **PR2**: Zod-validated env + import discipline + PII redaction in logger + Axiom transport
+- **PR3**: Inngest + `@anthropic-ai/sdk` deps + scaffold `/lib/agent/` boundary
 
-Input: raw address string from user. Output: normalized address, lat/long, Google Place ID. Use the Google Places API (New) Text Search endpoint. Cache results in Postgres.
+### Week 2 — Data layer
 
-**Failure modes to handle**
+- **PR4**: Per-property cache schema migration (parallel tables, RLS, indexes)
+- **PR5**: Stripe webhook → Inngest handoff behind `USE_INNGEST_REPORTS` flag. Acceptance includes flipping flag in staging same day, prod within 48 hours
+- Port existing Atlanta scraper into the new tool function pattern
+- Wrap scrapers as Zod-typed tools
 
-- Ambiguous address → return top 3 candidates, ask user to confirm before proceeding
-- Address outside Atlanta metro → reject with clear error + waitlist signup
-- Commercial property → flag as out-of-scope for MVP (residential only)
+### Week 3 — Agent loop
 
-### Step 2 — Parcel Resolution (deterministic)
+- **PR6**: Steps 1 + 2 deterministic (normalize + parcel)
+- v1 of planning and analysis prompts
+- First end-to-end agent run on Greenwich St SW
+- Iterate prompts 5-10 times manually
+- `report_events` logging for full audit trail
 
-Input: normalized address. Output: parcel ID + basic property facts (year built, square feet, property type). Use the existing Fulton County assessor scraper; extend pattern to DeKalb/Cobb if time allows.
+### Week 4 — Report generation & UI
 
-### Step 3 — Agent Planning (Claude Sonnet 4.5, ~2-3 sec)
+- Steps 5-8 of agent loop
+- Report display UI (Server Component)
+- Playwright + `@sparticuz/chromium-min` PDF integration
+- Resend email integration
+- Status page with Supabase Realtime
+- Landing page, pricing page, FAQ
 
-The agent receives normalized address, parcel data, and the user’s stated intent (flip / rental / primary residence). It produces an investigation plan: which data sources to query, which signals to look for based on property characteristics.
+### Week 5 — Evaluation & iteration
 
-**Why planning matters**
-A 1920s quadruplex in Grove Park has different risk signals than a 2015 single-family in Virginia-Highland. The planning step lets the agent customize its investigation. Without it, every report is generic.
+- **PR7**: Golden set eval harness + Greenwich fixture (blocked on Cameron authoring fixture)
+- 10 properties with ground truth
+- Iterate prompts until ≥90% recall
+- Hallucination detection
+- Admin review dashboard for first-100-reports gate
+- Prompt caching verification, latency optimization
 
-**System prompt for the planning step**
+### Week 6 — Launch prep
 
-```
-You are the planning module of PermitCheck's Diligence Agent. Your
-job is to produce an investigation plan for a residential property
-based on its characteristics and the user's stated investment intent.
-
-You will receive:
-- Normalized address, lat/long, parcel ID
-- Year built, square feet, property type
-- User intent: flip | rental | primary_residence | portfolio_hold
-
-Produce a JSON investigation plan with:
-{
-  "priority_checks": [...],  // ordered list of things to investigate
-  "risk_signals_to_watch": [...],
-  "minimum_permit_lookback_years": number,
-  "require_contractor_verification": boolean,
-  "require_violation_check": boolean,
-  "require_aerial_comparison": boolean,  // expensive; only if needed
-  "estimated_complexity": "low" | "medium" | "high"
-}
-
-Guidance:
-- Properties built before 1978 → always check lead disclosure
-  signals and major system permits (electrical, plumbing)
-- Properties built before 1950 → extend permit lookback to 50 years
-  due to higher likelihood of unpermitted accumulated work
-- Multi-unit (duplex, triplex, quadruplex) → always check change-
-  of-use permits and fire system compliance
-- Flip intent → prioritize unpermitted work detection and
-  open-permit inheritance
-- Rental intent → prioritize code violation history and
-  habitability issues
-- Recent sale (<3 years) → focus on seller's ownership period only
-```
-
-### Step 4 — Parallel Tool Calls (mix of deterministic + cached)
-
-Based on the plan, the agent dispatches parallel tool calls. These are Node.js async functions exposed to Claude via the tool use API. Run them concurrently with `Promise.all`; total time for this step should be 10-20 seconds.
-
-**Tool: `search_permits`**
-
-```typescript
-{
-  name: "search_permits",
-  description: "Search permit records for a specific property by\
-    parcel ID or address. Returns structured permit records including\
-    permit type, work description, contractor, issue date, final date,\
-    status, and valuation.",
-  input_schema: {
-    type: "object",
-    properties: {
-      parcel_id: { type: "string" },
-      address: { type: "string" },
-      jurisdiction: {
-        type: "string",
-        enum: ["atlanta", "dekalb", "fulton", "cobb"]
-      },
-      lookback_years: { type: "integer", default: 25 }
-    },
-    required: ["jurisdiction"]
-  }
-}
-
-// Implementation:
-// 1. Check Postgres cache (permits table joined to properties)
-// 2. If cache miss OR cache >30 days old: trigger live scrape
-// 3. Return structured array of permits, sorted by issue date desc
-```
-
-**Tool: `get_property_records`**
-
-```typescript
-{
-  name: "get_property_records",
-  description: "Fetches property records from the county assessor:\
-    ownership history, sale prices, assessed values, square footage\
-    as recorded, room count, and property classification.",
-  input_schema: {
-    type: "object",
-    properties: {
-      parcel_id: { type: "string" },
-      jurisdiction: { type: "string" }
-    },
-    required: ["parcel_id", "jurisdiction"]
-  }
-}
-```
-
-**Tool: `get_contractor_record`**
-
-```typescript
-{
-  name: "get_contractor_record",
-  description: "Looks up a contractor by Georgia license number or\
-    business name. Returns license status, expiration, disciplinary\
-    actions, and complaint history from the GA Secretary of State\
-    licensing database.",
-  input_schema: {
-    type: "object",
-    properties: {
-      license_number: { type: "string" },
-      business_name: { type: "string" }
-    }
-  }
-}
-```
-
-**Tool: `get_code_violations`**
-
-```typescript
-{
-  name: "get_code_violations",
-  description: "Searches code enforcement and housing violation\
-    records for the property. Returns violations with date,\
-    description, resolution status, and any associated fines.",
-  input_schema: {
-    type: "object",
-    properties: {
-      address: { type: "string" },
-      jurisdiction: { type: "string" }
-    },
-    required: ["address", "jurisdiction"]
-  }
-}
-```
-
-**Tool: `compare_footprint_to_permits`**
-
-```typescript
-{
-  name: "compare_footprint_to_permits",
-  description: "Compares the property's current recorded square\
-    footage and room count against the permitted changes in the\
-    permit history. Flags additions, remodels, or converted spaces\
-    that do not appear in the permit record — potential unpermitted\
-    work.",
-  input_schema: {
-    type: "object",
-    properties: {
-      parcel_id: { type: "string" },
-      jurisdiction: { type: "string" }
-    },
-    required: ["parcel_id", "jurisdiction"]
-  }
-}
-
-// Implementation: pulls current assessor square footage, compares
-// to baseline square footage at time of last recorded addition
-// permit, returns discrepancies.
-```
-
-**Tool: `get_permit_document` (called selectively)**
-
-```typescript
-{
-  name: "get_permit_document",
-  description: "Retrieves and extracts text from the full permit\
-    application PDF for a specific permit. Use only when a permit\
-    appears suspicious or incomplete from the structured record —\
-    this is expensive (vision model call).",
-  input_schema: {
-    type: "object",
-    properties: {
-      permit_id: { type: "string" }
-    },
-    required: ["permit_id"]
-  }
-}
-```
-
-### Step 5 — Analysis (Claude Sonnet 4.5, ~3-5 sec)
-
-With all gathered data, the agent runs the core analysis. This is where Alan’s domain expertise will live once he joins — for MVP, Cameron writes v1 of the analysis prompt based on his own insurance and real estate experience.
-
-**Analysis prompt skeleton (v1 — Cameron to refine before Alan joins)**
-
-```
-You are the analysis module of PermitCheck's Diligence Agent.
-You have been given:
-- Property facts (address, year built, square feet, type)
-- Complete permit history
-- Property records (ownership, sales, assessments)
-- Contractor records for all named contractors
-- Code violation history
-- Footprint comparison (current vs. permitted)
-
-Produce a structured analysis as JSON:
-
-{
-  "executive_summary": "2-3 sentence plain-English summary of the
-    property's permit health and overall risk",
-  "risk_level": "low" | "medium" | "high",
-  "permit_timeline": [
-    { "year": N, "summary": "brief description of activity in that year" }
-  ],
-  "red_flags": [
-    {
-      "category": "unpermitted_work" | "open_permit" | "expired_permit"
-         | "code_violation" | "contractor_quality" | "ownership_pattern",
-      "severity": "critical" | "major" | "minor",
-      "finding": "specific factual finding",
-      "why_it_matters": "insurance/investment implication",
-      "evidence": "specific permit IDs, dates, sources"
-    }
-  ],
-  "green_signals": [...],
-  "unpermitted_work_assessment": {
-    "likelihood": "high" | "medium" | "low" | "none_detected",
-    "suspected_categories": ["addition" | "finished_basement" | ...],
-    "evidence": "..."
-  },
-  "contractor_quality_score": 1-10,
-  "questions_for_seller": [
-    "Specific, actionable question the buyer should ask"
-  ],
-  "recommended_next_steps": [
-    "Specific inspection, verification, or escalation action"
-  ]
-}
-
-ANALYSIS GUIDELINES:
-
-1. Unpermitted work detection
-   - If assessor square footage exceeds permitted footprint by
-     >15%, flag as CRITICAL
-   - If room count increased without permit record, flag as MAJOR
-   - If permit finaled dates are missing for major work, flag as
-     MAJOR (may indicate incomplete inspection)
-   - Finished basements without permits are a top-5 claim driver;
-     always flag if assessor shows finished lower level without
-     matching permit
-
-2. Open/expired permits
-   - Any permit with status='issued' but no finaled date >12 months
-     old = MAJOR flag. New owner inherits this liability.
-   - Expired permits for work that appears complete = MAJOR. Likely
-     unfinaled inspection = code risk.
-
-3. Code violations
-   - Open violations = CRITICAL. Must be resolved before or at
-     closing.
-   - Resolved violations within 24 months = MAJOR context.
-   - Historical violations >5 years old = MINOR context.
-
-4. Contractor quality
-   - License expired at time of permit = MAJOR flag
-   - Contractor with >3 disciplinary actions = MAJOR
-   - Repeated use of same low-quality contractor by seller = pattern
-
-5. Ownership patterns
-   - Multiple sales within 24 months (flipping pattern with permit
-     gaps) = investigate for cosmetic-only renovation hiding
-     structural issues
-
-6. Insurance implications
-   - Unpermitted electrical work = likely coverage denial for
-     electrical fires
-   - Unpermitted plumbing = water damage coverage at risk
-   - Roof permits >15 years old with no recent renewal = underwriting
-     concern; many carriers non-renew roofs >20 years
-
-ALWAYS CITE EVIDENCE. Every red_flag must reference specific permit
-IDs, dates, or records. If you cannot cite evidence, do not make
-the claim. Hallucinated findings destroy the product's credibility.
-
-If data is incomplete or missing for a check, mark the finding as
-"incomplete_data" rather than guessing.
-```
-
-### Step 6 — Depth Decision
-
-After initial analysis, the agent decides whether to pull additional records. Example triggers: a permit with ambiguous status, a contractor whose license lookup failed, a suspected unpermitted addition where pulling the full permit document PDF might clarify. Budget: up to 2 additional tool calls before forcing report generation. Without this guardrail, the agent will over-investigate and blow the latency budget.
-
-### Step 7 — Report Generation (Claude Opus, ~10-15 sec)
-
-Opus receives the structured analysis JSON and produces the final report in two formats: HTML for web display and Markdown for PDF generation. Use structured outputs (JSON mode) — do not let the LLM generate free-form HTML.
-
-**Report sections**
-
-- Header: property address, report date, PermitCheck branding
-- Executive Summary (3-4 sentences, plain English)
-- Risk Assessment (color-coded: green/yellow/red)
-- Permit Timeline (visual, chronological)
-- Red Flags (each with severity, finding, why it matters, evidence)
-- Green Signals (what checked out clean)
-- Unpermitted Work Assessment
-- Contractor Quality
-- Questions for the Seller (copy-paste-ready list)
-- Recommended Next Steps
-- Data Sources & Disclaimers
-
-### Step 8 — Persistence & Delivery
-
-- Save JSON report to `reports.report_json`
-- Render HTML version in app via Server Component
-- Generate PDF via Puppeteer (serverless) or react-pdf; store in Supabase Storage
-- Send email via Resend (link to report + PDF attached)
-- Push Supabase Realtime event to update the user’s UI from `'generating'` to `'complete'`
+- **PR8**: Sentry wiring + magic-link auth migration
+- Inngest free → Pro upgrade
+- Extend to DeKalb if time permits
+- Soft launch to 5 users from Cameron’s network
+- Fix issues from soft launch
+- Public launch
 
 -----
 
-## 5. User Experience Flow
-
-### Happy path
-
-1. User lands on permitcheck.org. Hero: “Know what you’re buying. AI-powered permit due diligence in 90 seconds.” Single input: address.
-1. User types address. Google Places autocomplete limits to Atlanta metro.
-1. User clicks “Get Report — $29.”
-1. If not authenticated: magic-link auth (email). If authenticated: proceed.
-1. Stripe Checkout opens. User pays $29.
-1. Redirect to `/reports/[id]` status page.
-1. Status page shows live progress: “Normalizing address → Pulling permits → Analyzing → Writing report.” Uses Supabase Realtime to update as each step completes. Include an estimated time remaining and a calm progress indicator.
-1. At ~90 seconds: report renders in-page. User can scroll through, download PDF, share link.
-1. Email arrives with PDF attached.
-
-### Error paths
-
-- **Payment fails:** standard Stripe retry flow
-- **Agent fails mid-run:** status page shows “Something went wrong, we’re on it” — human notified via PagerDuty, user refunded automatically via Stripe. Error stored in `reports.error_message` for debugging.
-- **Data insufficient:** agent completes but flags “Limited data available for this property — report quality reduced.” Still deliver report but give user option for 50% refund.
-- **Property outside Atlanta:** before payment, reject and offer waitlist signup
-
-### Status page copy (user-facing)
-
-```
-Step 1: "Looking up the property..." (5 sec)
-Step 2: "Pulling permit records from City of Atlanta..." (15 sec)
-Step 3: "Cross-referencing property records..." (10 sec)
-Step 4: "Checking contractor licenses..." (10 sec)
-Step 5: "Scanning for code violations..." (8 sec)
-Step 6: "Analyzing findings..." (15 sec)
-Step 7: "Writing your report..." (15 sec)
-
-Total: ~78 sec typical, 90 sec ceiling
-```
-
------
-
-## 6. Evaluation & Quality Infrastructure
-
-This is the section most dev teams skip and it’s what separates a toy from a product. Build the evaluation harness before you launch. Every model change, prompt change, or new jurisdiction must run against the golden set before deploying.
-
-### The golden set
-
-Cameron will provide 10 Atlanta properties with known ground-truth reports. Each property has a hand-authored expected output covering: risk level, known red flags (count and categories), known unpermitted work, known violations. Save these as JSON fixtures in `/evals/golden-set/`.
-
-The Greenwich St SW quadruplex is golden set property #1 — Cameron has deep knowledge of this property from ongoing litigation, and the report should identify all the issues the litigation is about. If the agent’s output on this property doesn’t match what we know to be true, the agent is not ready to ship.
-
-### Evaluation metrics
-
-- **Accuracy:** does the agent correctly identify known red flags? (target: >90% recall on critical red flags)
-- **Hallucination:** does the agent cite evidence for every claim? (target: 0% unsupported claims)
-- **Latency:** p50 and p95 end-to-end duration (target: p50 <80s, p95 <110s)
-- **Cost:** LLM spend per report (target: <$2.00 all-in)
-- **Completeness:** does every section of the report have content? (target: 100%)
-
-### Evaluation harness
+## 13. Evaluation harness
 
 ```typescript
 // /evals/run-golden-set.ts
-// Run: pnpm eval
+// Run: npm run eval
 
 import { goldenSet } from './golden-set';
 import { runAgent } from '../lib/agent';
@@ -609,7 +688,7 @@ async function main() {
     results.push({ property: prop.address, duration, ...evaluation });
   }
   console.table(results);
-  // Fail build if any property scores below thresholds
+
   const failures = results.filter(r =>
     r.accuracy < 0.9 || r.hallucinations > 0 || r.duration > 120
   );
@@ -617,155 +696,41 @@ async function main() {
 }
 ```
 
-### Hallucination detection
+**Evaluator implementation:** Sonnet 4.5 acts as judge with a rubric, comparing the agent’s structured output against the ground-truth fixture. Not Opus (cost), not regex (brittle). The evaluator prompt is versioned in `/evals/evaluator.prompt.md`.
 
-Every claim in the final report must be traceable to a tool output. Implement a post-generation check: parse the report JSON, extract all factual claims, verify each one maps to an evidence field that references actual `permit_id` / `violation_id` / `record_id` values present in the gathered data. Any claim without traceable evidence = fail.
+**Hallucination detection** runs separately and is structural: parse the report’s `evidence_refs[]`, verify every entry resolves to an ID present in the gathered data. Set membership, not NLP. Any unresolved ref fails the report.
 
-### Human-in-the-loop for first 100 reports
+**Adding to the golden set:** when a production report surfaces a finding (or a missed finding) that should be a permanent test case, add it to `/evals/golden-set/` in the same PR that fixes the underlying issue.
 
-Cameron personally reviews every report produced in production for the first 100 users. Build a simple `/admin/review` dashboard that queues completed reports for review before they’re released to the user. This is slow but catches issues early. Remove gate after 100 reports show consistent quality.
-
------
-
-## 7. 6-Week Build Plan
-
-### Week 1 — Foundations
-
-- Set up Next.js 14 project with App Router, Tailwind, shadcn/ui
-- Supabase project with migrations for all tables and RLS policies
-- Stripe account setup + Checkout integration
-- Magic-link auth working end-to-end
-- Inngest integration with a “hello world” background job
-- Deploy skeleton to Vercel, confirm env vars work in production
-
-### Week 2 — Data layer
-
-- Port existing City of Atlanta Accela scraper into this codebase
-- Wrap scrapers as tool functions with the agreed schemas
-- Build caching logic in Postgres for properties and permits
-- Integrate Google Places API for address normalization
-- Build Fulton County assessor scraper
-- Test: every tool returns valid structured data for 5 known properties
-
-### Week 3 — Agent loop
-
-- Implement Step 1-4 of the agent loop (normalization through data gathering)
-- Write v1 of planning and analysis prompts
-- Run first end-to-end agent on Greenwich St SW property
-- Evaluate output manually; iterate prompts 5-10 times
-- Implement `report_events` logging for full audit trail
-
-### Week 4 — Report generation & UI
-
-- Step 5-8 of agent loop (analysis through delivery)
-- Build report display UI (Server Component with rich layout)
-- Puppeteer/react-pdf integration for PDF generation
-- Resend email integration
-- Status page with Supabase Realtime updates
-- Landing page, pricing page, FAQ
-
-### Week 5 — Evaluation & iteration
-
-- Build golden set evaluation harness
-- Cameron provides 10 properties with ground truth
-- Run golden set, iterate prompts until >90% accuracy
-- Hallucination detection implementation
-- Admin review dashboard for human-in-loop
-- End-to-end latency optimization (parallel tool calls, prompt caching)
-
-### Week 6 — Launch prep
-
-- Extend coverage to DeKalb County (if time permits)
-- Monitoring: Sentry for errors, Axiom for LLM logs, Stripe webhook reliability
-- Soft launch to 5 users from Cameron’s network
-- Fix issues from soft launch
-- Public launch: update permitcheck.org, announce on social
+**Greenwich St SW fixture:** Cameron authors this himself. PR7 is blocked on it.
 
 -----
 
-## 8. Non-Obvious Pitfalls
+## 14. Non-obvious pitfalls
 
-> **LLM timeout handling**
-> Claude API calls can take 30+ seconds. Use streaming for the orchestration model so we can log progress. Set explicit timeout per call (45s for Sonnet, 60s for Opus) with retry logic. Never let a hung API call block the job indefinitely.
+**LLM timeout handling.** Claude API calls can take 30+s. Use streaming for orchestration. Explicit timeouts: 45s Sonnet, 60s Opus. Never let a hung call block the job indefinitely.
 
-> **Tool call argument validation**
-> Claude will sometimes generate tool calls with malformed arguments (wrong types, missing fields). Validate every tool call input with Zod before executing. Return structured errors to the model so it can self-correct rather than crashing.
+**Tool call argument validation.** Claude will sometimes generate malformed tool calls. Validate every input with Zod before executing. Return structured errors so the model can self-correct.
 
-> **Scraping reliability**
-> City of Atlanta’s Accela portal goes down or throttles regularly. Build exponential backoff and circuit breakers. If scraping fails, the agent should still produce a report based on cached data with a clear caveat, not fail entirely.
+**Scraping reliability.** Atlanta’s Accela portal throttles regularly. Exponential backoff and circuit breakers. If scraping fails, produce a report from cached data with a clear caveat — don’t fail the whole job.
 
-> **Prompt injection via address field**
-> The user-submitted address flows into LLM prompts. Sanitize — reject addresses containing instruction-like text (‘ignore previous instructions’, etc.). For MVP, a regex + length limit is sufficient. Log suspected injection attempts.
+**Prompt injection via address field.** Sanitize. Reject inputs with instruction-like text (“ignore previous instructions”). Length limit. Log suspected attempts.
 
-> **PDF generation in serverless**
-> Puppeteer in Vercel serverless functions is a known pain point. Use `@sparticuz/chromium` or similar. Budget an extra day just for PDF reliability. Alternative: render HTML and use a service like Browserless or Documint for PDF conversion.
+**Playwright in serverless is fragile.** `@sparticuz/chromium-min` already a dep. Budget extra time. Browserless / Documint as hosted fallbacks.
 
-> **Stripe webhook idempotency**
-> Stripe sends webhooks multiple times. Always check if `payment_intent_id` already exists in reports table before enqueuing a new job. Without idempotency, a single payment can trigger multiple billed-but-unpaid reports.
+**Stripe webhook idempotency.** Stripe sends webhooks multiple times. Always check `stripe_payment_intent_id` uniqueness before enqueuing. The DB has a UNIQUE constraint — let it enforce; handle the conflict gracefully.
 
-> **Rate limiting on launch**
-> If a single user submits 100 addresses in a minute (or a scraper runs amok), cost explodes. Implement Upstash-backed rate limiting: 5 reports per user per hour during MVP, with ability to raise for trusted accounts.
+**Rate limiting on launch.** A single user submitting 100 addresses in a minute or a scraper running amok blows up cost. Upstash Redis: 5 reports/user/hour during MVP, raise for trusted accounts.
 
------
+**Prompt caching TTL.** If you don’t hit cached prompts every few minutes, the cache evicts. Skip the warm-up cron until soft launch tells you it’s needed.
 
-## 9. Repo Conventions
+**Admin review gate.** First 100 reports go to `pending_review`, not auto-deliver. Status page copy must reflect the wait. Gate is `AUTO_DELIVER_REPORTS=true` env flag; flip when 100 reports show consistent quality. **Applies to the new Inngest path only** — legacy `summary.ts` deliveries on the $9.99 path are unchanged until that path is deleted with the `USE_INNGEST_REPORTS` cutover.
 
-### Directory structure
-
-```
-/app                      # Next.js App Router
-  /(marketing)            # Public pages (landing, pricing, FAQ)
-  /(app)                  # Authenticated app (dashboard, reports)
-  /api                    # API routes (webhook handlers)
-/components               # React components, organized by feature
-  /ui                     # shadcn primitives
-  /report                 # Report display components
-  /forms                  # Form components
-/lib
-  /agent                  # Agent orchestration
-    /prompts              # System prompts as exported strings
-    /tools                # Tool function implementations
-    /orchestrator.ts      # Main agent loop
-  /supabase               # Supabase clients (server/client)
-  /stripe                 # Stripe client
-  /scraping               # Jurisdiction scrapers
-    /atlanta
-    /dekalb
-    /fulton-county
-  /pdf                    # PDF generation
-  /email                  # Email templates
-/supabase
-  /migrations             # SQL migrations
-  /functions              # Edge functions (if needed)
-/evals
-  /golden-set             # Test fixtures
-  /run-golden-set.ts
-  /evaluator.ts
-/inngest                  # Inngest job definitions
-/scripts                  # One-off scripts
-```
-
-### Code conventions
-
-- TypeScript strict mode. No `any`.
-- Zod schemas for every tool input/output and API boundary
-- Server Components by default; Client Components only when needed
-- Server Actions for mutations, not API routes (except webhooks)
-- No client-side Supabase writes — always go through server
-- Every async operation has error handling; no silent catches
-- Log to Axiom (structured JSON) for all agent steps
-- Environment variables validated with Zod at boot (fail fast if misconfigured)
-
-### Git workflow
-
-- `main` branch deploys to production (Vercel)
-- Feature branches → PR → Cameron reviews → merge
-- Commit messages follow Conventional Commits (`feat:`, `fix:`, etc.)
-- Every PR must include eval results for changes affecting the agent
+**Inngest free tier limits.** 24-hour event retention, lower concurrency than Pro. Acceptable through soft launch. Upgrade to Pro before public launch.
 
 -----
 
-## 10. Environment Variables
+## 15. Environment variables
 
 ```bash
 # Core
@@ -775,10 +740,12 @@ NODE_ENV=production
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...   # server-only, never exposed
+SUPABASE_SERVICE_ROLE_KEY=...
 
 # Anthropic
 ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL_ORCHESTRATOR=claude-sonnet-4-5
+ANTHROPIC_MODEL_REPORTER=claude-opus-4-7
 
 # Stripe
 STRIPE_SECRET_KEY=...
@@ -786,7 +753,8 @@ STRIPE_WEBHOOK_SECRET=...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=...
 
 # Google
-GOOGLE_PLACES_API_KEY=...
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...     # autocomplete, domain-restricted
+GOOGLE_MAPS_SERVER_KEY=...              # server-side Text Search
 
 # Inngest
 INNGEST_EVENT_KEY=...
@@ -794,6 +762,7 @@ INNGEST_SIGNING_KEY=...
 
 # Email
 RESEND_API_KEY=...
+EMAIL_FROM=...
 
 # Monitoring
 SENTRY_DSN=...
@@ -802,66 +771,15 @@ AXIOM_TOKEN=...
 # Rate limiting
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
+
+# Feature flags
+USE_INNGEST_REPORTS=false              # PR5 dual-path flag; flip after staging verification
+AUTO_DELIVER_REPORTS=false             # Admin review gate; flip after 100 reviewed
+LOG_FULL_ADDRESS=false                 # Debug-level PII flag
 ```
 
------
-
-## 11. Acceptance Criteria
-
-The MVP is considered shipped when ALL of the following are true. Do not declare done until every item is checked.
-
-### Functional
-
-- User can submit any City of Atlanta residential address and receive a report in <120 seconds (p95)
-- $29 one-time and $99/month subscription Stripe flows both work
-- PDF report delivers via email within 2 minutes of completion
-- Status page updates in real-time as agent progresses
-- Failed reports auto-refund via Stripe
-- Admin dashboard shows all reports with status, duration, cost
-
-### Quality
-
-- Golden set eval: >90% accuracy on critical red flags, 0 hallucinations
-- Greenwich St SW property correctly identifies known issues from litigation
-- First 10 production reports personally reviewed and approved by Cameron
-- No report contains a claim without cited evidence
-
-### Performance
-
-- p50 end-to-end: <80 seconds
-- p95 end-to-end: <120 seconds
-- LLM cost per report: <$2.00
-- All-in unit economics: <$5.00 per report (incl. infra + data APIs)
-
-### Reliability
-
-- 99%+ report completion rate (failures auto-refund)
-- Scraping circuit breakers prevent agent from hanging when portals are down
-- Sentry configured, receiving errors
-- Axiom logs every agent step
-
-### Compliance
-
-- Privacy policy live at `/privacy`
-- Terms of Service at `/terms` (disclaimers about data accuracy, not legal advice)
-- Supabase RLS policies enforced on all user-data tables
-- No PII in LLM logs
-- Stripe PCI handled entirely by Checkout (no card data touches our servers)
+All validated by Zod at boot in `lib/env.ts`. Server fails to start on misconfiguration.
 
 -----
 
-## 12. Questions for Cameron
-
-Before starting, the dev should confirm answers to these open questions. Do not guess.
-
-- Is the existing Atlanta scraper in the current permitcheck.org Next.js codebase, or a separate repo? Provide access.
-- Domain: is permitcheck.org pointed at anything currently? If so, do we preserve existing pages or replace entirely?
-- Is there existing Supabase infrastructure? Migrate or start fresh?
-- Pricing: confirm $29 one-time and $99/month with 10 reports. Subscription pricing model: hard cap at 10 or overages at $15?
-- Launch geography: Atlanta-only is fixed; is DeKalb scope-creep acceptable if we hit timeline risk on core product?
-- Branding: existing PermitCheck brand assets (logo, colors) or rebuild?
-- Who’s on-call for the first 30 days post-launch? Cameron alone or shared rotation?
-
------
-
-*This specification is the single source of truth for the MVP build. If anything is ambiguous, ask Cameron before making assumptions. The goal is a product that Alan Wiley can see running on real properties in 8 weeks and say “this is real.” Everything flows from there.*
+*The goal is a product Alan Wiley can run on a real Atlanta property and say “this is real.” Everything flows from there. See `/CLAUDE.md` for engineering conventions and `/docs/DECISIONS.md` for resolutions to design contradictions. Last updated: April 2026.*
