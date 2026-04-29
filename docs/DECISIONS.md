@@ -11,6 +11,74 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-29 — Week 1 audit findings (open)
+
+### D19. Live pricing in code vs. MVP scope
+- **Conflict:** `src/lib/config.ts:20–25` ships `singleLookup: 999` ($9.99),
+  `attorneyReport: 19900` ($199), `buyerPlan: 2900` ($29/mo), `agentPlan: 9900`
+  ($99/mo). D8 ruled MVP at "$29 one-time only" and deferred the $99/mo
+  subscription to v1.1. Three of four live SKUs disagree with D8. Affected
+  surface: `migrations/001_initial_schema.sql:27` (`report_type` column),
+  `migrations/008_agent_subscription.sql`, `src/app/api/subscription/*`,
+  `README.md:24`.
+- **Resolution:** Pending Cameron. Options: (a) flip `singleLookup` to $29 and
+  remove the other three SKUs for MVP, (b) keep them dormant behind a feature
+  flag, or (c) revise D8. No code change until resolved.
+
+### D20. Attorney-grade report SKU undocumented
+- **Conflict:** `report_type: 'standard' | 'attorney'` runs through the schema
+  (`migrations/001_initial_schema.sql:27`), checkout
+  (`src/app/api/checkout/create/route.ts:102–106`), the webhook PDF path
+  (`src/app/api/webhooks/stripe/route.ts:199–253`), and
+  `migrations/006_matter_reference.sql`. Neither `SPEC.md` nor `CLAUDE.md`
+  mentions an attorney-grade tier.
+- **Resolution:** Pending Cameron. Either fold under the $29 MVP and drop, or
+  write the SKU into SPEC §1 / §11. Tied to D19.
+
+### D21. Auth uses passwords, not magic-link
+- **Conflict:** SPEC §3 ("email + magic link, no password") and §5
+  ("magic-link auth (email)") versus `src/app/dashboard/page.tsx:75–95`, which
+  calls `supabase.auth.signUp({ email, password })` and
+  `signInWithPassword`. Recent commit `eacd9ef` added a show/hide password
+  toggle — the codebase is moving *toward* passwords, not away.
+- **Resolution:** Pending Cameron. Switch to magic-link before launch (and
+  remove the password UI), or amend SPEC §3/§5 to allow passwords for v0.
+
+### D22. Vitest path alias is broken
+- **Conflict:** `vitest.config.ts:4` defines the alias key as `"@/"` (trailing
+  slash). Standard `@/lib/...` imports resolve to `./src//lib/...` and fail.
+  Existing tests in `src/__tests__/` use relative paths to dodge the bug; new
+  tests written per the spec's convention will fail.
+- **Resolution:** Fix as part of PR6 (eval harness): change the alias key to
+  `"@"` and the value to `./src`. No controversy — recorded here for the
+  trail.
+
+### D23. `lib/env.ts` is not Zod-validated and does not fail at boot
+- **Conflict:** `CLAUDE.md` §4 requires "Validated with Zod at boot via
+  `lib/env.ts`. Server fails to start on misconfiguration. Never read
+  `process.env.X` directly." Reality: `src/lib/env.ts:10–45` is a string-array
+  check called lazily from API routes, and `src/lib/config.ts:3–10` reads
+  `process.env.X` directly with `|| ""` fallbacks (silent misconfig). D13
+  already schedules PR2 for PII redaction but does not capture the
+  Zod-at-boot requirement itself.
+- **Resolution:** Lands in PR2 alongside D9 and D13. Replace lazy validation
+  with a Zod schema validated at module load; route `config.ts` through the
+  typed export; remove direct `process.env.X` reads outside `lib/env.ts`.
+
+### D24. Webhook does PDF + email + summary inline (beyond the agent run)
+- **Conflict:** D6 addresses moving the *report generation* off the webhook.
+  The same webhook (`src/app/api/webhooks/stripe/route.ts:152–310`) also runs
+  property-data fetch, AI summary, PDF generation (with a 20s race), Storage
+  upload, and Resend email — all within the Stripe 30s budget. Per
+  `CLAUDE.md` §11, the same anti-pattern applies to the side-effects chain,
+  not just the analysis call.
+- **Resolution:** Lands in PR5 alongside D6. The post-payment side effects all
+  move into Inngest steps; the webhook becomes "verify, mark paid, enqueue,
+  return 200." Same `USE_INNGEST_REPORTS` flag and same 48h
+  staging→production cutover.
+
+-----
+
 ## 2026-04-29 — PR1 docs reconciliation
 
 ### D1. Next.js version
