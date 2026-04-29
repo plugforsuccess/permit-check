@@ -11,6 +11,39 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-29 — Q7 resolution: Inngest tier
+
+### D28. Inngest free through soft launch, paid before public launch (refines D14)
+- **Context:** D14 said "Free tier. Re-evaluate at 100 reports/month or first
+  observability gap." That left the public-launch threshold ambiguous and
+  didn't give PR3 enough to wire against.
+- **Resolution:** Free tier through soft launch (Cameron's network).
+  Upgrade to Pro **before** opening signups beyond that network. Calendar
+  reminder, not a code change — add to the launch-readiness checklist
+  next to the privacy policy / Sentry / Axiom items in SPEC §11.
+
+  PR3 wires against free-tier assumptions explicitly:
+  - **24h event retention.** Don't rely on Inngest's event replay for
+    forensics. Every step writes to `report_events` (PR4 schema) — that
+    table is the durable audit trail, Inngest is just the runner.
+  - **Lower concurrency.** Set `concurrency: { limit: 5 }` on the report
+    function so a burst (e.g. golden-set runs against prod) can't starve
+    the queue. Free tier ceiling is ~5 concurrent step runs in 2026; the
+    cap matches reality.
+  - **Retries.** Set `retries: 3` on the report function explicitly.
+    Idempotency comes from the `payment_intent_id` check already in the
+    webhook (`src/app/api/webhooks/stripe/route.ts:104–114`), so retries
+    are safe.
+  - **No pre-pay.** Don't enable Inngest billing until the upgrade
+    trigger fires.
+
+  **Early-upgrade trigger:** if the free tier proves insufficient before
+  soft launch — concurrency limits hit during eval runs is the concrete
+  example — upgrade then. Don't push through pain to save $20/mo on a
+  product targeting 85% gross margin.
+
+-----
+
 ## 2026-04-29 — Q6 resolution: legacy summary.ts lifecycle
 
 ### D27. Leave `src/lib/summary.ts` on legacy path until cutover, then delete
