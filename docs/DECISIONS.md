@@ -11,6 +11,30 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-29 — Q3 resolution: admin review gate scope
+
+### D25. Admin review gate applies to Inngest path only (refines D11)
+- **Context:** D11 prescribed a `pending_review` gate behind
+  `AUTO_DELIVER_REPORTS` (default false until 100 reviewed reports clear)
+  but did not specify whether the gate applies to (a) only the new Inngest
+  path or (b) both paths during the dual-path window opened by D6.
+- **Resolution:** New Inngest path only. The legacy $9.99 path is on
+  borrowed time — it dies when `USE_INNGEST_REPORTS` flips, so adding a
+  review gate to a path on the way out is throwaway work. Status page
+  copy and email copy on the legacy path stay as they are.
+
+  Accepted risk: any report delivered through the legacy path between now
+  and the flag flip is unreviewed. Acceptable at current volume
+  (effectively zero) and timeline (weeks, not months). Revisit if volume
+  picks up before the cutover.
+
+  PR5 implementation note: the `pending_review` write and
+  `AUTO_DELIVER_REPORTS` check land inside the Inngest function, not in
+  the webhook handler — keeps the legacy code path untouched and makes
+  the eventual deletion clean.
+
+-----
+
 ## 2026-04-29 — Week 1 audit findings
 
 ### D19. Live pricing in code vs. MVP scope
