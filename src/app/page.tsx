@@ -158,7 +158,7 @@ function HomePageContent() {
                 <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
                   <div className="text-center">
                     <div className="text-3xl mb-2">&#128274;</div>
-                    <div className="text-sm font-semibold text-gray-700">Unlock for $9.99</div>
+                    <div className="text-sm font-semibold text-gray-700">Unlock for $29</div>
                   </div>
                 </div>
               </div>
@@ -235,7 +235,7 @@ function HomePageContent() {
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 Per Report
               </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">$9.99</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">$29</div>
               <div className="text-sm text-gray-500 mb-6">per address · instant results</div>
               <ul className="space-y-3 text-sm text-gray-700">
                 <li>✓ Full permit history for one address</li>

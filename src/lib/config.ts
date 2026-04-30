@@ -18,7 +18,7 @@ export const config = {
     environment: process.env.ACCELA_ENVIRONMENT || "PROD",
   },
   pricing: {
-    singleLookup: 999, // $9.99 in cents
+    singleLookup: 2900, // $29.00 in cents
     buyerPlan: 2900, // $29/month in cents
   },
   app: {
