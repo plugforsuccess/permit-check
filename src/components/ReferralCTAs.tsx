@@ -1,5 +1,7 @@
 "use client";
 
+import { env } from "@/lib/env";
+
 interface ReferralCTAsProps {
   riskLevel: "low" | "medium" | "high";
   address: string;
@@ -25,7 +27,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
       "Permit violations can affect contract rights, title, and your negotiating position. Know your exposure before closing.",
     ctaText: "Find an attorney \u2192",
     ctaUrl:
-      process.env.NEXT_PUBLIC_AFFILIATE_ATTORNEY ||
+      env.NEXT_PUBLIC_AFFILIATE_ATTORNEY ||
       "https://www.avvo.com/real-estate-lawyer/ga/atlanta.html",
     showOn: ["medium", "high"],
     icon: "\u2696\uFE0F",
@@ -38,7 +40,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
       "Verify what work was actually completed and whether it meets code \u2014 independent of what the permits say.",
     ctaText: "Find an inspector \u2192",
     ctaUrl:
-      process.env.NEXT_PUBLIC_AFFILIATE_INSPECTOR ||
+      env.NEXT_PUBLIC_AFFILIATE_INSPECTOR ||
       "https://www.angi.com/companylist/us/ga/atlanta/home-inspection.htm",
     showOn: ["medium", "high"],
     icon: "\uD83D\uDD0D",
@@ -51,7 +53,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
       "Expired or open permits may require corrective work before close. Know the cost before you negotiate.",
     ctaText: "Find a contractor \u2192",
     ctaUrl:
-      process.env.NEXT_PUBLIC_AFFILIATE_CONTRACTOR ||
+      env.NEXT_PUBLIC_AFFILIATE_CONTRACTOR ||
       "https://www.angi.com/companylist/us/ga/atlanta/general-contractors.htm",
     showOn: ["high"],
     icon: "\uD83D\uDD27",
@@ -64,7 +66,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
       "A clean permit history supports a cleaner appraisal. Lock in your rate while due diligence is complete.",
     ctaText: "Compare rates \u2192",
     ctaUrl:
-      process.env.NEXT_PUBLIC_AFFILIATE_MORTGAGE ||
+      env.NEXT_PUBLIC_AFFILIATE_MORTGAGE ||
       "https://www.lendingtree.com/home/mortgage/",
     showOn: ["low"],
     icon: "\uD83C\uDFE6",
@@ -77,7 +79,7 @@ const REFERRAL_CARDS: ReferralCard[] = [
       "A strong buyer's agent can turn permit issues into negotiating leverage — use this data in your offer.",
     ctaText: "Find an agent \u2192",
     ctaUrl:
-      process.env.NEXT_PUBLIC_AFFILIATE_AGENT ||
+      env.NEXT_PUBLIC_AFFILIATE_AGENT ||
       "https://www.realtor.com/realestateagents/atlanta_ga",
     showOn: ["low", "medium", "high"],
     icon: "\uD83C\uDFE0",

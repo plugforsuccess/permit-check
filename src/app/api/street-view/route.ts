@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, extractClientIp } from "@/lib/ratelimit";
+import { env } from "@/lib/env";
 
 // Only allow alphanumeric characters, spaces, commas, periods, hashes, and hyphens
 const SAFE_ADDRESS_RE = /^[a-zA-Z0-9\s,.\-#/]+$/;
@@ -18,10 +19,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(null, { status: 429 });
   }
 
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
-  if (!apiKey) {
-    return new NextResponse(null, { status: 500 });
-  }
+  const apiKey = env.GOOGLE_MAPS_SERVER_KEY;
 
   const url = new URL("https://maps.googleapis.com/maps/api/streetview");
   url.searchParams.set("size", "800x300");

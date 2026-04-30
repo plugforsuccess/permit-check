@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { scrapeAccelaPermits } from "@/lib/accela/scraper";
 import { log } from "@/lib/logger";
 import { sendHealthCheckAlert } from "@/lib/health-check-email";
+import { env } from "@/lib/env";
 
 // Vercel Cron — runs daily at 6am ET
 export const maxDuration = 120;
 
 // Vercel calls this with a secret header to prevent unauthorized access
-const CRON_SECRET = process.env.CRON_SECRET;
+const CRON_SECRET = env.CRON_SECRET;
 
 const TEST_CASES = [
   {

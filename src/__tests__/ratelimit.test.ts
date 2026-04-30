@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock @upstash/redis
-vi.mock("@upstash/redis", () => ({
-  Redis: {
-    fromEnv: vi.fn(() => ({})),
-  },
-}));
+// Mock @upstash/redis. We support both the explicit constructor
+// (`new Redis({ url, token })`) used by ratelimit.ts and the legacy
+// `Redis.fromEnv()` static for other callers.
+vi.mock("@upstash/redis", () => {
+  function MockRedis() {}
+  MockRedis.fromEnv = vi.fn(() => ({}));
+  return { Redis: MockRedis };
+});
 
 let limitCallCount = 0;
 

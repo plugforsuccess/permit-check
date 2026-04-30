@@ -1,11 +1,12 @@
 import { Resend } from "resend";
+import { env } from "./env";
 import type { PermitRecord } from "@/lib/accela/scraper";
 
 let resendInstance: Resend | null = null;
 
 function getResend(): Resend {
   if (!resendInstance) {
-    resendInstance = new Resend(process.env.RESEND_API_KEY);
+    resendInstance = new Resend(env.RESEND_API_KEY);
   }
   return resendInstance;
 }
@@ -91,7 +92,7 @@ export async function sendWatchlistAlert(
   `.trim();
 
   await getResend().emails.send({
-    from: process.env.EMAIL_FROM || "alerts@updates.permitcheck.org",
+    from: env.EMAIL_FROM,
     to,
     subject: `New permit activity at ${address}`,
     html,

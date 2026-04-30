@@ -3,6 +3,7 @@ import GoogleMapsProvider from "@/components/GoogleMapsProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Logo from "@/components/Logo";
 import SiteNav from "@/components/SiteNav";
+import { env } from "@/lib/env";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -66,10 +67,10 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
+        {env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
           <script
             defer
-            data-domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
+            data-domain={env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
             src="https://plausible.io/js/script.js"
           />
         )}

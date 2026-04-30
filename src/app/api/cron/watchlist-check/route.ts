@@ -3,10 +3,11 @@ import { createServerClient } from "@/lib/supabase";
 import { scrapeAccelaPermits } from "@/lib/accela/index";
 import { sendWatchlistAlert } from "@/lib/watchlist-email";
 import { log } from "@/lib/logger";
+import { env } from "@/lib/env";
 
 export const maxDuration = 300;
 
-const CRON_SECRET = process.env.CRON_SECRET;
+const CRON_SECRET = env.CRON_SECRET;
 
 export async function GET(request: Request) {
   // Require CRON_SECRET — reject all requests if unset to prevent public access
@@ -91,7 +92,7 @@ export async function GET(request: Request) {
         });
         const newPermits = sorted.slice(0, diff);
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://permitcheck.org";
+        const appUrl = env.NEXT_PUBLIC_APP_URL;
 
         await sendWatchlistAlert({
           to: watch.email,

@@ -1,10 +1,12 @@
 import { Resend } from "resend";
+import { env } from "./env";
+import { log } from "./logger";
 
 let resendInstance: Resend | null = null;
 
 function getResend(): Resend {
   if (!resendInstance) {
-    resendInstance = new Resend(process.env.RESEND_API_KEY);
+    resendInstance = new Resend(env.RESEND_API_KEY);
   }
   return resendInstance;
 }
@@ -29,9 +31,12 @@ interface FailedTest {
 export async function sendHealthCheckAlert(
   failures: FailedTest[]
 ): Promise<void> {
-  const alertEmail = process.env.HEALTH_CHECK_ALERT_EMAIL;
+  const alertEmail = env.HEALTH_CHECK_ALERT_EMAIL;
   if (!alertEmail) {
-    console.error("[health-check] HEALTH_CHECK_ALERT_EMAIL not set");
+    log.error("health-check: HEALTH_CHECK_ALERT_EMAIL not set", {
+      step_name: "health_check_alert",
+      event_type: "config_missing",
+    });
     return;
   }
 
@@ -93,7 +98,7 @@ export async function sendHealthCheckAlert(
   `.trim();
 
   await getResend().emails.send({
-    from: process.env.EMAIL_FROM || "alerts@permitcheck.org",
+    from: env.EMAIL_FROM,
     to: alertEmail,
     subject: `🚨 PermitCheck Scraper Alert — ${failures.length} jurisdiction(s) failing`,
     html,

@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { config } from "@/lib/config";
+import { env } from "@/lib/env";
 import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
 import { fetchPropertyData } from "@/lib/property-data";
@@ -182,7 +183,7 @@ export async function POST(req: Request) {
             to: customerEmail,
             address: lookup.address_normalized,
             lookupId,
-            downloadUrl: `${process.env.NEXT_PUBLIC_APP_URL}${reportData.pdf_url}`,
+            downloadUrl: `${env.NEXT_PUBLIC_APP_URL}${reportData.pdf_url}`,
             permitCount: permits.length,
             summary: parsedSummary,
             expiresAt: reportData.expires_at,
