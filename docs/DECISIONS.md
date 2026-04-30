@@ -11,6 +11,44 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-30 — Migration ledger drift (open)
+
+### D25. `supabase_migrations.schema_migrations` only records 001–003 on prod
+- **Conflict:** The Supabase project `unjwbyybzfyhiavorcro` has all 15 local
+  migrations' DDL effects present (every column, table, index, and policy from
+  `001`–`015` exists, verified via MCP read-only queries against `pg_class`,
+  `pg_policies`, and `information_schema.columns`), but
+  `supabase_migrations.schema_migrations` only contains rows for
+  `001/002/003`. Twelve migrations were applied through a non-CLI path (almost
+  certainly the SQL Editor) and the ledger never learned about them. Two extra
+  objects exist on prod with **no migration source at all** in the repo:
+  `permits_lookup_record_unique` (UNIQUE on `permits(lookup_id, record_number)`)
+  and `reports_lookup_id_key` (UNIQUE on `reports(lookup_id)`). A
+  `supabase db push` against prod today would attempt to replay `004`–`015`;
+  `009` and `010` are **not safe to replay as written** (the `CREATE POLICY`
+  statements lack `IF NOT EXISTS` guards and would error mid-migration,
+  leaving the schema half-applied). Full forensic detail and replay-safety
+  matrix: `/docs/MIGRATION_LEDGER_AUDIT.md`.
+- **Resolution (audit-first):** PR2.6 audits the drift; Cameron picks the
+  backfill option (A: insert ledger rows + capture the two anomaly objects in
+  a new migration; B: squash 001–015 into a single dumped baseline). No
+  execution until Cameron approves the option. **Recommendation: Option A.**
+  PR4 is blocked absolutely until reconciliation lands and verifies clean.
+- **Operational guardrail (in effect from 2026-04-30 until verification
+  passes):**
+  1. No `supabase db push` against prod.
+  2. No `supabase migration up` against prod.
+  3. No new migration files merge to `main` beyond the in-flight PRs (PR1.6,
+     PR2, PR2.5, PR2.6) until the chosen backfill option executes.
+  4. All DDL changes to prod continue to flow through the SQL Editor or the
+     MCP `apply_migration` tool — both write the file *and* the ledger row
+     atomically, the way `001/002/003` originally landed.
+  5. Staging environments are exempt; they rebuild cleanly from
+     `/supabase/migrations` against an empty DB and are the proving ground
+     for the chosen option before prod touches.
+
+-----
+
 ## 2026-04-29 — Week 1 audit findings (open)
 
 ### D19. Live pricing in code vs. MVP scope

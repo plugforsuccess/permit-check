@@ -620,7 +620,8 @@ CREATE POLICY "Users read own reports" ON reports
 - **PR1**: Docs reconciliation — `/CLAUDE.md`, `/docs/SPEC.md`, `/docs/DECISIONS.md` (single combined `CLAUDE.md`, no split deep file)
 - **PR1.5**: Collapse the previously-split agent operating manual into a single combined `CLAUDE.md` (Part I / Part II structure)
 - **PR1.6**: Delete unused pricing SKUs (`attorney_report`, `agent_plan`), `src/app/api/subscription/*`, drop unused columns via new migration
-- **PR2.5**: RLS audit — read `010_fix_rls_policies.sql`, document effective policies on every user-data table, propose `017_rls_hardening.sql` if any `FOR ALL USING (true)` survives for non-service roles
+- **PR2.5**: RLS audit — read `010_fix_rls_policies.sql`, document effective policies on every user-data table, propose `017_rls_hardening.sql` if any `FOR ALL USING (true)` survives for non-service roles. Output: `/docs/RLS_AUDIT.md`
+- **PR2.6**: Migration ledger audit — `supabase_migrations.schema_migrations` on prod only records `001/002/003` while DDL from `004`–`015` is fully present. Forensic reconstruction, per-migration replay-safety matrix, backfill plan (Option A insert rows + anomaly capture, vs Option B squash to baseline), operational guardrail blocking `supabase db push` against prod until reconciled. Audit only — no execution. Output: `/docs/MIGRATION_LEDGER_AUDIT.md`. **Blocks PR4 absolutely.** See DECISIONS.md D25.
 - **PR2**: Zod-validated env + import discipline + PII redaction in logger + Axiom transport
 - **PR3**: Inngest + `@anthropic-ai/sdk` deps + scaffold `/lib/agent/` boundary
 
