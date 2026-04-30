@@ -5,8 +5,6 @@ import { config } from "@/lib/config";
 import { getStripe } from "@/lib/stripe";
 import { generatePermitSummary } from "@/lib/summary";
 import { fetchPropertyData } from "@/lib/property-data";
-import { generateReportHtml } from "@/lib/pdf";
-import { generatePdfFromHtml } from "@/lib/pdf-generator";
 import { log } from "@/lib/logger";
 import { sendReportEmail } from "@/lib/email";
 import type { PermitSummary } from "@/lib/summary";
@@ -41,58 +39,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // Handle subscription lifecycle events
-  if (
-    event.type === "customer.subscription.updated" ||
-    event.type === "customer.subscription.deleted"
-  ) {
-    const subscription = event.data.object as Stripe.Subscription;
-    const userId = subscription.metadata?.user_id;
-
-    if (userId) {
-      const supabase = createServerClient();
-      await supabase
-        .from("users")
-        .update({
-          subscription_status: subscription.status as string,
-        })
-        .eq("id", userId);
-
-      log.info("Webhook: subscription status updated", {
-        userId,
-        status: subscription.status,
-      });
-    }
-
-    return NextResponse.json({ received: true });
-  }
-
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    // Subscription checkout — handle separately from per-lookup payments
-    if (session.mode === "subscription") {
-      const userId = session.metadata?.user_id;
-
-      if (userId && session.customer) {
-        const supabase = createServerClient();
-        await supabase.from("users").upsert({
-          id: userId,
-          email: session.customer_email ?? "",
-          stripe_customer_id: session.customer as string,
-          stripe_subscription_id: session.subscription as string,
-          subscription_status: "active",
-        });
-
-        log.info("Webhook: agent subscription activated", { userId });
-      }
-
-      return NextResponse.json({ received: true });
-    }
-
     const lookupId = session.metadata?.lookup_id;
-    const reportType =
-      (session.metadata?.report_type as "standard" | "attorney") || "standard";
 
     if (!lookupId) {
       log.error("No lookup_id in session metadata");
@@ -184,8 +134,6 @@ export async function POST(req: Request) {
         // Don't block report creation if summary fails
       }
 
-      // Pre-generate PDF for attorney reports
-      let pdfStoragePath: string | null = null;
       let parsedSummary: PermitSummary | null = null;
 
       if (aiSummary) {
@@ -193,62 +141,6 @@ export async function POST(req: Request) {
           parsedSummary = JSON.parse(aiSummary) as PermitSummary;
         } catch {
           // ignore parse error
-        }
-      }
-
-      if (reportType === "attorney") {
-        // Guard: abort PDF gen if it takes >20s to avoid Stripe webhook timeout (30s).
-        // On-demand generation in the download route serves as fallback.
-        const PDF_TIMEOUT_MS = 20_000;
-        try {
-          const pdfResult = await Promise.race([
-            (async () => {
-              const reportHtml = generateReportHtml({
-                address: lookup.address_normalized,
-                lookupDate: new Date(lookup.created_at).toISOString().split("T")[0],
-                lookupId,
-                permits,
-                reportType: "attorney",
-                matterReference: session.metadata?.matter_reference || undefined,
-                summary: parsedSummary,
-              });
-
-              const pdfBuffer = await generatePdfFromHtml(reportHtml);
-              const fileName = `${lookupId}/report.pdf`;
-
-              const { error: uploadError } = await supabase.storage
-                .from("reports")
-                .upload(fileName, pdfBuffer, {
-                  contentType: "application/pdf",
-                  upsert: true,
-                });
-
-              if (uploadError) {
-                log.error("Webhook: PDF upload failed", {
-                  lookupId,
-                  error: uploadError.message,
-                });
-                return null;
-              }
-
-              log.info("Webhook: PDF pre-generated and stored", { lookupId, fileName });
-              return fileName;
-            })(),
-            new Promise<null>((resolve) => {
-              setTimeout(() => {
-                log.warn("Webhook: PDF generation timed out, will use on-demand", { lookupId });
-                resolve(null);
-              }, PDF_TIMEOUT_MS);
-            }),
-          ]);
-
-          pdfStoragePath = pdfResult;
-        } catch (err) {
-          log.error("Webhook: PDF generation failed", {
-            lookupId,
-            error: String(err),
-          });
-          // Don't block report creation — fall back to on-demand generation
         }
       }
 
@@ -266,10 +158,8 @@ export async function POST(req: Request) {
           {
             lookup_id: lookupId,
             pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
-            pdf_storage_path: pdfStoragePath,
             expires_at: expiresAt.toISOString(),
             download_token: downloadToken,
-            matter_reference: session.metadata?.matter_reference || null,
             ai_summary: aiSummary,
             risk_level: riskLevel,
           },
@@ -295,7 +185,6 @@ export async function POST(req: Request) {
             downloadUrl: `${process.env.NEXT_PUBLIC_APP_URL}${reportData.pdf_url}`,
             permitCount: permits.length,
             summary: parsedSummary,
-            reportType,
             expiresAt: reportData.expires_at,
           });
 

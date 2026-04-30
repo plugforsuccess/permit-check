@@ -13,7 +13,7 @@ PermitCheck solves this by pulling permit records directly from government Accel
 - **Instant permit history lookup** — enter any supported address and get results in ~20 seconds
 - **Permit status tracking** — see which permits are Issued, Finaled, Expired, In Review, Pending, or Void
 - **Risk assessment** — AI-powered summary flags potential issues like missing permits, expired permits, or unpermitted renovation work
-- **Downloadable PDF reports** — standard reports for buyers and litigation-grade attorney reports with chain of custody
+- **Downloadable PDF reports** — buyer-facing permit summary, generated server-side
 - **Multi-jurisdiction support** — currently covers City of Atlanta and Gwinnett County, GA
 
 ## Key Features
@@ -21,7 +21,7 @@ PermitCheck solves this by pulling permit records directly from government Accel
 - **Address autocomplete** — Google Maps–powered address input with structured address parsing
 - **Accela portal scraping** — automated data extraction from government permit portals via Cheerio + Puppeteer (interim solution pending Accela API approval)
 - **24-hour result caching** — repeat lookups for the same address return cached results
-- **Stripe payment gate** — $9.99 standard reports and $199 attorney-grade reports; permits are locked behind payment
+- **Stripe payment gate** — $9.99 per report; permits are locked behind payment
 - **PDF report generation** — server-side PDF rendering via `@react-pdf/renderer`
 - **AI-powered permit summaries** — risk-level classification (low/medium/high) with verdict, flags, and seller questions
 - **Property data enrichment** — street view imagery and property context via Google Maps
@@ -134,13 +134,13 @@ The Supabase PostgreSQL database consists of the following tables, managed throu
 Extends Supabase `auth.users`. Stores plan type (`free`, `buyer`, `agent`, `investor`) and Stripe customer ID.
 
 ### `lookups`
-Core table tracking each address lookup. Stores the raw and normalized address, payment status, jurisdiction ID (e.g. `ATLANTA_GA`), report type (`standard` or `attorney`), and unit detection flags. Cached for 24 hours.
+Core table tracking each address lookup. Stores the raw and normalized address, payment status, jurisdiction ID (e.g. `ATLANTA_GA`), and unit detection flags. Cached for 24 hours.
 
 ### `permits`
 Individual permit records tied to a lookup. Each record includes the permit number, type, status, filed/issued dates, description, contractor name, and address.
 
 ### `reports`
-Generated PDF reports linked to a lookup. Includes the PDF storage URL, expiration timestamp, secure download token, optional matter reference (for attorney reports), AI-generated summary text, and risk level classification.
+Generated PDF reports linked to a lookup. Includes the PDF storage URL, expiration timestamp, secure download token, AI-generated summary text, and risk level classification.
 
 All tables have Row Level Security enabled. Users can only read their own data; the service role has full access for server-side operations.
 

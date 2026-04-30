@@ -6,10 +6,7 @@ import { UUID_RE } from "@/lib/schemas";
 import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 import { generatePermitSummary } from "@/lib/summary";
 import { fetchPropertyData } from "@/lib/property-data";
-import { generateReportHtml } from "@/lib/pdf";
-import { generatePdfFromHtml } from "@/lib/pdf-generator";
 import { log } from "@/lib/logger";
-import type { PermitSummary } from "@/lib/summary";
 
 export const maxDuration = 60;
 
@@ -123,7 +120,6 @@ export async function POST(
   // Generate AI summary
   let aiSummary: string | null = null;
   let riskLevel: string | null = null;
-  let parsedSummary: PermitSummary | null = null;
 
   try {
     const summary = await generatePermitSummary(
@@ -138,70 +134,12 @@ export async function POST(
     );
     aiSummary = JSON.stringify(summary);
     riskLevel = summary.riskLevel;
-    parsedSummary = summary;
     log.info("Regenerate: summary generated", { lookupId, riskLevel });
   } catch (err) {
     log.error("Regenerate: summary generation failed", {
       lookupId,
       error: String(err),
     });
-  }
-
-  // Pre-generate PDF for attorney reports (with timeout guard)
-  let pdfStoragePath: string | null = null;
-
-  if (lookup.report_type === "attorney" && parsedSummary) {
-    const PDF_TIMEOUT_MS = 20_000;
-    try {
-      const pdfResult = await Promise.race([
-        (async () => {
-          const reportHtml = generateReportHtml({
-            address: lookup.address_normalized,
-            lookupDate: new Date(lookup.created_at)
-              .toISOString()
-              .split("T")[0],
-            lookupId,
-            permits,
-            reportType: "attorney",
-            summary: parsedSummary,
-          });
-
-          const pdfBuffer = await generatePdfFromHtml(reportHtml);
-          const fileName = `${lookupId}/report.pdf`;
-
-          const { error: uploadError } = await supabase.storage
-            .from("reports")
-            .upload(fileName, pdfBuffer, {
-              contentType: "application/pdf",
-              upsert: true,
-            });
-
-          if (uploadError) {
-            log.error("Regenerate: PDF upload failed", {
-              lookupId,
-              error: uploadError.message,
-            });
-            return null;
-          }
-
-          log.info("Regenerate: PDF stored", { lookupId, fileName });
-          return fileName;
-        })(),
-        new Promise<null>((resolve) => {
-          setTimeout(() => {
-            log.warn("Regenerate: PDF generation timed out", { lookupId });
-            resolve(null);
-          }, PDF_TIMEOUT_MS);
-        }),
-      ]);
-
-      pdfStoragePath = pdfResult;
-    } catch (err) {
-      log.error("Regenerate: PDF generation failed", {
-        lookupId,
-        error: String(err),
-      });
-    }
   }
 
   // Create report record
@@ -216,7 +154,6 @@ export async function POST(
       {
         lookup_id: lookupId,
         pdf_url: `/api/report/${lookupId}/download?token=${downloadToken}`,
-        pdf_storage_path: pdfStoragePath,
         expires_at: expiresAt.toISOString(),
         download_token: downloadToken,
         ai_summary: aiSummary,

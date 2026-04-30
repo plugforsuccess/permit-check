@@ -6,8 +6,6 @@ import { rateLimit, extractClientIp } from "@/lib/ratelimit";
 const schema = z.object({
   user_role: z.enum(["investor", "wholesaler", "flipper", "agent", "attorney", "other"]).optional(),
   deal_volume: z.enum(["1_5", "6_15", "16_plus"]).optional(),
-  agent_name: z.string().max(100).optional(),
-  brokerage: z.string().max(100).optional(),
 });
 
 /**
@@ -46,8 +44,6 @@ export async function POST(request: NextRequest) {
     .update({
       user_role: parsed.data.user_role ?? null,
       deal_volume: parsed.data.deal_volume ?? null,
-      agent_name: parsed.data.agent_name ?? null,
-      brokerage: parsed.data.brokerage ?? null,
       onboarding_completed: true,
     })
     .eq("id", user.id);
