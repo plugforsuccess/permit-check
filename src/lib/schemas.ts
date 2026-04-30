@@ -51,7 +51,6 @@ export const addressSchema = z.object({
 
 export const lookupInitiateSchema = z.object({
   address: z.string().min(5).max(200).trim(),
-  report_type: z.enum(["standard", "attorney"]).default("standard"),
   address_components: z
     .object({
       streetNumber: z.string(),

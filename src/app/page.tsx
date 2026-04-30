@@ -41,7 +41,6 @@ function HomePageContent() {
         },
         body: JSON.stringify({
           address: address.raw,
-          report_type: "standard",
           address_components: {
             streetNumber: address.streetNumber,
             streetName: address.streetName,

@@ -60,7 +60,6 @@ export interface User {
 
 export interface LookupInitiateRequest {
   address: string;
-  report_type?: "standard" | "attorney";
 }
 
 export interface LookupInitiateResponse {

@@ -19,9 +19,7 @@ export const config = {
   },
   pricing: {
     singleLookup: 999, // $9.99 in cents
-    attorneyReport: 19900, // $199.00 in cents
     buyerPlan: 2900, // $29/month in cents
-    agentPlan: 9900, // $99/month in cents
   },
   app: {
     baseUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",

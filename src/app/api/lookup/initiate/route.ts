@@ -106,7 +106,6 @@ export async function POST(request: NextRequest) {
         address_raw: address,
         address_normalized: addressNormalized,
         status: "pending",
-        report_type: parsed.data.report_type,
         user_id: userId,
         jurisdiction_id: jurisdictionId,
         is_unit: isUnit,

@@ -17,7 +17,6 @@ export interface SendReportEmailParams {
   downloadUrl: string;
   permitCount: number;
   summary: PermitSummary | null;
-  reportType: "standard" | "attorney";
   expiresAt: string;
 }
 
@@ -31,7 +30,6 @@ export async function sendReportEmail(
     downloadUrl,
     permitCount,
     summary,
-    reportType,
     expiresAt,
   } = params;
 
@@ -151,12 +149,6 @@ export async function sendReportEmail(
 
               <!-- Report details -->
               <table cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 24px; background: #f9fafb; border-radius: 8px; overflow: hidden;">
-                <tr>
-                  <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
-                    <span style="font-size: 12px; color: #6b7280;">Report type</span>
-                    <span style="float: right; font-size: 12px; font-weight: 600; color: #111827; text-transform: capitalize;">${reportType}</span>
-                  </td>
-                </tr>
                 <tr>
                   <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
                     <span style="font-size: 12px; color: #6b7280;">Report ID</span>

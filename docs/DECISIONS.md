@@ -11,6 +11,79 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-30 — PR1.6 broad-scope SKU surface deletion
+
+### D27. PR1.6 expanded from narrow (config.pricing only) to broad (full SKU surface)
+- **Conflict:** PR1.6 was originally scoped as "delete `attorney_report` /
+  `agent_plan` from `config.pricing`, delete `src/app/api/subscription/*`,
+  drop unused subscription columns." On execution, the dev's pre-deletion
+  audit surfaced that the narrow scope would leave four orphaned columns
+  (`agent_name`, `brokerage`, `stripe_subscription_id`, `subscription_status`)
+  on `public.users` plus `lookups.report_type` (001) and
+  `reports.matter_reference` (006), with branch logic in
+  `checkout/create/route.ts:102-106` and `webhooks/stripe/route.ts:199-253`
+  that handles 'standard' and 'attorney' paths but where only one ever fires.
+  Half-cleaned SKU code is worse than uncleaned — the orphans become future
+  "what is this for?" questions and nuisance fixes that re-litigate D19/D20.
+- **Resolution:** Expanded PR1.6 to **A2 + B** (broad). Single PR rips out the
+  entire dead subscription/attorney surface:
+  - All four 008 columns: `stripe_subscription_id`, `subscription_status`,
+    `agent_name`, `brokerage`.
+  - `lookups.report_type` (001).
+  - `reports.matter_reference` (006).
+  - `attorneyReport` and `agentPlan` from `src/lib/config.ts`.
+  - `src/app/api/subscription/*` (whole directory).
+  - `src/app/api/lookup/[id]/report-type/` (whole directory — its only purpose
+    was to toggle the SKU).
+  - `src/app/subscribe/page.tsx` (whole route).
+  - `src/lib/subscription.ts` (`hasAgentAccess`, `getSubscriptionMessage`,
+    `getSubscriptionCTA` are dead).
+  - `OnboardingModal` step 2 (name + brokerage fields) — collapsed to a
+    single-step modal (role + volume only).
+  - Dashboard subscription/profile UI block + report_type column display.
+  - PDF brokerage line + entire attorney cover page block in `src/lib/pdf.ts`.
+  - `report_type` branch logic in `checkout/create/route.ts` and
+    `webhooks/stripe/route.ts`; subscription event handlers in
+    `webhooks/stripe/route.ts`; agent branding fetch + attorney-specific
+    PDF storage path branch in `report/[id]/download/route.ts`.
+  - Stripe metadata fields `report_type` + `matter_reference` from
+    `lib/stripe.ts::createCheckoutSession`; the function signature also
+    drops the `reportType` and `matterReference` parameters.
+  - `lookupInitiateSchema.report_type` enum field from `lib/schemas.ts`.
+  - `LookupInitiateRequest.report_type` from `src/types/index.ts`.
+  - `reportType` parameter from `sendReportEmail` and the corresponding
+    "Report type" row in the email HTML.
+  - README references to "litigation-grade attorney reports", "$199
+    attorney-grade reports", and the `report_type` / `matter_reference`
+    column descriptions.
+- **Rationale:** Half-cleaned SKU code is worse than uncleaned. Cleanest
+  moment for the cascade is now — zero paying customers, no live
+  attorney reports, no active agent-subscribers. Every week PermitCheck
+  has real users is a week the cascade gets harder.
+- **Pre-flight audit (read-only via MCP, 2026-04-30):**
+  - All six dropped columns were NULL on every row in prod (verified via
+    `SELECT COUNT(*) WHERE <col> IS NOT NULL` per column — every count = 0).
+  - `pg_depend` showed only auto-droppable dependents: `lookups_report_type_check`,
+    `users_subscription_status_check`, `idx_users_subscription_status`.
+    No FKs, triggers, or views.
+  - The `'attorney'` enum value of `lookups.report_type` was never written
+    to a row in prod — no historical signal lost by dropping the column.
+- **Migration:** `018_drop_sku_columns.sql`. Idempotent (every `DROP COLUMN`
+  uses `IF EXISTS`). Applied direct-to-prod via MCP `apply_migration` under
+  the same expedited path established by D26 (no staging environment exists
+  yet; CI label gate provides the human pause point). Ledger entry
+  canonicalized from auto-generated timestamp to `'018'` matching the file
+  name (same housekeeping pattern as 016/017).
+- **Closes:** D19 (live pricing in code vs. MVP scope — `attorneyReport` and
+  `agentPlan` deleted; D19 remains open only for the `singleLookup` $9.99
+  vs. $29 pricing decision, which is independent of this PR). D20 (attorney
+  report SKU undocumented — SKU now fully removed).
+- **Build verification:** `npm run build` passes cleanly post-change. `npm
+  run lint` shows no PR1.6-introduced errors (only pre-existing
+  `no-html-link-for-pages` warnings unrelated to this work).
+
+-----
+
 ## 2026-04-30 — PR2.8 RLS hardening expedited apply
 
 ### D26. 017 applied direct-to-prod via MCP under expedited path

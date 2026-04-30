@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
         created_at,
         payment_status,
         permit_count,
-        report_type,
         reports (
           id,
           pdf_url,
