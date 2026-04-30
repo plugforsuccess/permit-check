@@ -7,6 +7,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@/": new URL("./src/", import.meta.url).pathname,
+      // The `server-only` marker package throws when imported outside
+      // a Server Component. In tests we're not in a Server Component,
+      // so we alias it to an empty module. This lets us unit-test
+      // server-only modules (refund.ts, supabase/server.ts, etc.)
+      // without server-component runtime.
+      "server-only": new URL("./src/__tests__/server-only-shim.ts", import.meta.url).pathname,
     },
   },
   test: {
