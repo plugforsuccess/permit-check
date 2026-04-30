@@ -22,3 +22,5 @@ process.env.RESEND_API_KEY ??= "re_stub";
 process.env.UPSTASH_REDIS_REST_URL ??= "https://stub.upstash.io";
 process.env.UPSTASH_REDIS_REST_TOKEN ??= "stub_redis_token";
 process.env.CRON_SECRET ??= "stub_cron_secret";
+process.env.INNGEST_EVENT_KEY ??= "stub_inngest_event_key";
+process.env.INNGEST_SIGNING_KEY ??= "stub_inngest_signing_key";

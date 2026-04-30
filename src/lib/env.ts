@@ -53,10 +53,12 @@ const serverSchema = z.object({
   // Google
   GOOGLE_MAPS_SERVER_KEY: z.string().min(1),
 
-  // Inngest — required at boot per SPEC §15. Optional today because the
-  // Inngest path doesn't ship until PR3; mark as required when PR3 lands.
-  INNGEST_EVENT_KEY: z.string().optional(),
-  INNGEST_SIGNING_KEY: z.string().optional(),
+  // Inngest — required at boot per SPEC §15 and per D33: the
+  // USE_INNGEST_REPORTS flag flips in PR6, after which any unset key
+  // here would silently break event signing or webhook auth. Fail-fast
+  // at boot beats a missing-key surprise in production.
+  INNGEST_EVENT_KEY: z.string().min(1),
+  INNGEST_SIGNING_KEY: z.string().min(1),
 
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1),
