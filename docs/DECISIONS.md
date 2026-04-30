@@ -11,6 +11,87 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-30 — PR2.8 RLS hardening expedited apply
+
+### D26. 017 applied direct-to-prod via MCP under expedited path
+- **Conflict:** PR2.8's standard apply path is "staging-first, then prod
+  with `migration-approved` label." No staging Supabase project exists
+  yet. F2 (the dropped self-UPDATE policy on `public.users`) is a
+  **currently-exploitable privilege escalation** — any logged-in user
+  could `PATCH /users?id=eq.<self>` with `{is_admin: true}` and get free
+  reports forever (the `is_admin` flag bypasses payment per migration
+  014). Waiting for staging delays a real fix.
+- **Resolution:** `017_rls_hardening.sql` applied direct-to-prod via the
+  MCP `apply_migration` tool, same expedited path as PR2.7. Justification:
+  (a) F2 is exploitable now; (b) staging environment does not yet exist;
+  (c) the CI `migration-approved` label gate provides the human pause
+  point that staging would have. Migration is fully idempotent (every
+  CREATE POLICY preceded by DROP POLICY IF EXISTS; ALTER TABLE ENABLE
+  RLS is a no-op on already-enabled tables; COMMENT ON TABLE is
+  unconditional). The pattern is **expedited, not standard** — once a
+  staging project exists, all schema migrations route through it before
+  prod, no exceptions.
+- **Scope reduction:** Item 5 of the originally-planned PR2.8 (service-role
+  INSERT policy on `public.profiles`) was **stripped from 017** and
+  deferred to PR4. Reason: project rule that policies live in the same
+  migration as the table they govern. The `public.profiles` table is
+  scheduled for creation in PR4, and its INSERT policy lands there.
+
+-----
+
+## 2026-04-30 — Migration ledger drift (RESOLVED via PR2.7)
+
+### D25. `supabase_migrations.schema_migrations` only records 001–003 on prod
+- **Conflict:** The Supabase project `unjwbyybzfyhiavorcro` has all 15 local
+  migrations' DDL effects present (every column, table, index, and policy from
+  `001`–`015` exists, verified via MCP read-only queries against `pg_class`,
+  `pg_policies`, and `information_schema.columns`), but
+  `supabase_migrations.schema_migrations` only contained rows for
+  `001/002/003`. Twelve migrations were applied through a non-CLI path (almost
+  certainly the SQL Editor) and the ledger never learned about them. Two extra
+  objects existed on prod with **no migration source at all** in the repo:
+  `permits_lookup_record_unique` (UNIQUE on `permits(lookup_id, record_number)`)
+  and `reports_lookup_id_key` (UNIQUE on `reports(lookup_id)`). A
+  `supabase db push` against prod would have attempted to replay `004`–`015`;
+  `009` and `010` are **not safe to replay as written** (the `CREATE POLICY`
+  statements lack `IF NOT EXISTS` guards and would error mid-migration,
+  leaving the schema half-applied). Full forensic detail and replay-safety
+  matrix: `/docs/MIGRATION_LEDGER_AUDIT.md`.
+- **Resolution:** Option A executed in PR2.7 on 2026-04-30. Cameron
+  authorized direct application to prod (skipping the originally-planned
+  staging-first step) because `016_ledger_backfill.sql` is fully idempotent:
+  ledger inserts use `ON CONFLICT (version) DO NOTHING`; the two anomaly
+  constraints are guarded by `pg_constraint` existence checks in `DO $$`
+  blocks. Both anomaly UNIQUEs were verified intentional (required by
+  application code paths — see `016_ledger_backfill.sql` header comment).
+  Post-execution state of `supabase_migrations.schema_migrations`: rows
+  `001`–`016` present, contiguous, matching the repo. Both anomaly
+  constraints captured authoritatively. `supabase db diff` is now expected
+  to return zero schema changes against the repo (not yet run from a clone
+  with CLI access; should be the next staging-up verification).
+- **Operational guardrail (still in effect — does not lapse with D25's
+  resolution):**
+  1. ~~No `supabase db push` against prod.~~ Theoretically safe again
+     post-PR2.7, but the label gate below makes it moot — no migration
+     reaches prod without the CI guardrail passing.
+  2. ~~No `supabase migration up` against prod.~~ Same as above.
+  3. **Every PR that touches `/supabase/migrations/**` requires the
+     `migration-approved` label** before it can merge. Enforced by
+     `.github/workflows/migration-guard.yml`. Only Cameron grants the
+     label, after either staging verification or an explicit
+     known-idempotent override (the latter is what happened for PR2.7).
+  4. All DDL changes to prod continue to flow through the SQL Editor or
+     the MCP `apply_migration` tool — both write the file *and* the
+     ledger row atomically, the way `001/002/003` originally landed.
+  5. Staging environments rebuild cleanly from `/supabase/migrations`
+     against an empty DB and are the default proving ground for any
+     migration before prod. (As of 2026-04-30 there is no staging
+     project; setup is its own follow-up.)
+
+  Full operational policy: `/docs/MIGRATION_GUARDRAIL.md`.
+
+-----
+
 ## 2026-04-29 — Week 1 audit findings (open)
 
 ### D19. Live pricing in code vs. MVP scope

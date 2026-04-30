@@ -617,10 +617,13 @@ CREATE POLICY "Users read own reports" ON reports
 
 ### Week 1 — Foundations
 
-- **PR1**: Docs reconciliation — `/CLAUDE.md`, `/docs/CLAUDE-deep.md`, `/docs/SPEC.md`, `/docs/DECISIONS.md`
-- **PR1.5**: Push `CLAUDE-deep.md` if not already in repo
+- **PR1**: Docs reconciliation — `/CLAUDE.md`, `/docs/SPEC.md`, `/docs/DECISIONS.md` (single combined `CLAUDE.md`, no split deep file)
+- **PR1.5**: Collapse the previously-split agent operating manual into a single combined `CLAUDE.md` (Part I / Part II structure)
 - **PR1.6**: Delete unused pricing SKUs (`attorney_report`, `agent_plan`), `src/app/api/subscription/*`, drop unused columns via new migration
-- **PR2.5**: RLS audit — read `010_fix_rls_policies.sql`, document effective policies on every user-data table, propose `017_rls_hardening.sql` if any `FOR ALL USING (true)` survives for non-service roles
+- **PR2.5**: RLS audit — read `010_fix_rls_policies.sql`, document effective policies on every user-data table, propose `017_rls_hardening.sql` if any `FOR ALL USING (true)` survives for non-service roles. Output: `/docs/RLS_AUDIT.md`
+- **PR2.6**: Migration ledger audit — `supabase_migrations.schema_migrations` on prod only records `001/002/003` while DDL from `004`–`015` is fully present. Forensic reconstruction, per-migration replay-safety matrix, backfill plan (Option A insert rows + anomaly capture, vs Option B squash to baseline), operational guardrail blocking `supabase db push` against prod until reconciled. Audit only — no execution. Output: `/docs/MIGRATION_LEDGER_AUDIT.md`. See DECISIONS.md D25.
+- **PR2.7**: Migration ledger backfill (Option A executed). `016_ledger_backfill.sql` records `004`–`015` and authoritatively captures the two anomaly UNIQUEs. Applied to prod 2026-04-30 (idempotent migration; staging-first step skipped with Cameron approval). CI guardrail `.github/workflows/migration-guard.yml` requires `migration-approved` label on every PR touching `supabase/migrations/`. Operational policy: `/docs/MIGRATION_GUARDRAIL.md`.
+- **PR2.8**: `017_rls_hardening.sql` — four items: (F1) recreate scoped service-role ALL policy on `reports`; (F2 option a) drop self-UPDATE on `users` after grep-verified zero client-side anon-key writes; (F3) `COMMENT ON TABLE summary_feedback` + idempotent `ALTER TABLE ENABLE ROW LEVEL SECURITY`; (4) service-role INSERT policy on `users`. The originally-planned item 5 (service-role INSERT policy on `profiles`) is deferred to PR4 — policies live in the same migration as the table they govern. Subject to `migration-approved` label gate. See DECISIONS.md D26 for the expedited direct-to-prod apply path.
 - **PR2**: Zod-validated env + import discipline + PII redaction in logger + Axiom transport
 - **PR3**: Inngest + `@anthropic-ai/sdk` deps + scaffold `/lib/agent/` boundary
 
