@@ -1,3 +1,6 @@
+import { env } from "@/lib/env";
+import { log } from "@/lib/logger";
+
 /**
  * Accela Citizen Access scraper using Playwright.
  *
@@ -297,9 +300,12 @@ async function scrapeModuleWithFallback(
   // Fallback 1 — street name only (no suffix, no quadrant)
   // e.g. "1278 GREENWICH ST SW" → search "1278 GREENWICH"
   if (parsed.streetName) {
-    console.log(
-      `[accela-scraper] Zero results — trying street name only: "${parsed.streetNumber} ${parsed.streetName}"`
-    );
+    log.info("scraper: zero results — trying street name only", {
+      step_name: "accela_scrape",
+      event_type: "fallback_street_name",
+      street_number: parsed.streetNumber,
+      street_name: parsed.streetName,
+    });
 
     const looseParsed = {
       ...parsed,
@@ -327,9 +333,12 @@ async function scrapeModuleWithFallback(
         });
 
         if (filtered.length > 0) {
-          console.log(
-            `[accela-scraper] Street name fallback found ${filtered.length} permits (${loosePermits.length} before filter)`
-          );
+          log.info("scraper: street name fallback found permits", {
+            step_name: "accela_scrape",
+            event_type: "fallback_street_name_match",
+            permits_after_filter: filtered.length,
+            permits_before_filter: loosePermits.length,
+          });
           return {
             permits: filtered,
             usedFallback: true,
@@ -351,9 +360,12 @@ async function scrapeModuleWithFallback(
       if (adjacentNum <= 0) continue; // skip non-positive street numbers
 
       const adjacentStr = String(adjacentNum);
-      console.log(
-        `[accela-scraper] Zero results — trying adjacent number: "${adjacentStr} ${parsed.streetName}"`
-      );
+      log.info("scraper: zero results — trying adjacent street number", {
+        step_name: "accela_scrape",
+        event_type: "fallback_adjacent_number",
+        adjacent_number: adjacentStr,
+        street_name: parsed.streetName,
+      });
 
       const adjacentParsed = { ...parsed, streetNumber: adjacentStr };
 
@@ -375,9 +387,12 @@ async function scrapeModuleWithFallback(
           });
 
           if (verified.length > 0) {
-            console.log(
-              `[accela-scraper] Adjacent number fallback found ${verified.length} permits at ${adjacentStr}`
-            );
+            log.info("scraper: adjacent number fallback found permits", {
+              step_name: "accela_scrape",
+              event_type: "fallback_adjacent_match",
+              adjacent_number: adjacentStr,
+              permits: verified.length,
+            });
             return {
               permits: verified,
               usedFallback: true,
@@ -431,9 +446,13 @@ async function scrapeModuleWithRetry(
         err
       );
       if (attempt < MAX_ATTEMPTS) {
-        console.log(
-          `[accela-scraper] Retrying ${mod.name} in ${RETRY_DELAY_MS / 1000} seconds...`
-        );
+        log.warn("scraper: retrying module after failure", {
+          step_name: "accela_scrape",
+          event_type: "module_retry",
+          module: mod.name,
+          attempt,
+          retry_delay_ms: RETRY_DELAY_MS,
+        });
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       }
     } finally {
@@ -459,9 +478,12 @@ export async function scrapeAccelaPermits(
   const normalizedAddress = `${streetNumber} ${streetName}`;
   const parsed = parseAddressForPortal(normalizedAddress);
 
-  console.log(
-    `[accela-scraper] Jurisdiction: ${jurisdiction.name} | modules: ${jurisdiction.modules.map((m) => m.name).join(", ")}`
-  );
+  log.info("scraper: starting jurisdiction scrape", {
+    step_name: "accela_scrape",
+    event_type: "jurisdiction_start",
+    jurisdiction: jurisdiction.name,
+    modules: jurisdiction.modules.map((m) => m.name),
+  });
 
   try {
     browser = await launchBrowser();
@@ -477,7 +499,11 @@ export async function scrapeAccelaPermits(
 
     // Scrape each module sequentially with retry on failure
     for (const mod of jurisdiction.modules) {
-      console.log(`[accela-scraper] Scraping module: ${mod.name}`);
+      log.info("scraper: scraping module", {
+        step_name: "accela_scrape",
+        event_type: "module_start",
+        module: mod.name,
+      });
 
       const { permits: modulePermits, usedFallback, rawCountBeforeFilter } =
         await scrapeModuleWithRetry(
@@ -490,9 +516,11 @@ export async function scrapeAccelaPermits(
 
       if (usedFallback) {
         usedFuzzyMatch = true;
-        console.log(
-          `[accela-scraper] Module ${mod.name}: used fuzzy fallback`
-        );
+        log.info("scraper: module used fuzzy fallback", {
+          step_name: "accela_scrape",
+          event_type: "module_used_fallback",
+          module: mod.name,
+        });
       }
 
       // Tag each permit with its source module
@@ -513,9 +541,13 @@ export async function scrapeAccelaPermits(
       const countForTruncation = rawCountBeforeFilter ?? modulePermits.length;
       if (countForTruncation >= 100) anyTruncated = true;
 
-      console.log(
-        `[accela-scraper] Module ${mod.name}: ${modulePermits.length} records, ${newCount} new`
-      );
+      log.info("scraper: module complete", {
+        step_name: "accela_scrape",
+        event_type: "module_complete",
+        module: mod.name,
+        records: modulePermits.length,
+        new_records: newCount,
+      });
 
       // Pause between modules to avoid rate limiting
       if (jurisdiction.modules.indexOf(mod) < jurisdiction.modules.length - 1) {
@@ -523,12 +555,14 @@ export async function scrapeAccelaPermits(
       }
     }
 
-    console.log(
-      `[accela-scraper] Total: ${allPermits.length} unique permit records across all modules`
-    );
+    log.info("scraper: total unique permits across modules", {
+      step_name: "accela_scrape",
+      event_type: "scrape_total",
+      total_records: allPermits.length,
+    });
 
     // Selectively fetch inspection history for high-signal permits
-    const FETCH_INSPECTION_HISTORY = process.env.FETCH_INSPECTION_HISTORY === "true";
+    const FETCH_INSPECTION_HISTORY = env.FETCH_INSPECTION_HISTORY;
     const HIGH_SIGNAL_STATUSES = new Set(["Expired", "In Review"]);
     const COMPLAINT_TYPES = /complaint|violation|code/i;
 
@@ -555,9 +589,11 @@ export async function scrapeAccelaPermits(
       : [];
 
     if (detailFetchTargets.length > 0) {
-      console.log(
-        `[accela-scraper] Fetching inspection history for ${detailFetchTargets.length} permits`
-      );
+      log.info("scraper: fetching inspection history", {
+        step_name: "accela_scrape",
+        event_type: "inspection_fetch_start",
+        permit_count: detailFetchTargets.length,
+      });
 
       const detailPage = await context.newPage();
       detailPage.setDefaultTimeout(15000);
@@ -573,9 +609,12 @@ export async function scrapeAccelaPermits(
         permit.inspections = inspections;
 
         if (inspections.length > 0) {
-          console.log(
-            `[accela-scraper] ${permit.recordNumber}: ${inspections.length} inspection records`
-          );
+          log.info("scraper: inspection records found", {
+            step_name: "accela_scrape",
+            event_type: "inspection_records_found",
+            record_number: permit.recordNumber,
+            inspections: inspections.length,
+          });
         }
 
         // Brief pause between detail page fetches

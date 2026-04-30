@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "./env";
 
 /**
  * Paths that use their own authentication and don't need origin checks.
@@ -39,7 +40,7 @@ export function originMiddleware(request: NextRequest): NextResponse | null {
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const baseUrl = env.NEXT_PUBLIC_APP_URL;
   const allowedOrigins = [
     baseUrl,
     "http://localhost:3000",

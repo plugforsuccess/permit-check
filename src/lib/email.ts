@@ -1,11 +1,12 @@
 import { Resend } from "resend";
+import { env } from "./env";
 import type { PermitSummary } from "./summary";
 
 let resendInstance: Resend | null = null;
 
 function getResend(): Resend {
   if (!resendInstance) {
-    resendInstance = new Resend(process.env.RESEND_API_KEY);
+    resendInstance = new Resend(env.RESEND_API_KEY);
   }
   return resendInstance;
 }
@@ -33,8 +34,8 @@ export async function sendReportEmail(
     expiresAt,
   } = params;
 
-  const fromEmail = process.env.EMAIL_FROM || "reports@permitcheck.org";
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://permitcheck.org";
+  const fromEmail = env.EMAIL_FROM;
+  const appUrl = env.NEXT_PUBLIC_APP_URL;
   const reportUrl = `${appUrl}/results/${lookupId}`;
   const expiryDate = new Date(expiresAt).toLocaleDateString("en-US", {
     month: "long",

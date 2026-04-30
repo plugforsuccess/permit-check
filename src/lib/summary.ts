@@ -3,6 +3,8 @@ import type { PropertyData } from "./property-data";
 import { formatPropertyContext, yearsSinceLastSale } from "./property-data";
 import { extractListingClaims, formatClaimsForPrompt, extractYearReferences } from "./listing-parser";
 import { permitSummarySchema } from "./schemas";
+import { env } from "./env";
+import { log } from "./logger";
 
 /**
  * Zero Permit Edge Cases
@@ -275,10 +277,11 @@ ${claimsCrossRef || "No specific renovation claims detected in listing text.\n"}
     );
 
     if (highSeverityUnmatched.length > 0) {
-      console.log(
-        "[summary] High-severity unmatched claims:",
-        highSeverityUnmatched.map((c) => c.type).join(", ")
-      );
+      log.info("summary: high-severity unmatched listing claims", {
+        step_name: "summary_listing_match",
+        event_type: "unmatched_claims",
+        claim_types: highSeverityUnmatched.map((c) => c.type),
+      });
     }
   }
 
@@ -426,7 +429,7 @@ Risk level guide:
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "x-api-key": env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({

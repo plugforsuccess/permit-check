@@ -2,11 +2,12 @@
 
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { createContext, useContext, useState, useCallback } from "react";
+import { env } from "@/lib/env";
 
 const MapsReadyContext = createContext(false);
 export const useMapsReady = () => useContext(MapsReadyContext);
 
-const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+const apiKey = env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export default function GoogleMapsProvider({
   children,

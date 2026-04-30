@@ -6,6 +6,9 @@
  * Docs: https://developer.realestateapi.com/reference/property-detail-api-1
  */
 
+import { env } from "./env";
+import { log } from "./logger";
+
 export interface PropertyData {
   beds: number | null;
   baths: number | null;
@@ -25,9 +28,12 @@ const REAPI_BASE = "https://api.realestateapi.com/v2/PropertyDetail";
 export async function fetchPropertyData(
   address: string
 ): Promise<PropertyData | null> {
-  const apiKey = process.env.REAPI_API_KEY;
+  const apiKey = env.REAPI_API_KEY;
   if (!apiKey) {
-    console.warn("[property-data] REAPI_API_KEY not set — skipping enrichment");
+    log.warn("property-data: REAPI_API_KEY not set — skipping enrichment", {
+      step_name: "property_data_fetch",
+      event_type: "config_missing",
+    });
     return null;
   }
 

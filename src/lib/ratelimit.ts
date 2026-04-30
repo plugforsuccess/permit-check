@@ -1,15 +1,22 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import { validateEnv } from "@/lib/env";
+import { env } from "@/lib/env";
+import { log } from "@/lib/logger";
+
+function makeRedis(): Redis {
+  return new Redis({
+    url: env.UPSTASH_REDIS_REST_URL,
+    token: env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
 
 // Lazy singleton — only instantiated on first call
 let _ratelimit: Ratelimit | null = null;
 
 function getRatelimit(): Ratelimit {
   if (!_ratelimit) {
-    validateEnv();
     _ratelimit = new Ratelimit({
-      redis: Redis.fromEnv(),
+      redis: makeRedis(),
       limiter: Ratelimit.slidingWindow(5, "60 s"),
       analytics: true,
     });
@@ -35,9 +42,8 @@ let _statusRatelimit: Ratelimit | null = null;
 
 function getStatusRatelimit(): Ratelimit {
   if (!_statusRatelimit) {
-    validateEnv();
     _statusRatelimit = new Ratelimit({
-      redis: Redis.fromEnv(),
+      redis: makeRedis(),
       limiter: Ratelimit.slidingWindow(60, "60 s"),
       analytics: true,
     });
@@ -53,15 +59,13 @@ export async function rateLimitStatus(identifier: string): Promise<boolean> {
 export async function rateLimit(identifier: string): Promise<boolean> {
   const { success } = await getRatelimit().limit(identifier);
   if (!success) {
-    // Structured logging for rate limit events — helps detect abuse patterns
-    console.warn(
-      JSON.stringify({
-        level: "WARN",
-        msg: "Rate limit exceeded",
-        identifier: identifier.replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/, "[REDACTED_IP]"),
-        timestamp: new Date().toISOString(),
-      })
-    );
+    log.warn("ratelimit: exceeded", {
+      step_name: "ratelimit",
+      event_type: "ratelimit_exceeded",
+      // Redact IPs from rate-limit identifiers; helps detect abuse patterns
+      // without leaking address-bearing identifiers into logs.
+      identifier: identifier.replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/, "[REDACTED_IP]"),
+    });
   }
   return success;
 }
