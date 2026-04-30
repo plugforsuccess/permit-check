@@ -11,6 +11,50 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-30 — PR4 user-data write pattern (permanent)
+
+### D32. User-data tables use service-role-only writes; no anon-key write policies
+- **Conflict (surfaced during PR4 verification):** PR4's approved scope
+  for `public.profiles` included an own-row UPDATE policy with `WITH
+  CHECK` pinning privileged columns. Implementation shipped without
+  any self-UPDATE policy, deviating from approved scope. The deviation
+  was driven by the F2 lesson from PR2.8: `users.UPDATE` originally
+  shipped as `USING (auth.uid() = id)` with no `WITH CHECK`, which
+  permitted any logged-in user to PATCH `is_admin = true` and bypass
+  payment. F2's resolution dropped the self-UPDATE policy entirely
+  and routed all profile writes through Server Actions on the service
+  role. Replicating that pattern on `profiles` from day one is safer
+  than re-introducing a `WITH CHECK`-pinned column list that rots as
+  schemas evolve.
+- **Resolution:** **User-data tables use service-role-only writes; no
+  anon-key write policies.** Both `public.users` (post-PR2.8 F2) and
+  `public.profiles` (PR4) ship without authenticated INSERT or UPDATE
+  policies. All writes route through Server Actions running with the
+  service role. **This is the permanent pattern for any future user-data
+  table; do not add own-row UPDATE policies even with `WITH CHECK`
+  clauses.**
+- **Rationale:** F2 surfaced that `WITH CHECK`-pinned column lists rot
+  as schemas evolve. Every privileged column has to be remembered in
+  the `WITH CHECK` clause; adding a new privileged column later without
+  updating the policy is the next privilege-escalation hole. Service-
+  role-only writes invert the default — clients cannot write at all,
+  server code explicitly chooses what to write. Adding columns later
+  doesn't introduce risk. The cost is one Server Action per write
+  path; the benefit is a permanently closed escalation surface.
+- **Consequence for code:** Every Server Action that writes to user-data
+  tables must use the service-role client (`getSupabaseAdmin()` /
+  `createServerClient()`), not the user-context client. Any code path
+  that needs to write to these tables from the user's request context
+  routes through a Server Action; the request never touches the table
+  directly.
+- **Process note:** The PR4 deviation produced the better result, but
+  the process was off — the dev decided inside execution rather than
+  surfacing the contradiction with approved scope first. Reinforced
+  going forward: scope conflict found → stop and surface → wait for
+  approval → execute. Not "deviate-and-surface-in-verification."
+
+-----
+
 ## 2026-04-30 — PR1.6 broad-scope SKU surface deletion
 
 ### D27. PR1.6 expanded from narrow (config.pricing only) to broad (full SKU surface)
