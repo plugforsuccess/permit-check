@@ -1,4 +1,31 @@
 /**
+ * Schema status: TENTATIVE (PR3 scaffold).
+ *
+ * These schemas are best-guess shapes for PR3 scaffolding based on SPEC §10.
+ * Real implementations will surface real shapes when tools and steps are
+ * wired up:
+ *   - PR5  → NormalizeOutput, ParcelOutput (in /src/lib/agent/steps/)
+ *   - PR6  → PlanOutput, GatherOutput, AnalyzeOutput, generate output
+ *
+ * Expect schema revisions in those PRs. When revising:
+ *   1. Update the schema here.
+ *   2. Update SPEC §10 to match.
+ *   3. Update PR_ROADMAP.md if a downstream PR's scope shifts.
+ *
+ * LOAD-BEARING — DO NOT DROP IN ANY REVISION:
+ * The system-attestation surface required by PR9_SCOPE.md must survive any
+ * future schema revision. Specifically these fields (or their successors
+ * by another name, only after explicit Cameron sign-off):
+ *   - system_category
+ *   - attestation_status
+ *   - system_attestation_profile
+ *   - unattested_systems
+ * They are locked by D29/D30 strategic decisions; downstream products
+ * depend on them. If a revision needs to rename or restructure these,
+ * that's a separate scope-affecting change, not a freebie inside PR5/PR6.
+ *
+ * ---
+ *
  * Zod schemas for the six agent tools described in SPEC §10.
  *
  * Every tool takes a Zod-validated input and returns a Zod-validated output —
