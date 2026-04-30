@@ -2,11 +2,11 @@
 -- PR2.8 — RLS hardening per /docs/RLS_AUDIT.md §H and PR2.8 scope.
 --
 -- This migration is fully idempotent. Every CREATE POLICY is preceded by
--- DROP POLICY IF EXISTS; every other DDL is conditional via IF EXISTS or
--- to_regclass guards. Safe to apply against prod, fresh staging, or any
--- partially-migrated state.
+-- DROP POLICY IF EXISTS; every other DDL is conditional or already
+-- guarded by IF EXISTS / ENABLE RLS no-op semantics. Safe to apply
+-- against prod, fresh staging, or any partially-migrated state.
 --
--- Five items:
+-- Four items:
 --   F1 — Recreate scoped service-role ALL policy on public.reports.
 --        Migration 010 dropped the original FOR ALL USING (true) version
 --        and did not recreate a scoped replacement. This restores parity
@@ -25,12 +25,12 @@
 --        magic-link. Today the policy is functionally redundant (service
 --        role bypasses RLS), but explicit-policy + intent-comment is the
 --        project standard.
---   5  — Service-role INSERT policy on public.profiles. The table does
---        not yet exist (scheduled for PR4). The block uses to_regclass
---        guards so it is a no-op when profiles is absent and creates the
---        policy when present. PR4's profiles-creation migration MUST
---        include this policy directly so that a fresh staging DB
---        applying 017 → PR4-migration in order ends up with the policy.
+--
+-- DEFERRED: A service-role INSERT policy on public.profiles was originally
+-- scoped as item 5 of this migration. Per the project rule that policies
+-- live in the same migration as the table, the profiles INSERT policy is
+-- deferred to PR4 — it lands inside whichever migration creates the
+-- public.profiles table. See SPEC §11 / DECISIONS.md.
 --
 -- See RLS_AUDIT.md for full grading and rationale per table.
 
@@ -71,29 +71,8 @@ CREATE POLICY "Service role inserts users"
   FOR INSERT
   WITH CHECK (auth.role() = 'service_role');
 
--- ---------------------------------------------------------------------
--- Item 5 — Service-role INSERT policy on public.profiles (conditional)
--- ---------------------------------------------------------------------
--- The profiles table is scheduled for PR4. This block runs the policy
--- DDL only if the table exists at apply time. On prod (2026-04-30), the
--- table does not yet exist — this block emits a NOTICE and does nothing.
--- PR4's profiles-creation migration MUST include this policy directly
--- so that a fresh staging DB applying 017 then PR4 migrations in order
--- ends up with the policy in place.
-DO $$
-BEGIN
-  IF to_regclass('public.profiles') IS NOT NULL THEN
-    EXECUTE 'DROP POLICY IF EXISTS "Service role inserts profiles" ON public.profiles';
-    EXECUTE $POLICY$
-      CREATE POLICY "Service role inserts profiles"
-        ON public.profiles
-        FOR INSERT
-        WITH CHECK (auth.role() = 'service_role')
-    $POLICY$;
-    RAISE NOTICE '017: created "Service role inserts profiles" on existing public.profiles.';
-  ELSE
-    RAISE NOTICE '017: public.profiles does not yet exist; INSERT policy deferred to PR4 (PR4 must include this policy in its profiles-creation migration).';
-  END IF;
-END $$;
+-- Item 5 (service-role INSERT policy on public.profiles) is intentionally
+-- omitted; deferred to PR4's profiles-creation migration per the rule
+-- that policies live in the same migration as the table they govern.
 
 COMMIT;
