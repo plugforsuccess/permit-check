@@ -625,12 +625,12 @@ CREATE POLICY "Users read own reports" ON reports
 - **PR2.7**: Migration ledger backfill (Option A executed). `016_ledger_backfill.sql` records `004`–`015` and authoritatively captures the two anomaly UNIQUEs. Applied to prod 2026-04-30 (idempotent migration; staging-first step skipped with Cameron approval). CI guardrail `.github/workflows/migration-guard.yml` requires `migration-approved` label on every PR touching `supabase/migrations/`. Operational policy: `/docs/MIGRATION_GUARDRAIL.md`.
 - **PR2.8**: `017_rls_hardening.sql` — four items: (F1) recreate scoped service-role ALL policy on `reports`; (F2 option a) drop self-UPDATE on `users` after grep-verified zero client-side anon-key writes; (F3) `COMMENT ON TABLE summary_feedback` + idempotent `ALTER TABLE ENABLE ROW LEVEL SECURITY`; (4) service-role INSERT policy on `users`. The originally-planned item 5 (service-role INSERT policy on `profiles`) is deferred to PR4 — policies live in the same migration as the table they govern. Subject to `migration-approved` label gate. See DECISIONS.md D26 for the expedited direct-to-prod apply path.
 - **PR2**: Zod-validated env + import discipline + PII redaction in logger + Axiom transport
-- **PR3**: Inngest + `@anthropic-ai/sdk` deps + scaffold `/lib/agent/` boundary
+- **PR3**: Inngest + `@anthropic-ai/sdk` deps + scaffold `/lib/agent/` boundary. Pattern (i) single Inngest function `report.requested` with eight semantic-named `step.run` calls (normalize, parcel, plan, gather, analyze, depth, generate, deliver). Each step is a stub throwing "not implemented" — orchestrator is registered but never invoked while `USE_INNGEST_REPORTS=false`. `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` stay `.optional()` in `env.ts`; flipped to required in PR5.
 
 ### Week 2 — Data layer
 
 - **PR4**: Per-property cache schema migration (parallel tables, RLS, indexes)
-- **PR5**: Stripe webhook → Inngest handoff behind `USE_INNGEST_REPORTS` flag. Acceptance includes flipping flag in staging same day, prod within 48 hours
+- **PR5**: Stripe webhook → Inngest handoff behind `USE_INNGEST_REPORTS` flag. Acceptance includes flipping flag in staging same day, prod within 48 hours. **Also flip `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` from `.optional()` to `.string().min(1)` in `env.ts`, and verify both are set in Vercel before merging** — the Inngest path now produces real events, so missing keys must fail-fast at boot rather than silently succeed.
 - Port existing Atlanta scraper into the new tool function pattern
 - Wrap scrapers as Zod-typed tools
 
