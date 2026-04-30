@@ -11,6 +11,79 @@ rather than editing it in place.
 
 -----
 
+## 2026-04-30 — PR5 prep: flag-flip ceremony, anonymous payments, intent default
+
+### D33. `USE_INNGEST_REPORTS` flag-flip ceremony moves from PR5 to PR6
+- **Conflict:** The original cutover rule (specified before the agent
+  loop scaffolding strategy was finalized) said `USE_INNGEST_REPORTS`
+  flips to `true` in staging the same day PR5 merges, and in prod
+  within 48h. PR3 ships the orchestrator with eight `step.run` calls
+  that all throw `not_implemented` until real implementations land.
+  Flipping the flag in PR5 with stub steps produces only failed report
+  runs — no useful signal, only Inngest dashboard noise.
+- **Resolution:** **The flip ceremony moves from PR5 to PR6.** PR5
+  ships the plumbing with `USE_INNGEST_REPORTS=false` as the default.
+  The flag flips to `true` in staging the same day PR6 (deterministic
+  steps 1+2: normalize + parcel) lands, and to prod within 48h of
+  staging verification. The 48-hour staging-to-prod window is unchanged;
+  only the trigger PR moves.
+- **Why this gets a `DECISIONS.md` entry instead of just doing it:** A
+  deviation from a documented rule, even a correct deviation, lands in
+  the docs or it becomes precedent for "we don't have to follow the
+  documented rule when it's inconvenient." Document the change, follow
+  the changed rule, hold the line. Same logic as the staging
+  conversation (D26 pre-customer extension) and the schema-deviation
+  process note (D32 process tail).
+- **Affected files:** `docs/PR_ROADMAP.md` PR5 entry (rule rewritten);
+  PR6 entry (flip ceremony added as acceptance).
+
+### D34. Anonymous payments stay on legacy path during the dual-path window
+- **Conflict:** `reports_v2.user_id` is `NOT NULL` (PR4 / migration 019).
+  Legacy `lookups.user_id` is nullable — anonymous lookups exist today.
+  When `USE_INNGEST_REPORTS=true` flips (PR6), an anonymous payer's
+  `reports_v2` insert fails on the NOT NULL constraint.
+- **Resolution:** During the dual-path window, payments where
+  `lookups.user_id IS NULL` route to the **legacy inline path** instead
+  of the new Inngest path. The new path's branch logic in
+  `src/app/api/webhooks/stripe/route.ts` checks `lookup.user_id` first
+  and falls through to legacy when null. The branch is named explicitly
+  (not a buried `if (!user_id)`) and tagged with a `TODO(D34)` comment
+  pointing here.
+- **Trigger to retire:** PR8 (magic-link auth) makes authentication a
+  precondition for payment. After PR8 ships, unauthenticated checkout
+  paths are removed and the D34 branch is unreachable. **The branch
+  deletion happens in PR8 itself, not as a follow-up** — same PR that
+  removes the unauth path also removes the dead-code branch.
+- **Do not** migrate this branch's logic into a permanent design
+  pattern. It exists to bridge a known gap during a known window.
+
+### D35. Report intent hardcoded to `"flip"` until form collection ships
+- **Conflict:** The `report.requested` Inngest event schema (PR3,
+  `src/inngest/orchestrator.ts`) requires
+  `intent: "flip" | "rental" | "primary_residence" | "portfolio_hold"`.
+  The current lookup form does not collect investor intent. PR5 needs
+  to emit the event from the Stripe webhook with a populated `intent`.
+- **Resolution:** **PR5 hardcodes `intent: "flip"`** in the
+  `report.requested` event payload via a named constant
+  (`DEFAULT_REPORT_INTENT` in `src/lib/agent/schemas.ts` or a sibling
+  constants file) so the future form-rebuild PR is a one-line change,
+  not a grep-and-replace. The constant carries a `TODO(D35)` comment
+  pointing here.
+- **Why "flip" specifically (not "rental" or another default):** Flip
+  is the most common investor case in the target Atlanta-metro market.
+  More importantly, the planning step's behavior on flip-intent
+  (prioritize unpermitted-work detection and open-permit inheritance,
+  per SPEC §10 Step 3) is the **safest default**. A flip-tuned report
+  on a rental property still surfaces the right red flags even if the
+  framing is slightly off. The reverse — a rental-tuned report on a
+  flip property — misses the most expensive failure modes. The
+  asymmetry favors flip-intent as the conservative default.
+- **Trigger to retire:** when the lookup form is rebuilt to collect
+  intent (separate post-MVP PR). Until then, every report runs as
+  flip-intent.
+
+-----
+
 ## 2026-04-30 — PR4 user-data write pattern (permanent)
 
 ### D32. User-data tables use service-role-only writes; no anon-key write policies
