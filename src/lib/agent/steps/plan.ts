@@ -16,6 +16,19 @@ export const intentSchema = z.enum([
 ]);
 export type Intent = z.infer<typeof intentSchema>;
 
+/**
+ * Default intent emitted on every `report.requested` event until the
+ * lookup form is rebuilt to collect investor intent (post-MVP form
+ * rebuild PR). Per D35: "flip" is the safe asymmetric default — its
+ * planning bias toward unpermitted-work + open-permit-inheritance still
+ * surfaces the right red flags on rental properties; the reverse misses
+ * the most expensive failure modes.
+ *
+ * TODO(D35): replace with form-collected value when intent capture
+ * ships. Single-line change at the import site once the form lands.
+ */
+export const DEFAULT_REPORT_INTENT: Intent = "flip";
+
 export const planInputSchema = z.object({
   normalized: normalizeOutputSchema,
   parcel: parcelOutputSchema,
