@@ -37,6 +37,43 @@ rather than editing it in place.
 - **Affected files:** `docs/PR_ROADMAP.md` PR5 entry (rule rewritten);
   PR6 entry (flip ceremony added as acceptance).
 
+### D33 (amended 2026-04-30 with PR6) — flip on prod Vercel directly until staging exists
+
+- **Original rule (above):** "same-day staging flip of
+  `USE_INNGEST_REPORTS=true` after PR6 merge; prod flip within 48h of
+  staging verification."
+- **Amendment:** PermitCheck has no staging Vercel environment and no
+  staging Supabase (per D26). The 48-hour staging-then-prod window
+  collapses to **"flip on prod Vercel directly"** until the staging
+  environments are provisioned. PR6 verification ceremony happens by
+  paying $29 in Stripe test mode against prod Vercel, observing the
+  `reports_v2` row + Inngest event + `step_started`/`step_completed`
+  events for normalize + parcel + the expected step 3 throw. The 48-hour
+  observation window still happens — just on prod, not on staging.
+- **Trigger to retire amendment:** same as D26 — first non-Cameron $29
+  settlement triggers staging provisioning across **both** Supabase
+  (D26) and Vercel (this amendment). After staging exists across both
+  surfaces, the original 48-hour staging-then-prod window applies to
+  all future flag flips. No "one more direct-to-prod" — first paying
+  customer is the hard cutoff for both staging gates.
+- **Operational ceremony for PR6 specifically:**
+  1. PR6 merges → prod Vercel redeploys → set `USE_INNGEST_REPORTS=true`
+     in Vercel Production env vars.
+  2. Run a $29 Stripe test-mode payment against the live site
+     (Cameron's test card).
+  3. Verify in prod Supabase: `reports_v2` row exists, normalized data
+     flows through, parcel resolved, `report_events` shows 4 rows
+     (started/completed for normalize and parcel).
+  4. Verify the agent loop fails at step 3 (plan) with `not_implemented`
+     — that's expected through PR9.
+  5. Verify the auto-refund handler fired: `reports_v2.status='failed'`,
+     `report_events` includes `event_type='refunded'`, Stripe shows the
+     test-mode payment refunded with `idempotency_key` matching
+     `reports_v2.id`.
+  6. Observe for 48 hours before authorizing PR7 (eval harness, which
+     runs against the deterministic-only path PR6 just shipped).
+
+
 ### D34. Anonymous payments stay on legacy path during the dual-path window
 - **Conflict:** `reports_v2.user_id` is `NOT NULL` (PR4 / migration 019).
   Legacy `lookups.user_id` is nullable — anonymous lookups exist today.
