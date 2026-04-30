@@ -22,6 +22,8 @@ Next.js 16 (App Router) · TypeScript strict · Supabase (Postgres + Auth + Stor
 
 > Recent Next.js may not match training data. Check `node_modules/next/dist/docs/` before writing routes, layouts, or server actions.
 
+> Inngest 4.x uses a 2-arg `createFunction(options, handler)` signature with triggers folded into `options.triggers[]` — older training data may show the 3-arg shape. Check the installed version's types before drafting handlers.
+
 -----
 
 ## The agent boundary
