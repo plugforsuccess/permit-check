@@ -24,3 +24,5 @@ process.env.UPSTASH_REDIS_REST_TOKEN ??= "stub_redis_token";
 process.env.CRON_SECRET ??= "stub_cron_secret";
 process.env.INNGEST_EVENT_KEY ??= "stub_inngest_event_key";
 process.env.INNGEST_SIGNING_KEY ??= "stub_inngest_signing_key";
+process.env.REAPI_API_KEY ??= "stub_reapi_key";
+process.env.HEALTH_CHECK_ALERT_EMAIL ??= "alerts@example.test";
