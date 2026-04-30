@@ -167,7 +167,7 @@ rather than editing it in place.
 
 ## 2026-04-29 — Week 1 audit findings (open)
 
-### D19. Live pricing in code vs. MVP scope
+### D19. Live pricing in code vs. MVP scope (RESOLVED 2026-04-30)
 - **Conflict:** `src/lib/config.ts:20–25` ships `singleLookup: 999` ($9.99),
   `attorneyReport: 19900` ($199), `buyerPlan: 2900` ($29/mo), `agentPlan: 9900`
   ($99/mo). D8 ruled MVP at "$29 one-time only" and deferred the $99/mo
@@ -175,9 +175,19 @@ rather than editing it in place.
   surface: `migrations/001_initial_schema.sql:27` (`report_type` column),
   `migrations/008_agent_subscription.sql`, `src/app/api/subscription/*`,
   `README.md:24`.
-- **Resolution:** Pending Cameron. Options: (a) flip `singleLookup` to $29 and
-  remove the other three SKUs for MVP, (b) keep them dormant behind a feature
-  flag, or (c) revise D8. No code change until resolved.
+- **Resolution:** $29 one-time confirmed as MVP price. The $9.99 figure was
+  legacy lookup-product pricing carried forward from a pre-MVP iteration —
+  not a discount on the diligence report. PR1.6 already removed
+  `attorneyReport` and `agentPlan` (option-a partial). This entry now closes
+  the remaining `singleLookup` thread: `config.pricing.singleLookup`
+  flipped from `999` to `2900` cents in a chore: PR; the four hardcoded
+  `$9.99` UI strings (`page.tsx` ×2, `results/[id]/page.tsx` ×1, `README.md`
+  ×1) updated to `$29` to match. `buyerPlan: 2900` stays as a placeholder
+  for the v1.1 subscription that D8 deferred — it isn't wired to any code
+  path today, but isn't actively misleading either; revisit when v1.1 lands.
+  Stripe Checkout will display `$29.00` on the next test-mode payment;
+  existing `reports.stripe_payment_intent_id` rows are unaffected (already
+  settled). No production data affected.
 
 ### D20. Attorney-grade report SKU undocumented
 - **Conflict:** `report_type: 'standard' | 'attorney'` runs through the schema

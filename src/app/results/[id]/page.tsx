@@ -1263,7 +1263,7 @@ export default function ResultsPage() {
                       Redirecting to payment...
                     </span>
                   ) : (
-                    "Unlock for $9.99"
+                    "Unlock for $29"
                   )}
                 </button>
                 <p className="mt-2 text-xs text-gray-500">

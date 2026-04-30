@@ -21,7 +21,7 @@ PermitCheck solves this by pulling permit records directly from government Accel
 - **Address autocomplete** — Google Maps–powered address input with structured address parsing
 - **Accela portal scraping** — automated data extraction from government permit portals via Cheerio + Puppeteer (interim solution pending Accela API approval)
 - **24-hour result caching** — repeat lookups for the same address return cached results
-- **Stripe payment gate** — $9.99 per report; permits are locked behind payment
+- **Stripe payment gate** — $29 per report; permits are locked behind payment
 - **PDF report generation** — server-side PDF rendering via `@react-pdf/renderer`
 - **AI-powered permit summaries** — risk-level classification (low/medium/high) with verdict, flags, and seller questions
 - **Property data enrichment** — street view imagery and property context via Google Maps
