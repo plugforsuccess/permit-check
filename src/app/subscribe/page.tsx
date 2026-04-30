@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { hasAgentAccess } from "@/lib/subscription";
 import Logo from "@/components/Logo";
+import EmailConfirmationPending from "@/components/EmailConfirmationPending";
 
 export default function SubscribePage() {
   // Auth state
@@ -14,6 +15,8 @@ export default function SubscribePage() {
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   // Profile state
   const [investorName, setInvestorName] = useState("");
@@ -65,12 +68,24 @@ export default function SubscribePage() {
       const supabase = getSupabaseClient();
 
       if (authMode === "register") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/subscribe`,
+          },
+        });
         if (error) {
           setAuthError(error.message);
           setAuthBusy(false);
           return;
         }
+        // Require email confirmation before sign-in. The user lands back on
+        // /subscribe via emailRedirectTo with an active session, ready to pay.
+        setRegisteredEmail(email);
+        setAwaitingConfirmation(true);
+        setAuthBusy(false);
+        return;
       }
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -79,7 +94,16 @@ export default function SubscribePage() {
       });
 
       if (error) {
-        setAuthError(error.message);
+        const msg = error.message.toLowerCase();
+        if (msg.includes("email not confirmed")) {
+          setAuthError(
+            "Please confirm your email before signing in. Check your inbox for a confirmation link."
+          );
+        } else if (msg.includes("invalid login")) {
+          setAuthError("Incorrect email or password. Please try again.");
+        } else {
+          setAuthError(error.message);
+        }
         setAuthBusy(false);
         return;
       }
@@ -167,6 +191,25 @@ export default function SubscribePage() {
           </a>
         </div>
       </div>
+    );
+  }
+
+  // Email confirmation pending state
+  if (!isAuthenticated && awaitingConfirmation) {
+    return (
+      <EmailConfirmationPending
+        email={registeredEmail}
+        onSignIn={() => {
+          setAwaitingConfirmation(false);
+          setAuthMode("login");
+          setPassword("");
+        }}
+        onTryAgain={() => {
+          setAwaitingConfirmation(false);
+          setAuthMode("register");
+          setEmail(registeredEmail);
+        }}
+      />
     );
   }
 
