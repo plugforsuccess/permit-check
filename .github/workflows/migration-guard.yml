@@ -1,0 +1,35 @@
+name: Migration guard
+
+# Blocks PRs that touch /supabase/migrations/ from merging without an
+# explicit `migration-approved` label. See /docs/MIGRATION_GUARDRAIL.md
+# and DECISIONS.md D25 for the policy this enforces.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+    paths:
+      - "supabase/migrations/**"
+
+jobs:
+  require-approval-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require migration-approved label on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            if (!labels.includes('migration-approved')) {
+              core.setFailed(
+                "This PR modifies /supabase/migrations/ but is missing the " +
+                "'migration-approved' label.\n\n" +
+                "Per DECISIONS.md D25, every prod-bound migration requires " +
+                "explicit Cameron approval. The label is added by Cameron " +
+                "after staging verification (or after Cameron decides to " +
+                "skip staging for a known-idempotent migration).\n\n" +
+                "If staging verification has not yet happened for this " +
+                "project's reconciliation, see /docs/MIGRATION_GUARDRAIL.md."
+              );
+            } else {
+              core.info("migration-approved label present — guardrail passed.");
+            }

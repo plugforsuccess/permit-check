@@ -1,6 +1,6 @@
 # MIGRATION_LEDGER_AUDIT.md — supabase_migrations.schema_migrations drift
 
-**Status:** PR2.6 deliverable. Audit only — no execution. Cameron approves backfill plan before any row is inserted, any migration is replayed, or any `supabase db push` runs against prod. **This audit blocks PR4.**
+**Status:** PR2.6 deliverable (audit). Backfill executed in PR2.7 on 2026-04-30 via Option A applied directly to prod with Cameron approval (idempotent migration; staging-first step skipped). Post-execution: `supabase_migrations.schema_migrations` contains rows `001`–`016` contiguous; both anomaly UNIQUEs are now captured authoritatively by `016_ledger_backfill.sql`. PR4 is **no longer blocked** by ledger drift; it is still subject to the `migration-approved` label gate documented in `/docs/MIGRATION_GUARDRAIL.md`.
 
 **TL;DR:** The Supabase project `unjwbyybzfyhiavorcro` has the *schema* of all 15 local migrations applied, but the *ledger* (`supabase_migrations.schema_migrations`) records only `001/002/003`. Twelve migrations were applied to prod through a non-CLI path (SQL Editor, dashboard, or direct `psql`) and the ledger never learned about them. Any future `supabase db push` or `supabase migration up` against prod will attempt to replay `004`–`015` against a database that already has the changes, with mixed (and partially destructive) results. Until reconciled, the CLI is unsafe to point at prod.
 
