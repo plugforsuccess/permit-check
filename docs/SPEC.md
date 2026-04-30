@@ -617,8 +617,8 @@ CREATE POLICY "Users read own reports" ON reports
 
 ### Week 1 — Foundations
 
-- **PR1**: Docs reconciliation — `/CLAUDE.md`, `/docs/CLAUDE-deep.md`, `/docs/SPEC.md`, `/docs/DECISIONS.md`
-- **PR1.5**: Push `CLAUDE-deep.md` if not already in repo
+- **PR1**: Docs reconciliation — `/CLAUDE.md`, `/docs/SPEC.md`, `/docs/DECISIONS.md` (single combined `CLAUDE.md`, no split deep file)
+- **PR1.5**: Collapse the previously-split agent operating manual into a single combined `CLAUDE.md` (Part I / Part II structure)
 - **PR1.6**: Delete unused pricing SKUs (`attorney_report`, `agent_plan`), `src/app/api/subscription/*`, drop unused columns via new migration
 - **PR2.5**: RLS audit — read `010_fix_rls_policies.sql`, document effective policies on every user-data table, propose `017_rls_hardening.sql` if any `FOR ALL USING (true)` survives for non-service roles
 - **PR2**: Zod-validated env + import discipline + PII redaction in logger + Axiom transport
