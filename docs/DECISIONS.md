@@ -104,6 +104,32 @@ rather than editing it in place.
   unconditional). The pattern is **expedited, not standard** — once a
   staging project exists, all schema migrations route through it before
   prod, no exceptions.
+
+- **Pre-customer phase clarification (added 2026-04-30 with PR4):**
+  PermitCheck has zero paying customers as of PR4. The production database
+  is functionally staging — no live customer data exists, no revenue is
+  at risk from a bad migration, and the cost of provisioning a second
+  Supabase project exceeds the bounded risk of a recoverable migration
+  error during this phase. The expedited path (CI `migration-approved`
+  label + idempotent migration + pre-flight `pg_depend` audit + post-apply
+  verification) **remains the migration workflow until first paying
+  customer.** This is not drift from D26's original framing — it is the
+  deliberate sequencing for the pre-customer window.
+
+  **Trigger to retire:** when the first $29 transaction settles in
+  production from a non-Cameron Stripe account, the expedited path is
+  permanently closed. The next migration after that event routes through
+  a staging environment (provisioned at that point). No exceptions, no
+  "one more expedited" — first paying customer is the hard cutoff.
+
+  **Operational implications:**
+  - Anyone reviewing this build six months from now sees the expedited
+    path as a deliberate choice, not drift.
+  - The retirement trigger is observable (Stripe dashboard) and unambiguous.
+  - **PR5 (Stripe webhook handoff) acceptance now includes:** "first
+    non-Cameron $29 transaction triggers staging provisioning before any
+    subsequent migration."
+
 - **Scope reduction:** Item 5 of the originally-planned PR2.8 (service-role
   INSERT policy on `public.profiles`) was **stripped from 017** and
   deferred to PR4. Reason: project rule that policies live in the same
