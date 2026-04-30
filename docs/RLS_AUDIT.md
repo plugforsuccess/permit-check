@@ -1,6 +1,6 @@
 # RLS_AUDIT.md — PermitCheck Row-Level Security audit
 
-**Status:** PR2.5 deliverable. Audit only — no migration code written. Cameron approves scope before `017_rls_hardening.sql` is drafted.
+**Status:** PR2.5 deliverable. Audit complete; `017_rls_hardening.sql` drafted in PR2.8 with all five items from §H scoped per Cameron's approval (F2 option (a) via grep verification). File is committed to the branch but not yet applied to prod — awaiting Cameron's explicit go-ahead and the `migration-approved` label.
 
 **Scope:** Every table in `public` that holds user data or feeds user-visible queries. The new schema prescribed in `SPEC.md` §11 (`profiles`, `properties`, `permits` v2, `reports` v2, `report_events`) does **not** exist on prod yet — PR4 lands it. This audit covers the *current* legacy schema only.
 
