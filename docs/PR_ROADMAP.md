@@ -197,16 +197,19 @@ Last updated: April 2026.
 
 **Scope:** Modify `src/app/api/webhooks/stripe/route.ts` so successful `checkout.session.completed` writes a `reports_v2` row in `pending`, emits an Inngest event, returns 200. Gated behind `USE_INNGEST_REPORTS` env flag. Don't delete legacy inline path — feature-flag the new path.
 
-**Operational rule:** Flip `USE_INNGEST_REPORTS=true` in staging same day PR5 lands. Flip in prod within 48 hours. The dual-path does not live indefinitely.
+**Operational rule (amended per D33):** PR5 ships the plumbing with `USE_INNGEST_REPORTS=false` as the default. The flag flips to `true` in staging the same day **PR6** (deterministic steps) lands, and to prod within 48h of staging verification. This is a deviation from the originally-specified "same-day staging flip after PR5 merge" rule — the agent loop being stubbed in PR3 means flipping the flag in PR5 produces no useful signal, only failed reports. The flip ceremony moves to PR6 where it actually exercises something. See DECISIONS.md D33.
 
 **Why it matters:** Connects "user paid" to "agent runs." Today, payments don't trigger background work — they trigger 20-second inline runs that violate the spec.
 
 **Acceptance:**
-- Paying $29 in staging lands a `reports_v2` row in `pending`
+- Paying $29 in staging with `USE_INNGEST_REPORTS=true` (post-PR6) lands a `reports_v2` row in `pending`
 - Inngest event logged
 - Webhook returns under 1s
 - Legacy path unchanged when flag is off
-- Staging flag flipped same day; prod flag flipped within 48h
+- Anonymous payments (`lookups.user_id IS NULL`) route to legacy path even when flag is on (D34 branch)
+- `intent` field populated on every event via `DEFAULT_REPORT_INTENT="flip"` constant (D35)
+- `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` flipped from `.optional()` to `.string().min(1)` in `env.ts`; both verified set in Vercel before merge
+- D26 pre-customer cutoff: first non-Cameron $29 transaction triggers staging provisioning before any subsequent migration
 
 ---
 
@@ -222,6 +225,7 @@ Last updated: April 2026.
 - Feeding a known Atlanta address through Inngest handler produces a `properties` row with `parcel_id` populated
 - Four `report_events` rows logged: `normalize_started`, `normalize_completed`, `parcel_started`, `parcel_completed`
 - Type-safe end-to-end
+- **Same-day staging flip of `USE_INNGEST_REPORTS=true` after merge; prod flip within 48h.** The flip ceremony that was originally tied to PR5 lands here per D33 — PR6 is where the deterministic steps actually execute, so this is the first PR where flipping the flag produces a useful signal instead of stub-throw failures.
 
 ---
 
